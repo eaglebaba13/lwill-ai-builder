@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Test, Lint, Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Prepare pnpm
+        run: corepack prepare pnpm@11.20.0 --activate
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run tests
+        run: pnpm test
+
+      - name: Run lint
+        run: pnpm lint
+
+      - name: Run production build
+        run: pnpm build
