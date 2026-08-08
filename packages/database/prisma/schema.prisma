@@ -8,15 +8,17 @@ datasource db {
 }
 
 model Tenant {
-  id            String         @id @default(uuid()) @db.Uuid
-  name          String
-  slug          String         @unique
-  isActive      Boolean        @default(true)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  businessUnits BusinessUnit[]
-  auditLogs     AuditLog[]
-  branches      Branch[]
+  id                String             @id @default(uuid()) @db.Uuid
+  name              String
+  slug              String             @unique
+  isActive          Boolean            @default(true)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  businessUnits     BusinessUnit[]
+  auditLogs         AuditLog[]
+  branches          Branch[]
+  tenantMemberships TenantMembership[]
+  roles             Role[]
 
   @@index([isActive])
 }
@@ -30,8 +32,9 @@ model BusinessUnit {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  branches Branch[]
+  tenant                      Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  branches                    Branch[]
+  businessUnitMembershipRoles BusinessUnitMembershipRole[]
 
   @@unique([tenantId, id])
   @@unique([tenantId, slug])
@@ -48,9 +51,11 @@ model Branch {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  businessUnit BusinessUnit @relation(fields: [tenantId, businessUnitId], references: [tenantId, id], onDelete: Restrict)
-  auditLogs    AuditLog[]
+  tenant                Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  businessUnit          BusinessUnit           @relation(fields: [tenantId, businessUnitId], references: [tenantId, id], onDelete: Restrict)
+  auditLogs             AuditLog[]
+  branchMembershipRoles BranchMembershipRole[]
+  membershipRoles       MembershipRole[]
 
   @@unique([tenantId, businessUnitId, id])
   @@unique([tenantId, businessUnitId, slug])
@@ -75,4 +80,132 @@ model AuditLog {
   @@index([tenantId, createdAt])
   @@index([tenantId, entityType, entityId])
   @@index([actorUserId, createdAt])
+}
+
+model User {
+  id             String   @id @default(uuid()) @db.Uuid
+  externalAuthId String?  @unique
+  email          String?  @unique
+  displayName    String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  memberships TenantMembership[]
+}
+
+model TenantMembership {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @db.Uuid
+  userId    String   @db.Uuid
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  roles             MembershipRole[]
+  businessUnitRoles BusinessUnitMembershipRole[]
+  branchRoles       BranchMembershipRole[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, userId])
+  @@index([tenantId, userId, isActive])
+}
+
+model Role {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @db.Uuid
+  code        String
+  name        String
+  description String?
+  isSystem    Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant                  Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  permissions             RolePermission[]
+  memberships             MembershipRole[]
+  businessUnitMemberships BusinessUnitMembershipRole[]
+  branchMemberships       BranchMembershipRole[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, code])
+  @@index([tenantId, isActive])
+}
+
+model Permission {
+  id          String   @id @default(uuid()) @db.Uuid
+  code        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+
+  roles RolePermission[]
+}
+
+model RolePermission {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @db.Uuid
+  roleId       String   @db.Uuid
+  permissionId String   @db.Uuid
+  createdAt    DateTime @default(now())
+
+  role       Role       @relation(fields: [tenantId, roleId], references: [tenantId, id], onDelete: Restrict)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, roleId, permissionId])
+  @@index([tenantId, roleId])
+}
+
+model MembershipRole {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @db.Uuid
+  membershipId String   @db.Uuid
+  roleId       String   @db.Uuid
+  createdAt    DateTime @default(now())
+
+  membership TenantMembership @relation(fields: [tenantId, membershipId], references: [tenantId, id], onDelete: Restrict)
+  role       Role             @relation(fields: [tenantId, roleId], references: [tenantId, id], onDelete: Restrict)
+  branch     Branch?          @relation(fields: [branchId], references: [id])
+  branchId   String?          @db.Uuid
+
+  @@unique([tenantId, membershipId, roleId])
+  @@index([tenantId, membershipId])
+}
+
+model BusinessUnitMembershipRole {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @db.Uuid
+  membershipId   String   @db.Uuid
+  roleId         String   @db.Uuid
+  businessUnitId String   @db.Uuid
+  createdAt      DateTime @default(now())
+
+  membership   TenantMembership @relation(fields: [tenantId, membershipId], references: [tenantId, id], onDelete: Restrict)
+  role         Role             @relation(fields: [tenantId, roleId], references: [tenantId, id], onDelete: Restrict)
+  businessUnit BusinessUnit     @relation(fields: [tenantId, businessUnitId], references: [tenantId, id], onDelete: Restrict)
+
+  @@unique([tenantId, membershipId, roleId, businessUnitId])
+  @@index([tenantId, membershipId])
+  @@index([tenantId, businessUnitId])
+}
+
+model BranchMembershipRole {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @db.Uuid
+  membershipId   String   @db.Uuid
+  roleId         String   @db.Uuid
+  businessUnitId String   @db.Uuid
+  branchId       String   @db.Uuid
+  createdAt      DateTime @default(now())
+
+  membership TenantMembership @relation(fields: [tenantId, membershipId], references: [tenantId, id], onDelete: Restrict)
+  role       Role             @relation(fields: [tenantId, roleId], references: [tenantId, id], onDelete: Restrict)
+  branch     Branch           @relation(fields: [tenantId, businessUnitId, branchId], references: [tenantId, businessUnitId, id], onDelete: Restrict)
+
+  @@unique([tenantId, membershipId, roleId, businessUnitId, branchId])
+  @@index([tenantId, membershipId])
+  @@index([tenantId, businessUnitId, branchId])
 }
