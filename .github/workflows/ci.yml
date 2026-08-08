@@ -44,6 +44,9 @@ jobs:
         env:
           DATABASE_URL: postgresql://ci:ci@localhost:5432/lwill_ci
 
+      - name: Typecheck authorization package
+        run: pnpm --filter @lwill/authorization run typecheck
+
       - name: Run tests
         run: pnpm test
 
