@@ -128,3 +128,20 @@
 - Database migration status: Not created yet.
 - Production database connection status: Not configured or verified.
 - Next development target: Phase 1 RBAC, permissions, identity mapping, and scoped authorization model.
+
+## Phase 1 Authorization Foundation Verification
+
+- Authorization package added at packages/authorization.
+- Provider-neutral authorization contracts implemented.
+- Deterministic permission resolution implemented for tenant, business-unit, and branch scopes.
+- Tenant-level grants inherit downward to business-unit and branch scopes.
+- Business-unit grants inherit only within the same business unit.
+- Branch grants are exact-scope only.
+- Cross-tenant authorization is denied.
+- Permission-code mismatches are denied.
+- Authorization unit tests: 7 passed.
+- Authorization strict TypeScript typecheck: Passed.
+- Repository tests, lint, production build, and TypeScript compilation: Passed.
+- GitHub Actions CI verified successful for commit 8124bbd7f0174375def662dbc2a59f6e9a2cf9c3.
+- Previous CI failure on ecb884bb2c87ddf7bec05bd644b090f2d9b87cfc was resolved by removing UTF-8 BOMs from authorization package files.
+- Next development target: Prisma-backed permission grant loader and authorization data adapter.
