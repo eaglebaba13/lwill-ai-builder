@@ -1,4 +1,4 @@
-﻿# Project Status & Baseline Tracking
+# Project Status & Baseline Tracking
 
 ## General Project Overview
 
@@ -100,3 +100,14 @@
 - Next development target: Phase 1 — Authentication, Multi-Tenancy, RBAC, database persistence, and audit foundation.
 - Verified implementation commit: `5b649a3`.
 
+
+## GitHub CI Verification
+
+- GitHub Actions CI workflow implemented.
+- Workflow file: .github/workflows/ci.yml.
+- Verification stages: dependency install, Vitest tests, ESLint, production build and TypeScript compilation.
+- Verified commit: 143e661316b1202009c62ef31b15427a21548881.
+- Remote GitHub Actions status: completed.
+- Remote GitHub Actions conclusion: success.
+- Phase 0 repository governance, automated testing baseline, and continuous integration baseline are operational.
+- Next development target: Phase 1 - Database Foundation, Authentication, Multi-Tenancy, RBAC, and Audit Engine.
