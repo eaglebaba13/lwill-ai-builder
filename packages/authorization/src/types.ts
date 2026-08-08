@@ -1,4 +1,4 @@
-﻿export type AuthorizationScope =
+export type AuthorizationScope =
   | { readonly kind: "tenant"; readonly tenantId: string }
   | {
       readonly kind: "business-unit";

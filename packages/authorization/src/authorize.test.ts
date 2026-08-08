@@ -1,4 +1,4 @@
-﻿import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { authorize } from "./authorize";
 import type { PermissionGrant } from "./types";
 
