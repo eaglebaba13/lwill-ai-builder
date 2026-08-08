@@ -47,6 +47,12 @@ jobs:
       - name: Typecheck authorization package
         run: pnpm --filter @lwill/authorization run typecheck
 
+      - name: Typecheck authorization Prisma adapter
+        run: pnpm --filter @lwill/authorization-prisma run typecheck
+
+      - name: Typecheck database client boundary
+        run: pnpm --filter @lwill/database exec tsc --noEmit --module ESNext --moduleResolution Bundler --target ES2022 src/client.ts
+
       - name: Run tests
         run: pnpm test
 
