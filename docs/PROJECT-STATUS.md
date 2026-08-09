@@ -367,3 +367,88 @@ git status --short --branch                                   — main...origin/
 ### Next Phase
 
 Phase 1D: Implement a concrete `VerifiedSessionSource` for a chosen, explicitly-approved authentication vendor, and exercise `createPrismaTenantHierarchyVerifier()` against a verified local (non-production) PostgreSQL instance. Do not proceed into ERP/business modules.
+
+---
+
+## Multi-Tenant Repository Isolation & Client Portability
+
+### Mandatory Architectural Rules
+
+1. LWILL AI Builder is the central multi-tenant platform repository.
+   - Repository: `lwill-ai-builder`
+
+2. Every tenant/client must have its own independent GitHub repository.
+   - Current tenant: EagleBABA → `eagle13-d609ce96`
+   - Future tenant: X Nail → separate dedicated GitHub repository
+
+3. Tenant-specific business logic, UI, configuration, assets, and application code must never be mixed between tenants.
+
+4. The LWILL platform repository contains only reusable platform infrastructure:
+   - Authentication
+   - Authentication context
+   - Tenant context
+   - Authorization
+   - Tenant isolation
+   - Database abstractions
+   - Shared SaaS infrastructure
+   - Reusable platform components
+   - Common security and governance contracts
+
+5. Tenant repositories contain only tenant-specific application functionality.
+
+6. Every tenant must be independently portable and capable of client handover.
+
+7. Client handover must be designed to include:
+   - Tenant Git repository
+   - Tenant database backup/export
+   - Tenant-specific configuration
+   - Tenant documentation
+   - Deployment configuration where applicable
+   - Required migration history
+
+8. Tenant data must remain isolated. Never depend on another tenant's:
+   - Source code
+   - Database
+   - Secrets
+   - Configuration
+   - Tenant-specific services
+
+9. EagleBABA and X Nail must remain separate tenants even though both use LWILL AI Builder as their platform foundation.
+
+10. Never place X Nail-specific implementation into `lwill-ai-builder`. Never place EagleBABA-specific implementation into the X Nail repository.
+
+11. Database architecture must support tenant isolation and future client portability from the beginning.
+
+12. Before implementing production tenant databases, verify:
+    - Tenant → BusinessUnit → Branch hierarchy
+    - Cross-tenant isolation
+    - Authorization isolation
+    - Tenant-specific backup/restore
+    - Tenant repository independence
+
+13. Existing EagleBABA production infrastructure must not be modified while establishing LWILL tenant infrastructure.
+
+14. Do not change existing Astro/EagleBABA production systems as part of LWILL platform development.
+
+### Architectural Diagram
+
+```
+LWILL AI BUILDER PLATFORM
+│
+├── EagleBABA Tenant
+│   ├── Independent GitHub Repository
+│   ├── Tenant Database/Data
+│   └── Tenant-specific Application
+│
+├── X Nail Tenant
+│   ├── Independent GitHub Repository
+│   ├── Tenant Database/Data
+│   └── Tenant-specific Application
+│
+└── Future Tenants
+    └── Independent Repository + Data
+```
+
+### Client Exit / Portability Requirement
+
+No tenant may be architecturally locked into LWILL. A tenant must be exportable and handover-ready without exposing or transferring another tenant's data or source code.
