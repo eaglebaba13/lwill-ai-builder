@@ -5,8 +5,8 @@
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
 - **Current Branch**: `main`
-- **Current HEAD Commit**: `695cbc5`
-- **Last Stable Commit**: `695cbc5`
+- **Current HEAD Commit**: `dea96b3`
+- **Last Stable Commit**: `dea96b3`
 
 ## State Breakdown
 
@@ -159,3 +159,103 @@
 - Database migration application: Not performed; the baseline was created and validated locally only.
 - Authorization behavior, authentication, middleware, landing page, and ERP functionality were not modified or implemented.
 - Next development target: Apply the migration only after a separately authorized PostgreSQL environment is available and verified.
+
+---
+
+## Phase 1B Authentication + Tenant Context Foundation
+
+### Status: **Complete — All verifications passed**
+
+### Implemented Files
+
+**New package: `packages/authentication-context/`**
+
+| File | Purpose |
+|------|---------|
+| `package.json` | Package manifest (`@lwill/authentication-context`) |
+| `tsconfig.json` | Strict TypeScript config (`exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`) |
+| `src/types.ts` | Core contracts: `AuthenticatedUser`, `TenantContext`, `AuthenticationSession`, `UnauthenticatedSession`, `AuthenticationContext`, `AuthenticationProvider` |
+| `src/unauthenticated.ts` | `UNAUTHENTICATED` constant |
+| `src/tenant-context-validator.ts` | `TenantHierarchyVerifier` interface + `validateTenantContext()` function |
+| `src/index.ts` | Barrel re-exports |
+| `src/auth-context.test.ts` | 6 deterministic type-contract tests |
+| `src/tenant-context-validator.test.ts` | 7 deterministic hierarchy-validation tests |
+
+**New files in `apps/web/`**
+
+| File | Purpose |
+|------|---------|
+| `src/lib/auth/server-context.ts` | Server-only boundary; resolves `AuthenticationContext`; fails closed; no secrets exposed to client |
+| `src/lib/auth/authorization-boundary.ts` | Server-only integration bridge connecting `AuthenticationContext` → `@lwill/authorization-service` |
+| `src/test/server-context.test.ts` | 4 deterministic server-context tests |
+| `src/test/authorization-boundary.test.ts` | 7 deterministic authorization-boundary tests |
+| `src/test/__mocks__/server-only.ts` | Vitest stub for the `server-only` package |
+
+**Modified files**
+
+| File | Change |
+|------|--------|
+| `apps/web/package.json` | Added `server-only`, `@lwill/authentication-context` (deps); `@lwill/authorization`, `@lwill/authorization-service` (devDeps) |
+| `apps/web/vitest.config.mts` | Added `resolve.alias` to stub `server-only` in Vitest |
+| `apps/web/next.config.ts` | Added `transpilePackages: ["@lwill/authentication-context"]` |
+| `pnpm-lock.yaml` | Updated for new `server-only` dependency |
+| `docs/PROJECT-STATUS.md` | Updated HEAD commit and added this section |
+
+### Authentication Provider Status
+
+**No real authentication provider has been connected yet.**
+
+The `AuthenticationProvider` interface in `packages/authentication-context/src/types.ts` defines the contract. The `setAuthenticationProvider()` function in `apps/web/src/lib/auth/server-context.ts` registers the provider at startup. No JWT, OAuth, session cookie, or password-based provider has been implemented or integrated. The system always returns `UnauthenticatedSession` until a provider is registered.
+
+### Tenant Context Status
+
+A deterministic, provider-neutral `validateTenantContext()` function enforces the full `Tenant → BusinessUnit → Branch` hierarchy through an injected `TenantHierarchyVerifier` interface. The concrete verifier (database-backed via Prisma) has not been implemented yet — a live PostgreSQL instance is required for that step.
+
+### Authorization Integration Status
+
+`apps/web/src/lib/auth/authorization-boundary.ts` connects `AuthenticationContext` to `@lwill/authorization-service`. `userId` and `tenantId` are drawn exclusively from the validated session — never from client-supplied input. The boundary fails closed on any error, missing context, or unauthenticated state.
+
+### Tests Added
+
+| Package / Location | Test File | Count |
+|-------------------|-----------|-------|
+| `@lwill/authentication-context` | `src/auth-context.test.ts` | 6 |
+| `@lwill/authentication-context` | `src/tenant-context-validator.test.ts` | 7 |
+| `apps/web` | `src/test/server-context.test.ts` | 4 |
+| `apps/web` | `src/test/authorization-boundary.test.ts` | 7 |
+| **Total new tests** | | **24** |
+
+**Test coverage by requirement:**
+
+- ✅ Unauthenticated context
+- ✅ Authenticated user context
+- ✅ Missing tenant context
+- ✅ Valid tenant context
+- ✅ Invalid tenant/business-unit relationship
+- ✅ Invalid business-unit/branch relationship
+- ✅ Cross-tenant context rejection
+- ✅ Expired session rejection
+- ✅ Fail-closed authorization integration
+- ✅ No client-controlled tenant escalation
+
+### Verification Results
+
+```
+pnpm test  — 45 tests, 8 test files, 0 failures
+pnpm lint  — Passed
+pnpm build — Passed (TypeScript compilation + Next.js production build)
+tsc --noEmit (packages/authentication-context) — Passed (0 errors)
+git diff --check — No trailing whitespace errors
+```
+
+### Known Limitations
+
+- No real authentication provider is connected. Production authentication (JWT, OAuth, session cookie) must be implemented in a future phase.
+- `TenantHierarchyVerifier` has no concrete database-backed implementation. A Prisma-based verifier must be created once a live PostgreSQL instance is available.
+- `server-only` enforcement is active in the Next.js production build; test execution relies on a Vitest stub.
+
+**No production database has been connected or migrated.**
+
+### Next Phase
+
+Phase 1C: Implement a Prisma-backed `TenantHierarchyVerifier` and register a concrete `AuthenticationProvider` (e.g., JWT/session cookie reading from HTTP headers, validated server-side). Do not connect to production database without a separate verified PostgreSQL environment.

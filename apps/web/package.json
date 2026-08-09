@@ -10,11 +10,15 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@lwill/authentication-context": "workspace:*",
     "next": "16.3.0",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
+    "@lwill/authorization": "workspace:*",
+    "@lwill/authorization-service": "workspace:*",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^7.0.0",
     "@testing-library/react": "^16.3.2",
