@@ -145,3 +145,17 @@
 - GitHub Actions CI verified successful for commit 8124bbd7f0174375def662dbc2a59f6e9a2cf9c3.
 - Previous CI failure on ecb884bb2c87ddf7bec05bd644b090f2d9b87cfc was resolved by removing UTF-8 BOMs from authorization package files.
 - Next development target: Prisma-backed permission grant loader and authorization data adapter.
+
+## Phase 1A Prisma Migration Baseline Verification
+
+- Initial Prisma migration baseline generated from the existing schema only.
+- Migration directory: `packages/database/prisma/migrations/0_init`.
+- Migration lock file: `packages/database/prisma/migrations/migration_lock.toml`.
+- Migration baseline preserves the Tenant -> BusinessUnit -> Branch hierarchy and existing membership, role, permission, role-assignment, and audit-log contracts.
+- Prisma schema validation: Passed.
+- Prisma Client generation: Passed.
+- Migration baseline consistency verification: Passed locally against the current Prisma schema.
+- PostgreSQL connection: Not performed; no live production database was connected.
+- Database migration application: Not performed; the baseline was created and validated locally only.
+- Authorization behavior, authentication, middleware, landing page, and ERP functionality were not modified or implemented.
+- Next development target: Apply the migration only after a separately authorized PostgreSQL environment is available and verified.
