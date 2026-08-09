@@ -259,3 +259,111 @@ git diff --check — No trailing whitespace errors
 ### Next Phase
 
 Phase 1C: Implement a Prisma-backed `TenantHierarchyVerifier` and register a concrete `AuthenticationProvider` (e.g., JWT/session cookie reading from HTTP headers, validated server-side). Do not connect to production database without a separate verified PostgreSQL environment.
+
+---
+
+## Phase 1C Prisma-Backed Tenant Hierarchy Verifier + Concrete Authentication Provider
+
+### Status: **Complete — All verifications passed**
+
+### Implemented Files
+
+**New package: `packages/authentication-context-prisma/`**
+
+| File | Purpose |
+|------|---------|
+| `package.json` | Package manifest (`@lwill/authentication-context-prisma`) |
+| `tsconfig.json` | Strict TypeScript config, matching `@lwill/authentication-context` |
+| `src/tenant-hierarchy-rules.ts` | Pure, dependency-free decision rules: `evaluateBusinessUnitInTenant()`, `evaluateBranchInBusinessUnit()` |
+| `src/tenant-hierarchy-rules.test.ts` | 12 deterministic tests covering every rule branch (active/inactive/missing/cross-tenant) |
+| `src/tenant-hierarchy-verifier.ts` | Thin Prisma I/O wrapper implementing `TenantHierarchyVerifier` from `@lwill/authentication-context`; delegates all accept/reject decisions to the pure rules; fails closed on any database error |
+| `src/tenant-hierarchy-integration.test.ts` | 3 deterministic tests proving `validateTenantContext()` (Phase 1B) wires correctly to the Prisma-shaped rules via an in-memory fixture verifier |
+| `src/index.ts` | Barrel re-exports |
+
+**New files in `apps/web/`**
+
+| File | Purpose |
+|------|---------|
+| `src/lib/auth/session-provider.ts` | Concrete, isolated `AuthenticationProvider` adapter (`createSessionAuthenticationProvider`) that maps an already-verified `VerifiedSessionRecord` (supplied by a future vendor-specific `VerifiedSessionSource`) into `AuthenticationContext`. Performs no cryptography, password handling, or token generation itself; fails closed on null/expired/throwing sources. |
+| `src/test/session-provider.test.ts` | 6 deterministic tests: authenticated, unauthenticated, expired, null tenant context, provider throw, malformed source result |
+| `src/test/phase1c-integration.test.ts` | 4 deterministic tests wiring `session-provider.ts` → `server-context.ts` → `authorization-boundary.ts` end-to-end, including fail-closed and no-tenant-escalation cases |
+
+**Modified files**
+
+| File | Change |
+|------|--------|
+| `pnpm-lock.yaml` | Updated to register the new `@lwill/authentication-context-prisma` workspace package |
+
+No existing package (`@lwill/authorization`, `@lwill/authorization-prisma`, `@lwill/authorization-service`, `@lwill/authentication-context`) or existing test was modified. `apps/web/src/lib/auth/server-context.ts` and `apps/web/src/lib/auth/authorization-boundary.ts` were **not modified** — the concrete provider and verifier are connected purely through their existing dependency-injection points (`setAuthenticationProvider()`, and the `AuthorizationService`/`TenantHierarchyVerifier` parameters), preserving the existing authorization API and semantics exactly.
+
+### Authentication Provider Status
+
+**No real authentication provider has been connected yet.**
+
+`createSessionAuthenticationProvider()` is a concrete, isolated adapter boundary. It fulfils the `AuthenticationProvider` contract but requires an injected `VerifiedSessionSource` — a boundary that a future concrete vendor integration (session cookie service, JWT verifier, SSO gateway, etc.) must implement and perform all cryptographic/session verification in. No such vendor source is instantiated or wired into the running application. No OAuth, JWT, or custom cryptography was invented. No password storage exists anywhere in the repository.
+
+### Tenant-Context Status
+
+`createPrismaTenantHierarchyVerifier()` (in `@lwill/authentication-context-prisma`) is a concrete, Prisma-backed implementation of the existing `TenantHierarchyVerifier` contract from Phase 1B. It verifies, using the real Prisma schema:
+- the tenant exists and `isActive`
+- the business unit exists, `isActive`, and belongs to the requested tenant (via the schema's `@@unique([tenantId, id])` composite key)
+- the branch exists, `isActive`, and belongs to the requested business unit and tenant (via `@@unique([tenantId, businessUnitId, id])`)
+- any database error fails closed (returns `false`)
+
+The decision logic itself lives in pure, fully unit-tested functions (`tenant-hierarchy-rules.ts`); the Prisma I/O wrapper only fetches records and delegates to those functions, matching the existing repository convention (`authorization-prisma`'s pure `map-permission-grants.ts` vs. I/O `load-permission-grants.ts`).
+
+### Authorization Integration Status
+
+Unchanged from Phase 1B. `authorization-boundary.ts` still requires an authenticated session with a non-null tenant context, still draws `userId`/`tenantId` exclusively from the session, and still fails closed on any error. Phase 1C adds only end-to-end tests proving the concrete provider and verifier compose correctly with this existing boundary — no behavioral change was made to it.
+
+### Tests Added
+
+| Package / Location | Test File | Count |
+|-------------------|-----------|-------|
+| `@lwill/authentication-context-prisma` | `src/tenant-hierarchy-rules.test.ts` | 12 |
+| `@lwill/authentication-context-prisma` | `src/tenant-hierarchy-integration.test.ts` | 3 |
+| `apps/web` | `src/test/session-provider.test.ts` | 6 |
+| `apps/web` | `src/test/phase1c-integration.test.ts` | 4 |
+| **Total new tests** | | **25** |
+| **Total repository tests (all packages)** | | **70** |
+
+**Test coverage by requirement:**
+
+- ✅ Valid tenant / inactive tenant / missing tenant
+- ✅ Valid business unit / wrong-tenant business unit / inactive business unit
+- ✅ Valid branch / wrong-tenant branch / wrong-business-unit branch / inactive branch
+- ✅ Cross-tenant rejection (end-to-end, via `validateTenantContext`)
+- ✅ Authenticated session / unauthenticated session / expired session
+- ✅ Invalid (malformed) authentication result
+- ✅ Fail-closed provider failure
+- ✅ Authorization uses authenticated `userId`/`tenantId` only (no client-controlled tenant escalation), proven again end-to-end through the concrete provider
+
+### Verification Results
+
+```
+pnpm test                                                    — 70 tests, 12 test files, 0 failures
+pnpm lint                                                     — Passed
+pnpm build                                                    — Passed (TypeScript compilation + Next.js production build)
+pnpm --filter @lwill/authentication-context exec tsc --noEmit — Passed (0 errors)
+pnpm --filter @lwill/authentication-context-prisma exec tsc --noEmit — Passed (0 errors)
+pnpm --filter @lwill/database exec prisma validate            — Passed ("The schema at prisma\schema.prisma is valid")
+pnpm --filter @lwill/database exec prisma generate            — Passed (Prisma Client v6.19.3 generated)
+git diff --check                                               — No errors (CRLF-only line-ending notices)
+git status --short --branch                                   — main...origin/main, clean except new/expected files
+```
+
+`prisma validate` and `prisma generate` required a temporary, local, non-connecting placeholder `DATABASE_URL` (`postgresql://localhost:5432/placeholder_not_connected`) to satisfy Prisma's static schema-loading requirement; this is static analysis only — **no database connection was attempted or established**. The environment variable was unset immediately after use and is not committed anywhere.
+
+### Known Limitations
+
+- No real authentication provider is connected; a `VerifiedSessionSource` implementation for a real vendor (session cookie, JWT, SSO) is required in a future phase.
+- `createPrismaTenantHierarchyVerifier()` has not been exercised against a live PostgreSQL instance; its I/O layer is intentionally untested directly (consistent with the existing `load-permission-grants.ts` precedent) and relies on its pure, fully-tested decision rules.
+- The Prisma schema was **not modified**; no migration was created or required for Phase 1C.
+
+**No real authentication provider has been connected yet.**
+
+**No production database has been connected or migrated.**
+
+### Next Phase
+
+Phase 1D: Implement a concrete `VerifiedSessionSource` for a chosen, explicitly-approved authentication vendor, and exercise `createPrismaTenantHierarchyVerifier()` against a verified local (non-production) PostgreSQL instance. Do not proceed into ERP/business modules.
