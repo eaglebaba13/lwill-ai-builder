@@ -472,3 +472,5 @@ No tenant may be architecturally locked into LWILL. A tenant must be exportable 
 8. **Migration verification requirements**: Rule 12 criteria above (Tenant -> BusinessUnit -> Branch hierarchy, cross-tenant isolation, authorization isolation, tenant-specific backup/restore, tenant repository independence), plus `pnpm test`, `pnpm lint`, and `pnpm build` passing in both repositories post-migration.
 9. **Production deployment/cutover sequence**: NOT SPECIFIED. No Coolify configuration or documented cutover runbook exists in this repository.
 10. **Rollback strategy**: NOT SPECIFIED.
+11. **Sequencing**: Creating the X Nail tenant GitHub repository and migrating the tenant code out of `lwill-ai-builder` are separate, sequential future steps. Creating the repository does not itself constitute migration; migration must not be executed until the tenant repository name (item 2) is decided.
+12. **`builder.lwill.in` cutover dependency**: Remains NOT SPECIFIED. Cutover is contingent on both (a) completion of the code migration (item 3) and (b) a decision on interim/actual LWILL AI Builder platform homepage content (item 6) — neither has occurred.
