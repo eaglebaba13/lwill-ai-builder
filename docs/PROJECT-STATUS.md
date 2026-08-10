@@ -62,6 +62,11 @@
 - Database, migrations, authentication, and authorization are not implemented.
 - Production deployment is not configured.
 - Dyad preview currently has a root Turborepo `--port` forwarding incompatibility; this does not affect verified `pnpm lint` or `pnpm build`.
+- `builder.lwill.in` currently serves the HDK Beauty / X Nail tenant preview page (`apps/web/src/app/page.tsx`), not a LWILL AI Builder platform homepage. No actual LWILL AI Builder platform UI exists anywhere in this repository yet.
+- `DEVELOPMENT-GUIDELINES.md` references a "Master Platform Blueprint" and "SRS documents" that do not exist anywhere in this repository. NOT SPECIFIED / unresolved.
+- The X Nail tenant repository name is NOT SPECIFIED (unlike EagleBABA, which has an explicit repository name, `eagle13-d609ce96`).
+- Coolify configuration, a Dockerfile `HEALTHCHECK`, and a documented domain cutover procedure for `builder.lwill.in` are NOT SPECIFIED anywhere in this repository.
+- The phase sequence in `docs/ROADMAP.md` does not map one-to-one onto a Foundation -> Authentication/Multi-Tenancy -> Shared Modules -> X Nail MVP -> Marketplace -> AI Builder -> Industry Clouds ordering; reconciliation is NOT SPECIFIED.
 
 ## Do-Not-Modify Areas
 
@@ -452,3 +457,18 @@ LWILL AI BUILDER PLATFORM
 ### Client Exit / Portability Requirement
 
 No tenant may be architecturally locked into LWILL. A tenant must be exportable and handover-ready without exposing or transferring another tenant's data or source code.
+
+### HDK/X Nail Migration Plan (Not Yet Executed)
+
+**Status: Decided in principle (ADR 010, `docs/DECISIONS.md`) — migration execution has not started.** This subsection records the plan only; no file listed here has been moved, deleted, or created as part of this plan.
+
+1. **Purpose of the tenant repository**: Hold HDK Beauty / X Nail tenant-specific implementation (UI, business logic, configuration, assets), separate from the `lwill-ai-builder` platform repository, per the Multi-Tenant Repository Isolation rules above.
+2. **Target repository name**: NOT SPECIFIED (unlike EagleBABA's `eagle13-d609ce96`, no name has been assigned for X Nail).
+3. **Files to migrate out of `lwill-ai-builder`**: `apps/web/src/app/page.tsx` (full HDK Beauty / X Nail tenant page) and the HDK Beauty / X Nail metadata in `apps/web/src/app/layout.tsx` (`title`/`description`).
+4. **Files/packages that remain in `lwill-ai-builder`**: `packages/authentication-context`, `packages/authentication-context-prisma`, `packages/authorization`, `packages/authorization-prisma`, `packages/authorization-service`, `packages/database`, `apps/web/src/lib/auth/*`, and all governance docs — none of these contain tenant-specific content.
+5. **Disposition of the current page**: To be relocated (not deleted) into the tenant repository once named, preserving it as tenant work product; exact history-preservation mechanism (e.g., subtree extraction vs. plain copy) is NOT SPECIFIED.
+6. **Interim `builder.lwill.in` content after separation**: NOT SPECIFIED. No document defines placeholder/interim content; an actual LWILL AI Builder platform UI is confirmed Not Implemented (see "Not Implemented State" above).
+7. **Platform vs. tenant UI boundary**: Per Rules 3-5 above — `lwill-ai-builder` carries no tenant-branded UI or tenant business logic; all tenant-specific UI belongs only in the tenant repository.
+8. **Migration verification requirements**: Rule 12 criteria above (Tenant -> BusinessUnit -> Branch hierarchy, cross-tenant isolation, authorization isolation, tenant-specific backup/restore, tenant repository independence), plus `pnpm test`, `pnpm lint`, and `pnpm build` passing in both repositories post-migration.
+9. **Production deployment/cutover sequence**: NOT SPECIFIED. No Coolify configuration or documented cutover runbook exists in this repository.
+10. **Rollback strategy**: NOT SPECIFIED.

@@ -39,10 +39,11 @@ lwill-ai-builder/
 
 ## 3. Current `apps/web` State
 
-- **Framework**: Next.js 16 (App Router).
-- **Styling**: Tailwind CSS v4 configured via `@tailwindcss/postcss`.
-- **Routes**: Basic landing baseline (`src/app/page.tsx` and `src/app/layout.tsx`).
-- **State**: Verified build and lint clean; no backend ORM or database connections attached.
+- **Framework**: Next.js 16 (App Router). **[VERIFIED]**
+- **Styling**: Tailwind CSS v4 configured via `@tailwindcss/postcss`. **[VERIFIED]**
+- **Routes**: `/` (`src/app/page.tsx` and `src/app/layout.tsx`) currently renders a full HDK Beauty / X Nail tenant preview page (navigation, hero, franchise-dashboard demo panel, module grid, footer), not a platform landing page. **[VERIFIED]** — see "Current Production State" in `docs/PROJECT-STATUS.md` for the production-serving implication and the "HDK/X Nail Migration Plan" subsection for its planned relocation per ADR 010 (`docs/DECISIONS.md`).
+- **State**: Verified build and lint clean; no backend ORM or database connections attached. **[VERIFIED]**
+- **Actual LWILL AI Builder platform UI**: **NOT IMPLEMENTED** — no route, page, or component in this repository renders platform-branded (as opposed to tenant-branded) UI.
 
 ---
 
