@@ -81,3 +81,27 @@ This file records key architectural decisions made for **LWILL AI BUILDER v1**.
 - **Context**: ADR 003 established that HDK Beauty / X Nail operational requirements should validate initial ERP domain models before generalization, but did not specify where the resulting implementation code should physically reside. In practice, tenant-branded implementation (`apps/web/src/app/page.tsx`, and the metadata in `apps/web/src/app/layout.tsx`) was committed directly inside this platform repository. The later "Multi-Tenant Repository Isolation & Client Portability" rules (`docs/PROJECT-STATUS.md`) mandate that every tenant/client must have its own independent repository and that tenant-specific implementation must never enter `lwill-ai-builder`. These two positions conflict on code placement.
 - **Decision**: ADR 003's domain-validation strategy remains valid and is not overturned — HDK Beauty / X Nail requirements may continue to inform platform design. However, tenant-specific implementation code (UI, business logic, configuration, assets) must not be committed into `lwill-ai-builder`; it must reside only in that tenant's own dedicated repository, per the Multi-Tenant Repository Isolation rules in `docs/PROJECT-STATUS.md`.
 - **Consequences**: The HDK Beauty / X Nail content currently present in `apps/web/src/app/page.tsx` and `apps/web/src/app/layout.tsx` is scheduled for migration out of this repository. The migration plan, its execution status, and open items (target tenant repository name, interim `builder.lwill.in` content, verification, deployment cutover, rollback) are tracked in the "HDK/X Nail Migration Plan (Not Yet Executed)" subsection of `docs/PROJECT-STATUS.md` and are NOT SPECIFIED where not yet decided. This ADR does not itself perform, authorize execution timing for, or modify any application code.
+
+---
+
+## ADR 011: Phase 1D Authentication Architecture Decision
+- **Status**: Proposed
+- **Context**: Phase 1D must implement a concrete authentication slice without redesigning the existing authentication context boundary, authorization boundary, tenant hierarchy, or migration baseline. The repository already defines provider-neutral authentication contracts in `packages/authentication-context/src/types.ts` and a server-side session adapter in `apps/web/src/lib/auth/session-provider.ts`; the Prisma schema already models `User`, `TenantMembership`, `AuditLog`, and the tenant/business-unit/branch hierarchy.
+- **Decision**:
+  - **SRS requirement**: Email + Password is the first concrete authentication method for Phase 1D.
+  - **Existing repository decision**: The existing `AuthenticationProvider` and `VerifiedSessionSource` boundaries remain unchanged and provider-neutral. The concrete authentication implementation must still be adapted through `VerifiedSessionSource` into the existing `AuthenticationContext` contract.
+  - **Existing repository decision**: Tenant context continues to derive from authenticated identity plus a valid tenant membership and the existing tenant/business-unit/branch hierarchy; the implementation must not redesign the tenant hierarchy or authorization boundary.
+  - **New proposed implementation decision**: Password credentials require dedicated server-side persistence. Passwords must never be stored in plaintext.
+  - **New proposed implementation decision**: Argon2id is the proposed password hashing algorithm for Phase 1D. This is explicitly marked as an implementation decision because DOC-015 does not specify the algorithm.
+  - **SRS requirement**: JWT access tokens are required by DOC-015.
+  - **NOT SPECIFIED**: JWT signing algorithm, issuer, audience, claims, token TTL, and key-rotation policy are not specified by DOC-015 and must not be invented in this ADR.
+  - **New proposed implementation decision**: Refresh tokens should be server-managed and revocable. The exact refresh-token lifecycle and rotation policy remain NOT SPECIFIED by DOC-015.
+  - **SRS requirement**: Single-session logout and logout-all-devices behavior are required.
+  - **SRS requirement**: Authentication events must be auditable.
+  - **SRS requirement**: Failed-login lockout, rate limiting, session/device tracking, HTTPS-only transport, and signing-key protection are required by DOC-015.
+  - **Out of scope for this implementation slice**: MFA, OAuth, OTP, API-key authentication, and ERP modules are excluded and must not be introduced here.
+  - **Constraint**: Migration `0_init` must not be modified as part of this phase.
+- **Consequences**:
+  - The Phase 1D implementation can proceed through the existing provider-neutral architecture without changing the current authentication-context contracts or tenant hierarchy model.
+  - Password persistence, hashing, JWT policy details, and refresh-token lifecycle details require explicit approval before implementation because DOC-015 does not fully specify them.
+  - No migration or schema change is performed in this ADR; any new persistence model must be introduced later through a separately approved change.
