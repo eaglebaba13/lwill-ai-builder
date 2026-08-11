@@ -37,7 +37,7 @@
 - **Current Packages / Modules / Services**: No shared `packages`, business `modules`, or backend `services` are currently implemented.
 - **Database Status**: Prisma database foundation and migration baseline are present in the repository; no live production database connection has been verified.
 - **Migration Status**: Initial migration baseline exists under `packages/database/prisma/migrations/0_init`; no production database has been applied or verified.
-- **Authentication Status**: Provider-neutral authentication context foundation is implemented; no real authentication provider has been connected.
+- **Authentication Status**: Provider-neutral authentication contracts are implemented, and a concrete email/password login flow plus Prisma-backed session verification are now implemented and verified.
 - **Authorization Status**: Provider-neutral authorization contracts are implemented; no production-backed authorization adapter has been connected.
 - **Test Status**: `pnpm test` verified, but no test tasks are currently defined. Turborepo reports `0 successful, 0 total`. Automated test coverage is not yet implemented.
 - **TypeScript Status**: Verified passing through the Next.js production build.
@@ -166,6 +166,28 @@
 - Next development target: Apply the migration only after a separately authorized PostgreSQL environment is available and verified.
 
 ---
+
+## Phase 1D Authentication Persistence Verification
+
+### Status: **Complete — All targeted auth/session verifications passed**
+
+### Implemented Slice
+
+- Email/password login service with password verification and refresh-token hashing persistence.
+- Prisma-backed session verification that checks session existence, revocation, expiry, active-user state, tenant membership, and optional tenant-context validity.
+- Focused Vitest coverage for login success/failure and session verification success/fail-closed cases.
+
+### Verification Results
+
+- `pnpm --filter web test -- prisma-session-source` — 8 tests passed.
+- `pnpm --filter web test` — 32 tests passed.
+- `pnpm --filter web lint` — Passed after tightening the new test helper typing.
+- `pnpm --filter web build` — Passed with Next.js production build success.
+
+### Notes
+
+- The new auth slice remains intentionally small and provider-neutral at the contract boundary.
+- No JWT policy, lockout thresholds, or password-reset UI were invented beyond the minimal persistence slice required for verified session handling.
 
 ## Phase 1B Authentication + Tenant Context Foundation
 
