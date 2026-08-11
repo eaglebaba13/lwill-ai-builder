@@ -474,3 +474,54 @@ No tenant may be architecturally locked into LWILL. A tenant must be exportable 
 10. **Rollback strategy**: NOT SPECIFIED.
 11. **Sequencing**: Creating the X Nail tenant GitHub repository and migrating the tenant code out of `lwill-ai-builder` are separate, sequential future steps. Creating the repository does not itself constitute migration; migration must not be executed until the tenant repository name (item 2) is decided.
 12. **`builder.lwill.in` cutover dependency**: Remains NOT SPECIFIED. Cutover is contingent on both (a) completion of the code migration (item 3) and (b) a decision on interim/actual LWILL AI Builder platform homepage content (item 6) — neither has occurred.
+---
+
+## Phase 1D Production PostgreSQL Migration Verification
+
+### Status: **Database Foundation Applied and Verified**
+
+The previously generated Prisma baseline migration was applied to the dedicated LWILL PostgreSQL database through the running Coolify application container.
+
+### Verified Infrastructure
+
+- PostgreSQL container: `ab72kxm0tnmfnao38e0tvm6g`
+- PostgreSQL version: `16.14`
+- Database: `lwill`
+- Schema: `public`
+- Application container: `5ffff971377c`
+- Application domain: `builder.lwill.in`
+- Docker network connectivity: verified
+- Application to PostgreSQL TCP connectivity: verified
+
+### Migration Verification
+
+- Migration directory present in application image: `packages/database/prisma/migrations/0_init`
+- `prisma migrate deploy`: Passed
+- Migration applied: `0_init`
+- `_prisma_migrations` confirms `0_init` with a completed `finished_at` timestamp.
+- `prisma migrate status`: Passed
+- Database schema status: **up to date**
+
+### Database Structure Verification
+
+- Application database contains 13 tables including `_prisma_migrations`.
+- Foreign-key verification returned 19 constraints.
+- Tenant hierarchy foreign keys are present:
+  - `Tenant` to `BusinessUnit`
+  - `Tenant` to `Branch`
+  - `BusinessUnit` to `Branch`
+- Tenant-scoped membership and role relationships are enforced.
+- AuditLog tenant and branch relationships are enforced.
+- No manual production table modification was performed.
+
+### Important Boundary
+
+This verification establishes that the Prisma database schema and baseline migration are deployed to the dedicated LWILL PostgreSQL environment.
+
+It does **not** establish completion of production authentication, tenant CRUD, RBAC management APIs or UI, audit recording services, or ERP/business modules.
+
+No Prisma major-version upgrade was performed. The repository remains on Prisma `6.19.3`.
+
+### Current Next Development Target
+
+Phase 1D remains focused on concrete authentication/session integration and associated production-safe verification. Do not proceed to ERP/business modules until the Phase 1 authentication, tenant context, authorization, and audit foundation requirements are verified.
