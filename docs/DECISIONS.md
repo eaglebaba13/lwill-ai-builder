@@ -85,23 +85,33 @@ This file records key architectural decisions made for **LWILL AI BUILDER v1**.
 ---
 
 ## ADR 011: Phase 1D Authentication Architecture Decision
-- **Status**: Proposed
+- **Status**: Accepted for Phase 1D implementation scope
 - **Context**: Phase 1D must implement a concrete authentication slice without redesigning the existing authentication context boundary, authorization boundary, tenant hierarchy, or migration baseline. The repository already defines provider-neutral authentication contracts in `packages/authentication-context/src/types.ts` and a server-side session adapter in `apps/web/src/lib/auth/session-provider.ts`; the Prisma schema already models `User`, `TenantMembership`, `AuditLog`, and the tenant/business-unit/branch hierarchy.
 - **Decision**:
-  - **SRS requirement**: Email + Password is the first concrete authentication method for Phase 1D.
+  - **SRS requirement**: Email + Password login is in scope for Phase 1D.
+  - **SRS requirement**: Password reset via verified email is in scope for Phase 1D.
+  - **SRS requirement**: JWT access tokens are required by DOC-015 and are in scope for Phase 1D.
+  - **SRS requirement**: Refresh tokens are required by DOC-015 and are in scope for Phase 1D.
+  - **SRS requirement**: Session timeout is in scope for Phase 1D.
+  - **SRS requirement**: Single-session revocation is in scope for Phase 1D.
+  - **SRS requirement**: Logout-all-devices is in scope for Phase 1D.
+  - **SRS requirement**: Device/session tracking is in scope for Phase 1D.
+  - **SRS requirement**: Authentication-event audit logging is in scope for Phase 1D.
+  - **SRS requirement**: Failed-login lockout is in scope for Phase 1D.
+  - **SRS requirement**: Rate limiting is in scope for Phase 1D.
+  - **SRS requirement**: Existing tenant membership and tenant-context enforcement remain in scope for Phase 1D.
+  - **SRS requirement**: Existing RBAC authorization boundary enforcement remains in scope for Phase 1D.
   - **Existing repository decision**: The existing `AuthenticationProvider` and `VerifiedSessionSource` boundaries remain unchanged and provider-neutral. The concrete authentication implementation must still be adapted through `VerifiedSessionSource` into the existing `AuthenticationContext` contract.
   - **Existing repository decision**: Tenant context continues to derive from authenticated identity plus a valid tenant membership and the existing tenant/business-unit/branch hierarchy; the implementation must not redesign the tenant hierarchy or authorization boundary.
   - **New proposed implementation decision**: Password credentials require dedicated server-side persistence. Passwords must never be stored in plaintext.
   - **New proposed implementation decision**: Argon2id is the proposed password hashing algorithm for Phase 1D. This is explicitly marked as an implementation decision because DOC-015 does not specify the algorithm.
-  - **SRS requirement**: JWT access tokens are required by DOC-015.
-  - **NOT SPECIFIED**: JWT signing algorithm, issuer, audience, claims, token TTL, and key-rotation policy are not specified by DOC-015 and must not be invented in this ADR.
-  - **New proposed implementation decision**: Refresh tokens should be server-managed and revocable. The exact refresh-token lifecycle and rotation policy remain NOT SPECIFIED by DOC-015.
-  - **SRS requirement**: Single-session logout and logout-all-devices behavior are required.
-  - **SRS requirement**: Authentication events must be auditable.
-  - **SRS requirement**: Failed-login lockout, rate limiting, session/device tracking, HTTPS-only transport, and signing-key protection are required by DOC-015.
-  - **Out of scope for this implementation slice**: MFA, OAuth, OTP, API-key authentication, and ERP modules are excluded and must not be introduced here.
+  - **NOT SPECIFIED**: JWT signing algorithm, issuer, audience, claims, token TTL, key-rotation policy, lockout thresholds, rate-limit thresholds, and refresh-token rotation policy are not specified by DOC-015 and must not be invented in this ADR.
+  - **DOC-015 baseline, deferred to a subsequent Phase 1 implementation slice**: MFA remains a DOC-015 requirement but is deferred to a subsequent Phase 1 implementation slice.
+  - **DOC-015 baseline, deferred to a subsequent Phase 1 implementation slice**: API-key authentication remains a DOC-015 requirement but is deferred to a subsequent Phase 1 implementation slice.
+  - **DOC-015 baseline, future methods**: Google Sign-In, Microsoft Sign-In, and OTP remain future methods exactly as stated by DOC-015.
   - **Constraint**: Migration `0_init` must not be modified as part of this phase.
 - **Consequences**:
-  - The Phase 1D implementation can proceed through the existing provider-neutral architecture without changing the current authentication-context contracts or tenant hierarchy model.
-  - Password persistence, hashing, JWT policy details, and refresh-token lifecycle details require explicit approval before implementation because DOC-015 does not fully specify them.
+  - Phase 1D can proceed through the existing provider-neutral architecture without changing the current authentication-context contracts or tenant hierarchy model.
+  - Password persistence, hashing, JWT policy details, lockout thresholds, rate-limit thresholds, and refresh-token lifecycle details require explicit approval before implementation because DOC-015 does not fully specify them.
+  - MFA and API-key authentication remain part of the SRS baseline but are deferred to a later implementation slice; they are not introduced in Phase 1D.
   - No migration or schema change is performed in this ADR; any new persistence model must be introduced later through a separately approved change.
