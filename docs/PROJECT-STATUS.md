@@ -35,10 +35,10 @@
 
 - **Current Applications**: `apps/web` only.
 - **Current Packages / Modules / Services**: No shared `packages`, business `modules`, or backend `services` are currently implemented.
-- **Database Status**: Not implemented; no database connection verified.
-- **Migration Status**: Not implemented; no migration system verified.
-- **Authentication Status**: Not implemented.
-- **Authorization Status**: Not implemented.
+- **Database Status**: Prisma database foundation and migration baseline are present in the repository; no live production database connection has been verified.
+- **Migration Status**: Initial migration baseline exists under `packages/database/prisma/migrations/0_init`; no production database has been applied or verified.
+- **Authentication Status**: Provider-neutral authentication context foundation is implemented; no real authentication provider has been connected.
+- **Authorization Status**: Provider-neutral authorization contracts are implemented; no production-backed authorization adapter has been connected.
 - **Test Status**: `pnpm test` verified, but no test tasks are currently defined. Turborepo reports `0 successful, 0 total`. Automated test coverage is not yet implemented.
 - **TypeScript Status**: Verified passing through the Next.js production build.
 - **Lint Status**: Verified passing with `pnpm lint`.
