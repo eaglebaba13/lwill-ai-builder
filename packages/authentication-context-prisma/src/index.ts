@@ -10,3 +10,9 @@ export {
 } from "./tenant-hierarchy-rules";
 
 export { createPrismaTenantHierarchyVerifier } from "./tenant-hierarchy-verifier";
+
+export {
+  createPasswordHash,
+  createTokenHash,
+  verifyPasswordHash,
+} from "./auth-persistence";

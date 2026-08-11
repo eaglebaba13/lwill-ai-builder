@@ -19,6 +19,7 @@ model Tenant {
   branches          Branch[]
   tenantMemberships TenantMembership[]
   roles             Role[]
+  authenticationSessions AuthenticationSession[]
 
   @@index([isActive])
 }
@@ -91,7 +92,75 @@ model User {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  memberships TenantMembership[]
+  memberships         TenantMembership[]
+  passwordCredential  PasswordCredential?
+  authenticationSessions AuthenticationSession[]
+  refreshTokens      RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+}
+
+model PasswordCredential {
+  id               String   @id @default(uuid()) @db.Uuid
+  userId           String   @unique @db.Uuid
+  passwordHash     String
+  passwordUpdatedAt DateTime @default(now())
+  passwordVersion  Int      @default(1)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+}
+
+model AuthenticationSession {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @db.Uuid
+  tenantId     String?   @db.Uuid
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  lastSeenAt   DateTime?
+  userAgent    String?
+  ipAddress    String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  refreshTokens RefreshToken[]
+
+  @@index([userId, revokedAt, expiresAt])
+  @@index([tenantId, createdAt])
+}
+
+model RefreshToken {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @db.Uuid
+  sessionId    String    @db.Uuid
+  tokenHash    String    @unique
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  session AuthenticationSession @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+
+  @@index([userId, expiresAt])
+  @@index([sessionId, revokedAt])
+}
+
+model PasswordResetToken {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @db.Uuid
+  tokenHash    String    @unique
+  expiresAt    DateTime
+  consumedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId, expiresAt])
 }
 
 model TenantMembership {

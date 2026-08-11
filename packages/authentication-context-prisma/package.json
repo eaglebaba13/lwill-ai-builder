@@ -9,7 +9,8 @@
   },
   "dependencies": {
     "@lwill/authentication-context": "workspace:*",
-    "@lwill/database": "workspace:*"
+    "@lwill/database": "workspace:*",
+    "argon2": "^0.45.1"
   },
   "devDependencies": {
     "typescript": "^5",
