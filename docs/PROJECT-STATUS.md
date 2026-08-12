@@ -189,6 +189,153 @@
 - The new auth slice remains intentionally small and provider-neutral at the contract boundary.
 - No JWT policy, lockout thresholds, or password-reset UI were invented beyond the minimal persistence slice required for verified session handling.
 
+## Phase 1E Tenant-Aware Business Slice Verification
+
+### Status: **Complete — New customer/service/appointment services verified locally**
+
+### Implemented Slice
+
+- Tenant-aware `Customer`, `Service`, and `Appointment` Prisma models added to the shared database schema.
+- Reusable service-layer modules for creating and reading tenant-scoped customers and services.
+- Appointment creation validation that rejects records unless the referenced customer and service belong to the same tenant.
+- Focused Vitest coverage for tenant-scoped creation, cross-tenant lookup rejection, and cross-tenant appointment rejection.
+
+### Verification Results
+
+- `pnpm --filter @lwill/authentication-context-prisma test` — 26 tests passed.
+- `pnpm lint` — Passed.
+- `pnpm build` — Passed with Next.js production build success.
+
+### Notes
+
+- This is intentionally the smallest reusable business workflow slice for the X Nail MVP: customers, services, and appointments with tenant isolation.
+- No broader CRM UI, scheduling engine, or invoice/payment workflow was introduced beyond the verified persistence and validation boundary.
+
+## Phase 1F Staff + Attendance Slice Verification
+
+### Status: **Complete — New staff and attendance services verified locally**
+
+### Implemented Slice
+
+- Tenant-aware `Staff` and `Attendance` Prisma models added to the shared database schema.
+- Reusable service-layer modules for creating, reading, and listing tenant-scoped staff records.
+- Attendance creation validation that rejects records unless the referenced staff member belongs to the same tenant.
+- Focused Vitest coverage for staff creation, tenant isolation, branch validation, attendance creation, and cross-tenant attendance rejection.
+
+### Verification Results
+
+- `pnpm --filter @lwill/authentication-context-prisma test` — 31 tests passed.
+- `pnpm --filter web test` — 32 tests passed.
+- `pnpm lint` — Passed.
+- `pnpm build` — Passed with Next.js production build success.
+- `pnpm exec prisma validate` — Passed.
+
+### Notes
+
+- This slice remains intentionally small and reusable for the X Nail MVP: staff records and attendance entries with tenant isolation.
+- No payroll, HRMS, commission, biometric attendance, or advanced scheduling functionality was introduced.
+
+## Phase 1G Packages + Memberships Slice Verification
+
+### Status: **Complete — New package and membership services verified locally**
+
+### Implemented Slice
+
+- Tenant-aware `Package` and `Membership` Prisma models added to the shared database schema.
+- Reusable service-layer modules for creating, reading, and listing tenant-scoped packages and memberships.
+- Package creation validation that rejects service links outside the same tenant.
+- Membership creation validation that rejects records unless the customer and package belong to the same tenant.
+- Focused Vitest coverage for package creation, cross-tenant service rejection, membership creation, and cross-tenant membership rejection.
+
+### Verification Results
+
+- `pnpm --filter @lwill/authentication-context-prisma test` — 35 tests passed.
+- `pnpm --filter web test` — 32 tests passed.
+- `pnpm exec prisma validate` — Passed.
+
+### Notes
+
+- This slice remains intentionally small and reusable for the X Nail MVP: packages and memberships with tenant isolation.
+- No billing, redemption, or loyalty-engine logic beyond the verified persistence boundary was introduced.
+
+## Phase 1H POS + Billing Slice Verification
+
+### Status: **Complete — Minimal tenant-aware POS billing slice verified locally**
+
+### Implemented Slice
+
+- Tenant-aware `Invoice` and `InvoiceLineItem` Prisma models added to the shared database schema.
+- Reusable invoice service with tenant-scoped customer validation and line-item validation for service/package references.
+- Invoice calculations for subtotal, discount, GST, and total using explicit line-item inputs.
+- Focused Vitest coverage for calculation correctness, cross-tenant customer rejection, and tenant-scoped invoice retrieval.
+
+### Verification Results
+
+- `pnpm --filter @lwill/authentication-context-prisma exec vitest run src/invoice-service.test.ts` — 3 tests passed.
+- `pnpm --filter @lwill/authentication-context-prisma test` — 38 tests passed.
+- `pnpm --filter web test` — 32 tests passed.
+- `pnpm lint` — Passed.
+- `pnpm build` — Passed with Next.js production build success.
+- `pnpm exec prisma validate` — Passed.
+
+### Notes
+
+- This is intentionally the smallest reusable POS/billing slice aligned to the X Nail MVP: customer-linked billing with line-item totals and tenant isolation.
+- No advanced accounting, refund engine, payment gateway integration, invoice numbering policy, or tax engine beyond the explicit GST field support in the SRS was introduced.
+
+## Phase 1J Tenant Domain Resolution Verification
+
+### Status: **In progress — minimal tenant-domain resolution and tenant isolation guardrails are implemented and validated locally**
+
+### Implemented Slice
+
+- Minimal `TenantDomain` Prisma model for tenant-owned hostname records: `tenantId`, `domain`, `isPrimary`, `verificationStatus`, `isActive`, and timestamps.
+- Hostname normalization and safe resolution rules that reject unknown, inactive, or unverified domains.
+- Tenant-domain isolation guard that refuses hostname-driven tenant switching when the authenticated session belongs to a different tenant.
+- Focused Vitest coverage for valid resolution, rejection paths, primary-domain behavior, duplicate rejection, and development-hostname safety.
+
+### Verification Results
+
+- `pnpm --filter @lwill/authentication-context-prisma test` — Passed with the new tenant-domain tests.
+- `pnpm --filter web test` — Passed.
+- `pnpm lint` — Passed.
+- `pnpm build` — Passed with Next.js production build success.
+- `pnpm exec prisma validate --schema packages/database/prisma/schema.prisma` — Passed.
+
+### Migration Status
+
+- A new, versioned Prisma migration was added for `TenantDomain` under `packages/database/prisma/migrations/`.
+- The migration was validated statically with Prisma. No live PostgreSQL database was connected or modified during this task, so no production migration was applied.
+
+### Remaining Blockers
+
+- No live tenant-domain DNS or certificate automation was implemented; this remains a future infrastructure concern.
+- No tenant admin UI or domain-management application flow was introduced beyond the internal reusable service boundary.
+- No production deployment or VPS/Coolify configuration changes were made.
+
+## Phase 1I X Nail Operational Launch Workflow
+
+### Status: **In progress — minimal X Nail operations shell and workflow logic are implemented and validated locally**
+
+### Implemented Slice
+
+- Minimal X Nail login/authentication flow at the app boundary using the verified tenant-scoped operational contract.
+- Operational workflow model for tenant-scoped customer, service, staff, appointment, and invoice creation.
+- Simple authenticated dashboard shell covering the launch sequence: login → tenant context → customer/service/staff → appointment → POS invoice.
+- Focused Vitest coverage for authentication, tenant access, customer creation, service creation, appointment progression, and invoice totals.
+
+### Verification Results
+
+- `pnpm --filter web test -- x-nail-operational-flow.test.ts` — 9 tests passed.
+- `pnpm --filter web test` — Passed after the new slice was added.
+- `pnpm --filter web build` — Passed with Next.js production build success.
+- `pnpm --filter web lint` — Passed.
+
+### Notes
+
+- This remains intentionally limited to the first usable launch slice for X Nail and does not expand into broader HDK Academy, distribution, franchise, or AI features.
+- The UI is intentionally a lightweight operational shell rather than a full multi-module ERP.
+
 ## Phase 1B Authentication + Tenant Context Foundation
 
 ### Status: **Complete — All verifications passed**
@@ -394,6 +541,22 @@ git status --short --branch                                   — main...origin/
 ### Next Phase
 
 Phase 1D: Implement a concrete `VerifiedSessionSource` for a chosen, explicitly-approved authentication vendor, and exercise `createPrismaTenantHierarchyVerifier()` against a verified local (non-production) PostgreSQL instance. Do not proceed into ERP/business modules.
+
+### Local PostgreSQL Runtime Verification Status
+
+**Current state**: Runtime validation against a local PostgreSQL instance was attempted in this Windows environment, but it remains blocked by a machine-level installation issue rather than a code-level failure.
+
+**Evidence**:
+
+- `winget install --id PostgreSQL.PostgreSQL.16 --source winget -e --accept-source-agreements --accept-package-agreements` downloaded the installer successfully but the installation remained incomplete and left a background `postgresql-16.14-2-windows-x64.exe` process running.
+- The resulting server files were partially present under `C:\Program Files\PostgreSQL\16`, but the required server runtime shared library (`$libdir/utf8_and_win`) was missing.
+- `initdb` then failed with: `FATAL: could not access file "$libdir/utf8_and_win": No such file or directory` and the cluster initialization was rolled back.
+
+**Impact**:
+
+- Source-level validation remains green (`pnpm test`, `pnpm lint`, `pnpm build`, `prisma validate`), but the repo has not yet been exercised against a live PostgreSQL instance.
+- No claim should be made that production-grade runtime auth/database integration is complete until a working local PostgreSQL runtime is available and the migration history is applied successfully.
+- This is an environment/distribution blocker, not a schema or application logic validation result.
 
 ---
 

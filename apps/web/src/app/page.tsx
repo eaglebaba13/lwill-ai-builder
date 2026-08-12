@@ -1,257 +1,600 @@
 "use client";
 
 import { useState } from "react";
+import {
+  APPOINTMENT_STATUS_ORDER,
+  authenticateOperationalUser,
+  createAppointmentRecord,
+  createCustomerRecord,
+  createInvoiceRecord,
+  createServiceRecord,
+  createStaffRecord,
+  transitionAppointmentStatus,
+  type AppointmentStatus,
+} from "@/lib/x-nail/operational-workflow";
 
-const navigation = [
-  "Overview",
-  "Business Ecosystem",
-  "Platform Modules",
-  "Business Intelligence",
-  "Franchise",
-  "Mobile Access",
-  "Security",
-  "Roadmap",
+type CustomerRecord = {
+  tenantId: string;
+  name: string;
+  phone?: string;
+  email?: string;
+};
+
+type AppointmentRecord = {
+  tenantId: string;
+  customerId: string;
+  serviceId: string;
+  staffId: string;
+  startsAt: string;
+  endsAt: string;
+  status: AppointmentStatus;
+};
+
+const initialCustomers: CustomerRecord[] = [
+  { tenantId: "tenant-xnail", name: "Priya Sharma", phone: "9876543210" },
+  { tenantId: "tenant-xnail", name: "Neha Verma", phone: "9988776655" },
 ];
 
-const modules = [
+const initialServices = [
+  { tenantId: "tenant-xnail", name: "Classic Manicure", durationMinutes: 45, priceCents: 1500 },
+  { tenantId: "tenant-xnail", name: "Gel Polish", durationMinutes: 60, priceCents: 2200 },
+];
+
+const initialStaff = [
+  { tenantId: "tenant-xnail", displayName: "Mina Patel", branchId: "branch-main" },
+  { tenantId: "tenant-xnail", displayName: "Aisha Khan", branchId: "branch-main" },
+];
+
+const initialAppointments: AppointmentRecord[] = [
   {
-    title: "Salon Operations",
-    description: "Appointments, service workflows, staff allocation and customer management.",
+    tenantId: "tenant-xnail",
+    customerId: "cust-1",
+    serviceId: "svc-1",
+    staffId: "staff-1",
+    startsAt: "2026-08-12T10:30:00.000Z",
+    endsAt: "2026-08-12T11:15:00.000Z",
+    status: "Booked",
   },
   {
-    title: "Academy",
-    description: "Courses, trainers, attendance, assessments and certification workflows.",
-  },
-  {
-    title: "Retail & Inventory",
-    description: "Product catalogue, stock movement, purchasing and retail operations.",
-  },
-  {
-    title: "Franchise Management",
-    description: "Central oversight of franchise locations, performance and operational compliance.",
-  },
-  {
-    title: "Business Intelligence",
-    description: "Management dashboards, KPIs and consolidated business reporting.",
-  },
-  {
-    title: "Finance & Compliance",
-    description: "Billing, expenses, GST-ready workflows and financial reporting foundations.",
+    tenantId: "tenant-xnail",
+    customerId: "cust-2",
+    serviceId: "svc-2",
+    staffId: "staff-2",
+    startsAt: "2026-08-12T14:00:00.000Z",
+    endsAt: "2026-08-12T15:00:00.000Z",
+    status: "Confirmed",
   },
 ];
 
-const dashboardCards = [
-  ["Operations", "Multi-location control"],
-  ["Revenue", "Consolidated reporting"],
-  ["Customers", "Central CRM"],
-  ["Inventory", "Stock visibility"],
-];
+const tabs = ["Overview", "Customers", "Services", "Staff", "Appointments", "Billing"] as const;
 
 export default function Home() {
-  const [active, setActive] = useState("Overview");
+  const [activeTab, setActiveTab] = useState<(typeof tabs)[number]>("Overview");
+  const [session, setSession] = useState<ReturnType<typeof authenticateOperationalUser> | null>(null);
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [customers, setCustomers] = useState<CustomerRecord[]>(initialCustomers);
+  const [services, setServices] = useState(initialServices);
+  const [staff, setStaff] = useState(initialStaff);
+  const [appointments, setAppointments] = useState<AppointmentRecord[]>(initialAppointments);
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [serviceName, setServiceName] = useState("");
+  const [servicePrice, setServicePrice] = useState("1500");
+  const [staffName, setStaffName] = useState("");
+  const [appointmentCustomer, setAppointmentCustomer] = useState("cust-1");
+  const [appointmentService, setAppointmentService] = useState("svc-1");
+  const [appointmentStaff, setAppointmentStaff] = useState("staff-1");
+  const [selectedInvoice, setSelectedInvoice] = useState({
+    tenantId: "tenant-xnail",
+    customerId: "cust-1",
+    items: [
+      { description: "Classic Manicure", quantity: 1, unitPriceCents: 1500 },
+      { description: "Gel Polish", quantity: 1, unitPriceCents: 2200 },
+    ],
+    discountCents: 200,
+    gstCents: 180,
+  });
+
+  const handleLogin = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    try {
+      const nextSession = authenticateOperationalUser({
+        email: "owner@x-nail.local",
+        password: "Xnail2024!",
+        tenantId: "tenant-xnail",
+      });
+      setSession(nextSession);
+      setLoginError(null);
+    } catch (error) {
+      setLoginError(
+        error instanceof Error ? error.message : "Authentication failed.",
+      );
+    }
+  };
+
+  const addCustomer = () => {
+    if (!customerName.trim()) return;
+
+    const record = createCustomerRecord({
+      tenantId: "tenant-xnail",
+      name: customerName,
+      phone: customerPhone,
+    });
+
+    setCustomers((current) => [{ ...record }, ...current]);
+    setCustomerName("");
+    setCustomerPhone("");
+  };
+
+  const addService = () => {
+    if (!serviceName.trim()) return;
+
+    const record = createServiceRecord({
+      tenantId: "tenant-xnail",
+      name: serviceName,
+      durationMinutes: 45,
+      priceCents: Number(servicePrice) || 1500,
+      isActive: true,
+    });
+
+    setServices((current) => [{ ...record }, ...current]);
+    setServiceName("");
+    setServicePrice("1500");
+  };
+
+  const addStaff = () => {
+    if (!staffName.trim()) return;
+
+    const record = createStaffRecord({
+      tenantId: "tenant-xnail",
+      displayName: staffName,
+      branchId: "branch-main",
+      isActive: true,
+    });
+
+    setStaff((current) => [{ ...record }, ...current]);
+    setStaffName("");
+  };
+
+  const addAppointment = () => {
+    const record = createAppointmentRecord({
+      tenantId: "tenant-xnail",
+      customerId: appointmentCustomer,
+      serviceId: appointmentService,
+      staffId: appointmentStaff,
+      startsAt: "2026-08-12T10:30:00.000Z",
+      endsAt: "2026-08-12T11:15:00.000Z",
+      status: "Booked",
+    });
+
+    setAppointments((current) => [record, ...current]);
+  };
+
+  const advanceAppointment = (index: number) => {
+    setAppointments((current) => {
+      const item = current[index];
+      const currentStatus = item.status;
+      const nextStatus = APPOINTMENT_STATUS_ORDER[
+        APPOINTMENT_STATUS_ORDER.indexOf(currentStatus) + 1
+      ] ?? currentStatus;
+
+      return current.map((appointment, appointmentIndex) =>
+        appointmentIndex === index
+          ? transitionAppointmentStatus(appointment, nextStatus)
+          : appointment,
+      );
+    });
+  };
+
+  const invoicePreview = createInvoiceRecord(selectedInvoice);
+
+  if (!session) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#fdf8f6] px-4 py-12 text-[#26171d]">
+        <div className="w-full max-w-md rounded-[28px] border border-[#f0dfe6] bg-white p-8 shadow-[0_30px_80px_rgba(59,24,38,0.08)]">
+          <div className="mb-6">
+            <p className="text-xs font-semibold tracking-[0.22em] text-[#7c4f62]">X NAIL</p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em]">Operations login</h1>
+          </div>
+
+          <form className="space-y-4" onSubmit={handleLogin}>
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium text-[#5a3b48]">Email</span>
+              <input
+                defaultValue="owner@x-nail.local"
+                readOnly
+                className="w-full rounded-xl border border-[#e8d8df] bg-[#fffafc] px-3 py-2.5 text-sm"
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium text-[#5a3b48]">Password</span>
+              <input
+                defaultValue="Xnail2024!"
+                readOnly
+                className="w-full rounded-xl border border-[#e8d8df] bg-[#fffafc] px-3 py-2.5 text-sm"
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium text-[#5a3b48]">Tenant</span>
+              <select
+                defaultValue="tenant-xnail"
+                className="w-full rounded-xl border border-[#e8d8df] bg-[#fffafc] px-3 py-2.5 text-sm"
+              >
+                <option value="tenant-xnail">X Nail Main Branch</option>
+              </select>
+            </label>
+
+            {loginError ? (
+              <div className="rounded-xl border border-[#f0c5c5] bg-[#fff6f6] px-3 py-2 text-sm text-[#8f3f3f]">
+                {loginError}
+              </div>
+            ) : null}
+
+            <button
+              type="submit"
+              className="w-full rounded-xl bg-[#5a1838] px-4 py-3 text-sm font-semibold text-white"
+            >
+              Sign in
+            </button>
+          </form>
+        </div>
+      </main>
+    );
+  }
 
   return (
-    <main className="min-h-screen bg-[#fbf7f5] text-[#321824]">
-      <header className="sticky top-0 z-50 border-b border-[#eadedb] bg-[#fbf7f5]/95 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-8">
+    <main className="min-h-screen bg-[#faf4f2] text-[#2d1a22]">
+      <header className="border-b border-[#f0dfe5] bg-white/85 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div>
-            <div className="text-lg font-semibold tracking-tight">HDK Beauty</div>
-            <div className="text-xs tracking-[0.18em] text-[#8c6c78]">
-              X NAIL BUSINESS PLATFORM
+            <div className="text-xl font-semibold tracking-tight">X Nail</div>
+            <div className="text-[10px] font-medium uppercase tracking-[0.22em] text-[#8a606d]">
+              Operations dashboard
             </div>
           </div>
 
-          <nav className="hidden items-center gap-6 lg:flex">
-            {navigation.map((item) => (
-              <button
-                key={item}
-                onClick={() => setActive(item)}
-                className={`text-sm transition ${
-                  active === item
-                    ? "font-semibold text-[#641f42]"
-                    : "text-[#765f68] hover:text-[#641f42]"
-                }`}
-              >
-                {item}
-              </button>
-            ))}
-          </nav>
-
-          <div className="flex items-center gap-3">
-            <button className="hidden rounded-full border border-[#dbcacb] px-5 py-2 text-sm font-medium sm:block">
-              ERP Login
-            </button>
-            <button className="rounded-full bg-[#5b183a] px-5 py-2 text-sm font-semibold text-white">
-              Request Demo
+          <div className="flex items-center gap-2 text-sm">
+            <span className="rounded-full bg-[#fceff4] px-3 py-1 text-[#6a2f4a]">{session.tenantId}</span>
+            <button
+              className="rounded-full border border-[#ead0d9] px-3 py-1.5"
+              onClick={() => setSession(null)}
+            >
+              Sign out
             </button>
           </div>
         </div>
       </header>
 
-      <section className="mx-auto grid max-w-7xl gap-16 px-6 py-20 lg:grid-cols-2 lg:px-8 lg:py-28">
-        <div className="flex flex-col justify-center">
-          <div className="mb-6 inline-flex w-fit rounded-full border border-[#dfc9cf] bg-white px-4 py-2 text-xs font-semibold tracking-[0.14em] text-[#6b3550]">
-            HDK BEAUTY PVT. LTD.
-          </div>
-
-          <h1 className="max-w-3xl text-5xl font-semibold leading-[1.02] tracking-[-0.04em] sm:text-6xl">
-            The operating platform for modern beauty businesses.
-          </h1>
-
-          <p className="mt-7 max-w-xl text-lg leading-8 text-[#765f68]">
-            One connected platform for X Nail operations, academy management,
-            retail, inventory, customers, finance and franchise oversight.
-          </p>
-
-          <div className="mt-9 flex flex-wrap gap-4">
-            <button className="rounded-full bg-[#5b183a] px-7 py-3.5 text-sm font-semibold text-white">
-              Explore Platform
+      <div className="mx-auto max-w-6xl px-6 py-8">
+        <div className="mb-6 flex flex-wrap gap-2">
+          {tabs.map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                activeTab === tab
+                  ? "bg-[#5a1838] text-white"
+                  : "bg-white text-[#5a3b48] ring-1 ring-[#eed8df]"
+              }`}
+            >
+              {tab}
             </button>
-            <button className="rounded-full border border-[#cdbabd] bg-white px-7 py-3.5 text-sm font-semibold">
-              View Franchise Dashboard
-            </button>
-          </div>
-
-          <div className="mt-10 grid max-w-xl grid-cols-2 gap-4 text-sm text-[#765f68] sm:grid-cols-4">
-            {dashboardCards.map(([title, description]) => (
-              <div key={title} className="border-l border-[#d8c5ca] pl-3">
-                <div className="font-semibold text-[#321824]">{title}</div>
-                <div className="mt-1 text-xs leading-5">{description}</div>
-              </div>
-            ))}
-          </div>
+          ))}
         </div>
 
-        <div className="rounded-[2rem] border border-[#eadedb] bg-white p-5 shadow-[0_25px_80px_rgba(73,35,48,0.10)]">
-          <div className="rounded-[1.5rem] bg-[#f8f1ef] p-5">
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="text-sm font-semibold">Franchise Command Center</div>
-                <div className="mt-1 text-xs text-[#92757f]">
-                  Client preview · illustrative interface
-                </div>
-              </div>
-              <div className="rounded-full bg-[#ead7df] px-3 py-1 text-[10px] font-semibold text-[#6b3550]">
-                DEMO
-              </div>
-            </div>
+        <section className="grid gap-4 md:grid-cols-4">
+          <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
+            <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Today</div>
+            <div className="mt-2 text-3xl font-semibold">18</div>
+            <div className="mt-1 text-sm text-[#715a62]">Appointments</div>
+          </div>
+          <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
+            <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Revenue</div>
+            <div className="mt-2 text-3xl font-semibold">₹42.5k</div>
+            <div className="mt-1 text-sm text-[#715a62]">Gross sales</div>
+          </div>
+          <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
+            <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Members</div>
+            <div className="mt-2 text-3xl font-semibold">128</div>
+            <div className="mt-1 text-sm text-[#715a62]">Loyalty</div>
+          </div>
+          <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
+            <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Staff</div>
+            <div className="mt-2 text-3xl font-semibold">6</div>
+            <div className="mt-1 text-sm text-[#715a62]">On duty</div>
+          </div>
+        </section>
 
-            <div className="mt-5 grid grid-cols-2 gap-3">
-              {[
-                ["Locations", "Portfolio view"],
-                ["Operations", "Branch health"],
-                ["Revenue", "Consolidated"],
-                ["Inventory", "Stock control"],
-              ].map(([title, value]) => (
-                <div
-                  key={title}
-                  className="rounded-2xl border border-[#eadedb] bg-white p-4"
-                >
-                  <div className="text-xs text-[#92757f]">{title}</div>
-                  <div className="mt-2 font-semibold">{value}</div>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-4 rounded-2xl border border-[#eadedb] bg-white p-5">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold">Franchise overview</span>
-                <span className="text-xs text-[#92757f]">Preview data</span>
-              </div>
-
-              <div className="mt-5 space-y-3">
-                {["Operations", "Customers", "Inventory", "Financials"].map(
-                  (item, index) => (
-                    <div
-                      key={item}
-                      className="flex items-center justify-between rounded-xl bg-[#faf7f6] px-4 py-3"
-                    >
-                      <span className="text-sm">{item}</span>
-                      <span className="text-xs font-medium text-[#6b3550]">
-                        {index === 0
-                          ? "Configured"
-                          : index === 1
-                            ? "Ready"
-                            : "Foundation"}
-                      </span>
+        {activeTab === "Customers" ? (
+          <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <h2 className="text-xl font-semibold">Customer list</h2>
+              <div className="mt-4 space-y-3">
+                {customers.map((customer, index) => (
+                  <div key={`${customer.name}-${index}`} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    <div>
+                      <div className="font-medium">{customer.name}</div>
+                      <div className="text-sm text-[#736067]">{customer.phone}</div>
                     </div>
-                  ),
-                )}
+                    <span className="rounded-full bg-[#f5edf1] px-2.5 py-1 text-xs">Active</span>
+                  </div>
+                ))}
               </div>
             </div>
-          </div>
-        </div>
-      </section>
 
-      <section className="border-y border-[#eadedb] bg-white">
-        <div className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
-          <div className="max-w-2xl">
-            <div className="text-xs font-semibold tracking-[0.16em] text-[#8c6174]">
-              PLATFORM MODULES
-            </div>
-            <h2 className="mt-3 text-4xl font-semibold tracking-[-0.03em]">
-              One operating system across the business.
-            </h2>
-          </div>
-
-          <div className="mt-12 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-            {modules.map((module) => (
-              <article
-                key={module.title}
-                className="rounded-3xl border border-[#eadedb] bg-[#fcf9f8] p-7"
-              >
-                <h3 className="text-lg font-semibold">{module.title}</h3>
-                <p className="mt-3 text-sm leading-6 text-[#765f68]">
-                  {module.description}
-                </p>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-7xl px-6 py-20 lg:px-8">
-        <div className="rounded-[2rem] bg-[#42152c] px-8 py-12 text-white lg:px-14">
-          <div className="grid gap-10 lg:grid-cols-2 lg:items-center">
-            <div>
-              <div className="text-xs font-semibold tracking-[0.16em] text-[#dfb9c8]">
-                FRANCHISE NETWORK
-              </div>
-              <h2 className="mt-4 text-4xl font-semibold tracking-[-0.03em]">
-                Central control. Local execution.
-              </h2>
-              <p className="mt-5 max-w-xl leading-7 text-[#ead6dd]">
-                A structured operating layer for franchise owners, managers and
-                central leadership with tenant, business-unit and branch-level
-                access control.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                "Branch Management",
-                "Staff & Roles",
-                "Business Intelligence",
-                "Central Governance",
-              ].map((item) => (
-                <div
-                  key={item}
-                  className="rounded-2xl border border-white/15 bg-white/10 p-5 text-sm"
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <h2 className="text-xl font-semibold">Add customer</h2>
+              <div className="mt-4 space-y-3">
+                <input
+                  value={customerName}
+                  onChange={(event) => setCustomerName(event.target.value)}
+                  placeholder="Customer name"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <input
+                  value={customerPhone}
+                  onChange={(event) => setCustomerPhone(event.target.value)}
+                  placeholder="Phone"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <button
+                  onClick={addCustomer}
+                  className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
                 >
-                  {item}
+                  Save customer
+                </button>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {activeTab === "Services" ? (
+          <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <h2 className="text-xl font-semibold">Service menu</h2>
+              <div className="mt-4 space-y-3">
+                {services.map((service, index) => (
+                  <div key={`${service.name}-${index}`} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    <div>
+                      <div className="font-medium">{service.name}</div>
+                      <div className="text-sm text-[#736067]">{service.durationMinutes} min</div>
+                    </div>
+                    <div className="font-semibold text-[#6a2f4a]">₹{service.priceCents / 100}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <h2 className="text-xl font-semibold">Add service</h2>
+              <div className="mt-4 space-y-3">
+                <input
+                  value={serviceName}
+                  onChange={(event) => setServiceName(event.target.value)}
+                  placeholder="Service name"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <input
+                  value={servicePrice}
+                  onChange={(event) => setServicePrice(event.target.value)}
+                  placeholder="Price"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <button
+                  onClick={addService}
+                  className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                >
+                  Save service
+                </button>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {activeTab === "Staff" ? (
+          <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <h2 className="text-xl font-semibold">Staff roster</h2>
+              <div className="mt-4 space-y-3">
+                {staff.map((member, index) => (
+                  <div key={`${member.displayName}-${index}`} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    <div>
+                      <div className="font-medium">{member.displayName}</div>
+                      <div className="text-sm text-[#736067]">{member.branchId}</div>
+                    </div>
+                    <span className="rounded-full bg-[#edf8f3] px-2.5 py-1 text-xs text-[#2f6d47]">On duty</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <h2 className="text-xl font-semibold">Add staff</h2>
+              <div className="mt-4 space-y-3">
+                <input
+                  value={staffName}
+                  onChange={(event) => setStaffName(event.target.value)}
+                  placeholder="Staff name"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <button
+                  onClick={addStaff}
+                  className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                >
+                  Save staff
+                </button>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {activeTab === "Appointments" ? (
+          <section className="mt-6 grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <h2 className="text-xl font-semibold">Appointments</h2>
+              <div className="mt-4 space-y-3">
+                {appointments.map((appointment, index) => (
+                  <div key={`${appointment.customerId}-${index}`} className="rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="font-medium">Customer {appointment.customerId}</div>
+                        <div className="text-sm text-[#736067]">{appointment.startsAt}</div>
+                      </div>
+                      <button
+                        onClick={() => advanceAppointment(index)}
+                        className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                      >
+                        {appointment.status}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <h2 className="text-xl font-semibold">Book appointment</h2>
+              <div className="mt-4 space-y-3">
+                <select
+                  value={appointmentCustomer}
+                  onChange={(event) => setAppointmentCustomer(event.target.value)}
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                >
+                  {customers.map((customer, index) => (
+                    <option key={`${customer.name}-${index}`} value={`cust-${index + 1}`}>
+                      {customer.name}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={appointmentService}
+                  onChange={(event) => setAppointmentService(event.target.value)}
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                >
+                  {services.map((service, index) => (
+                    <option key={`${service.name}-${index}`} value={`svc-${index + 1}`}>
+                      {service.name}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={appointmentStaff}
+                  onChange={(event) => setAppointmentStaff(event.target.value)}
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                >
+                  {staff.map((member, index) => (
+                    <option key={`${member.displayName}-${index}`} value={`staff-${index + 1}`}>
+                      {member.displayName}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={addAppointment}
+                  className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                >
+                  Save appointment
+                </button>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {activeTab === "Billing" ? (
+          <section className="mt-6 rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+            <h2 className="text-xl font-semibold">Invoice / POS</h2>
+            <div className="mt-5 grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
+              <div className="rounded-2xl bg-[#fffafc] p-4 ring-1 ring-[#f3e6eb]">
+                <div className="space-y-3">
+                  {selectedInvoice.items.map((item, index) => (
+                    <div key={`${item.description}-${index}`} className="flex items-center justify-between text-sm">
+                      <span>{item.description}</span>
+                      <span>₹{(item.quantity * item.unitPriceCents) / 100}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 border-t border-[#f0dfe6] pt-4 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span>Subtotal</span>
+                    <span>₹{invoicePreview.subtotalCents / 100}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Discount</span>
+                    <span>-₹{invoicePreview.discountCents / 100}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>GST</span>
+                    <span>₹{invoicePreview.gstCents / 100}</span>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between text-lg font-semibold">
+                    <span>Total</span>
+                    <span>₹{invoicePreview.totalCents / 100}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl bg-[#fffafc] p-4 ring-1 ring-[#f3e6eb]">
+                <div className="text-sm font-medium text-[#5a3b48]">Quick POS</div>
+                <div className="mt-4 space-y-3">
+                  <button
+                    onClick={() =>
+                      setSelectedInvoice({
+                        tenantId: "tenant-xnail",
+                        customerId: "cust-1",
+                        items: [
+                          { description: "Classic Manicure", quantity: 1, unitPriceCents: 1500 },
+                          { description: "Nail Art Add-on", quantity: 2, unitPriceCents: 800 },
+                        ],
+                        discountCents: 200,
+                        gstCents: 180,
+                      })
+                    }
+                    className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                  >
+                    Generate invoice
+                  </button>
+                  <button
+                    onClick={() =>
+                      setSelectedInvoice({
+                        tenantId: "tenant-xnail",
+                        customerId: "cust-2",
+                        items: [{ description: "Gel Polish", quantity: 1, unitPriceCents: 2200 }],
+                        discountCents: 0,
+                        gstCents: 120,
+                      })
+                    }
+                    className="w-full rounded-xl border border-[#ead0d9] px-4 py-2.5 text-sm font-semibold"
+                  >
+                    Quick checkout
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {activeTab === "Overview" ? (
+          <section className="mt-6 rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+            <h2 className="text-xl font-semibold">Launch workflow</h2>
+            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              {[
+                "Login",
+                "Tenant context",
+                "Customer + Service",
+                "Appointment + completion",
+                "Invoice / POS",
+              ].map((step, index) => (
+                <div key={step} className="rounded-xl bg-[#fffafc] p-4 ring-1 ring-[#f3e6eb]">
+                  <div className="text-xs uppercase tracking-[0.2em] text-[#8a606d]">0{index + 1}</div>
+                  <div className="mt-2 font-medium">{step}</div>
                 </div>
               ))}
             </div>
-          </div>
-        </div>
-      </section>
-
-      <footer className="border-t border-[#eadedb] bg-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-6 py-8 text-sm text-[#765f68] sm:flex-row sm:items-center sm:justify-between lg:px-8">
-          <span>HDK Beauty Pvt. Ltd. · X Nail Business Platform</span>
-          <span>Client Preview · Demo data only</span>
-        </div>
-      </footer>
+          </section>
+        ) : null}
+      </div>
     </main>
   );
 }
