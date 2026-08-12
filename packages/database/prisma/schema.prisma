@@ -17,11 +17,39 @@ model Tenant {
   businessUnits     BusinessUnit[]
   auditLogs         AuditLog[]
   branches          Branch[]
+  tenantDomains     TenantDomain[]
   tenantMemberships TenantMembership[]
   roles             Role[]
   authenticationSessions AuthenticationSession[]
+  customers        Customer[]
+  services         Service[]
+  appointments     Appointment[]
+  staff            Staff[]
+  attendance       Attendance[]
+  packages         Package[]
+  memberships      Membership[]
+  invoices         Invoice[]
+  invoiceLineItems InvoiceLineItem[]
 
   @@index([isActive])
+}
+
+model TenantDomain {
+  id                 String   @id @default(uuid()) @db.Uuid
+  tenantId           String   @db.Uuid
+  domain             String   @unique
+  isPrimary          Boolean  @default(false)
+  verificationStatus String   @default("pending")
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, domain])
+  @@index([tenantId, isActive])
+  @@index([domain, isActive])
+  @@index([isActive, verificationStatus])
 }
 
 model BusinessUnit {
@@ -57,10 +85,198 @@ model Branch {
   auditLogs             AuditLog[]
   branchMembershipRoles BranchMembershipRole[]
   membershipRoles       MembershipRole[]
+  staff                 Staff[]
 
   @@unique([tenantId, businessUnitId, id])
+  @@unique([tenantId, id])
   @@unique([tenantId, businessUnitId, slug])
   @@index([tenantId, businessUnitId, isActive])
+}
+
+model Customer {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @db.Uuid
+  name      String
+  phone     String?
+  email     String?
+  notes     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  appointments Appointment[]
+  memberships Membership[]
+  invoices Invoice[]
+
+  @@unique([tenantId, id])
+  @@index([tenantId, isActive])
+}
+
+model Service {
+  id               String   @id @default(uuid()) @db.Uuid
+  tenantId         String   @db.Uuid
+  name             String
+  durationMinutes  Int
+  priceCents       Int
+  description      String?
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  appointments Appointment[]
+  packages Package[]
+  invoiceLineItems InvoiceLineItem[]
+
+  @@unique([tenantId, id])
+  @@index([tenantId, isActive])
+}
+
+model Appointment {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @db.Uuid
+  customerId   String   @db.Uuid
+  serviceId    String   @db.Uuid
+  startsAt     DateTime
+  endsAt       DateTime
+  status       String
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  customer Customer @relation(fields: [tenantId, customerId], references: [tenantId, id], onDelete: Restrict)
+  service  Service  @relation(fields: [tenantId, serviceId], references: [tenantId, id], onDelete: Restrict)
+
+  @@unique([tenantId, id])
+  @@index([tenantId, startsAt])
+  @@index([tenantId, status])
+}
+
+model Package {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @db.Uuid
+  name         String
+  serviceIds   String[] @db.Uuid
+  priceCents   Int?
+  durationDays Int?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  memberships Membership[]
+  services Service[]
+  invoiceLineItems InvoiceLineItem[]
+
+  @@unique([tenantId, id])
+  @@index([tenantId, isActive])
+}
+
+model Membership {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @db.Uuid
+  customerId String    @db.Uuid
+  packageId  String    @db.Uuid
+  startedAt  DateTime
+  endsAt     DateTime?
+  status     String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  customer Customer @relation(fields: [tenantId, customerId], references: [tenantId, id], onDelete: Restrict)
+  package  Package  @relation(fields: [tenantId, packageId], references: [tenantId, id], onDelete: Restrict)
+
+  @@unique([tenantId, id])
+  @@index([tenantId, startedAt])
+  @@index([tenantId, status])
+}
+
+model Staff {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @db.Uuid
+  branchId     String?  @db.Uuid
+  displayName  String
+  email        String?
+  phone        String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  branch     Branch?     @relation(fields: [tenantId, branchId], references: [tenantId, id], onDelete: Restrict)
+  attendance Attendance[]
+
+  @@unique([tenantId, id])
+  @@index([tenantId, isActive])
+  @@index([tenantId, branchId])
+}
+
+model Attendance {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @db.Uuid
+  staffId     String    @db.Uuid
+  checkInAt   DateTime
+  checkOutAt  DateTime?
+  status      String?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  staff  Staff  @relation(fields: [tenantId, staffId], references: [tenantId, id], onDelete: Restrict)
+
+  @@unique([tenantId, id])
+  @@index([tenantId, checkInAt])
+  @@index([tenantId, status])
+}
+
+model Invoice {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @db.Uuid
+  customerId     String   @db.Uuid
+  issuedAt       DateTime
+  subtotalCents  Int
+  discountCents  Int      @default(0)
+  gstCents       Int      @default(0)
+  totalCents     Int
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  customer Customer @relation(fields: [tenantId, customerId], references: [tenantId, id], onDelete: Restrict)
+  lineItems InvoiceLineItem[]
+
+  @@unique([tenantId, id])
+  @@index([tenantId, issuedAt])
+  @@index([tenantId, customerId])
+}
+
+model InvoiceLineItem {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @db.Uuid
+  invoiceId      String   @db.Uuid
+  description    String
+  serviceId      String?  @db.Uuid
+  packageId      String?  @db.Uuid
+  quantity       Int
+  unitPriceCents Int
+  lineTotalCents Int
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  invoice Invoice @relation(fields: [tenantId, invoiceId], references: [tenantId, id], onDelete: Restrict)
+  service Service? @relation(fields: [tenantId, serviceId], references: [tenantId, id], onDelete: Restrict)
+  package Package? @relation(fields: [tenantId, packageId], references: [tenantId, id], onDelete: Restrict)
+
+  @@unique([tenantId, id])
+  @@index([tenantId, invoiceId])
+  @@index([tenantId, serviceId])
+  @@index([tenantId, packageId])
 }
 
 model AuditLog {

@@ -1,4 +1,4 @@
-﻿-- CreateTable
+-- CreateTable
 CREATE TABLE "PasswordCredential" (
     "id" UUID NOT NULL,
     "userId" UUID NOT NULL,
