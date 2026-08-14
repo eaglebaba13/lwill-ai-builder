@@ -136,3 +136,61 @@ This file records key architectural decisions made for **LWILL AI BUILDER v1**.
   - The control-plane boundary remains anchored in the existing Prisma schema and the existing authentication/authorization contracts.
   - Tenant business data remains logically separated from platform identity and authorization in the intended architecture, but the exact physical database provisioning model and RLS policy implementation remain future work and require explicit approval.
   - This ADR preserves the existing repository architecture and does not create a new tenant database or modify the existing schema or migration baseline.
+
+  ---
+
+  ## ADR 013: Proposed Phase 1D Native Authentication Integration Policy
+  - **Status**: Proposed — requires approval before application implementation
+  - **Scope**: First native-authentication integration slice for `AUTH-001`, `AUTH-003`, and the core session/revocation portion of `AUTH-005`.
+  - **Context**: DOC-015 requires secure login, JWT access tokens with refresh tokens, and session timeout/logout capability, but does not specify a JWT algorithm, token claims, token lifetimes, transport, cookie policy, key configuration, or refresh-token lifecycle. The repository already contains provider-neutral authentication contracts, a Prisma-backed session verifier, email/password login persistence, hashed refresh-token persistence, and tenant membership/context validation. The missing piece is application integration that obtains and verifies the request token, connects it to the existing session source, and exposes login/refresh/logout behavior. This ADR does not redesign those existing boundaries.
+  - **Existing architecture**:
+    - `AuthenticationProvider` is the provider-neutral contract consumed by server authorization callers.
+    - `VerifiedSessionSource` is the concrete integration boundary. It returns an already verified session record or `null`; `createSessionAuthenticationProvider` only maps that record and fails closed.
+    - `createPrismaVerifiedSessionSource` validates the session ID against Prisma, including existence, revocation, expiry, active user state, active tenant membership, and optional tenant hierarchy context.
+    - `loginWithEmailPassword` verifies the persisted password hash, creates an `AuthenticationSession`, creates a hashed refresh token, and records login audit events.
+    - The Prisma schema already contains `User`, `PasswordCredential`, `AuthenticationSession`, `RefreshToken`, `PasswordResetToken`, `TenantMembership`, and `AuditLog`. Migration `0_init` is the unchanged baseline.
+    - Authorization derives identity and tenant scope from the authenticated context; JWTs must not become a replacement authorization boundary.
+  - **Current implementation boundary**:
+    - The login and database session persistence slice is implemented and tested.
+    - Session verification is implemented behind `VerifiedSessionSource` and is fail-closed.
+    - No application request resolver currently verifies a native JWT or reads a native session cookie, and no application login, refresh, or logout route is wired to the provider.
+    - No JWT policy is currently implemented. The values below are proposed implementation decisions, not DOC-015 requirements.
+  - **Decision — proposed implementation policy**:
+    - **JWT signing algorithm**: RS256 (`RSASSA-PKCS1-v1_5` with SHA-256). Access tokens are signed with a private key and verified with the corresponding public key. The JWT header includes `alg: RS256`, `typ: JWT`, and a configured `kid` to support key rotation.
+    - **Issuer**: A required configured value, `LWILL_AUTH_JWT_ISSUER`, representing the deployed LWILL authentication authority. It is not inferred from the request host.
+    - **Audience**: A required configured value, `LWILL_AUTH_JWT_AUDIENCE`, representing the LWILL web application/API resource boundary. It is not accepted from client input.
+    - **Claims**: The access JWT contains only `iss`, `aud`, `sub` (the `User.id`), `sid` (the `AuthenticationSession.id`), `iat`, `exp`, and `jti`. `jti` is unique per issued access token. Roles, permissions, tenant hierarchy context, and mutable profile fields are intentionally excluded; those remain server-side and are resolved through the existing session, membership, tenant-context, and authorization boundaries.
+    - **Access-token lifetime**: 15 minutes from issuance. The verifier rejects expired tokens and still requires the referenced server session to be active, so JWT validity alone cannot bypass revocation.
+    - **Refresh-token lifetime**: 30 days maximum, bounded by the server session `expiresAt`. The session absolute lifetime is 30 days. No sliding extension is performed merely by presenting an access token.
+    - **Refresh-token format and rotation**: Refresh tokens are opaque, cryptographically random values. Only their SHA-256 hashes are persisted. Each successful refresh atomically revokes the presented token and creates one replacement token linked to the same session. A previously revoked or otherwise invalid refresh token is rejected; suspected reuse revokes the associated session and its active refresh tokens. The existing `revokedAt` fields are used; no replacement-token or family columns are added by this ADR.
+    - **Access-token transport**: The web integration transports the access JWT in an `HttpOnly`, `Secure` cookie named `lwill_access`. It is not placed in local storage, session storage, URLs, or response bodies for browser use. External bearer-token transport is deferred with API authentication.
+    - **Session-cookie strategy**: The refresh token is carried separately in an `HttpOnly`, `Secure` cookie named `lwill_refresh`, with `Path=/`, no configured `Domain`, and `SameSite=Lax`. Both cookies are cleared on logout. Cookie `Max-Age`/expiry follows the token expiry. Because authentication is cookie-based, state-changing authentication endpoints require HTTPS and same-origin/CSRF defenses appropriate to the route; cookie attributes alone are not treated as complete CSRF protection.
+    - **Signing-key configuration and secret handling**: The private key, public verification key, active `kid`, issuer, and audience are deployment configuration supplied through the platform secret manager or protected environment configuration. They must never be committed, logged, sent to the client, or placed in `.env` files containing real secrets. Production startup fails closed when required key configuration is absent or invalid. Verification accepts only explicitly configured public keys, and rotation keeps the previous public key available until all tokens signed with it have expired.
+    - **Session revocation**: Logout revokes the current `AuthenticationSession` and its refresh tokens. Logout-all-devices revokes all active sessions and their refresh tokens for the user. Every request still performs the existing server-side session checks through `createPrismaVerifiedSessionSource`.
+  - **SRS requirements versus implementation decisions**:
+    - DOC-015 requirements for this slice are secure email/password login (`AUTH-001`), JWT access and refresh tokens (`AUTH-003`), and session timeout/revocation/logout capability from `AUTH-005`.
+    - DOC-015 security controls also name password hashing, HTTPS, JWT signing keys, device/session tracking, and audit logs. Existing code provides password hashing, session metadata, and login audit persistence; the native integration must preserve those controls.
+    - RS256, issuer, audience, claims, 15-minute/30-day lifetimes, cookie names and attributes, key variable names, rotation behavior, and the server-side session checks are implementation decisions proposed by this ADR. They are not requirements stated by DOC-015.
+  - **Security implications**:
+    - Short-lived access tokens limit exposure, while the database session and refresh-token records provide revocation that a self-contained JWT cannot provide.
+    - Keeping authorization data out of JWTs avoids stale roles/permissions and preserves the existing authorization boundary, at the cost of server-side session and membership reads.
+    - Cookie transport reduces browser token exfiltration through script access but creates CSRF risk; HTTPS, `Secure`, `SameSite`, origin checks, and route-appropriate CSRF protection are required.
+    - Refresh-token rotation and reuse-triggered session revocation reduce replay risk. Refresh and revocation updates must be transactional and fail closed.
+    - Key rotation requires overlapping verification keys and careful access to private key material. A compromised private key requires an operational key replacement and token/session revocation procedure.
+  - **Still NOT SPECIFIED**:
+    - DOC-015 does not specify any of the concrete JWT or refresh-token values chosen above.
+    - Password policy, failed-login lockout thresholds, rate-limit algorithms/thresholds, email verification and password-reset delivery/provider, MFA enrollment/challenge policy, API-key format/lifecycle, audit retention, and operational key-rotation cadence remain NOT SPECIFIED.
+    - The exact CSRF mechanism, login/refresh/logout route names, UI behavior, error response contract, and production secret-manager product remain NOT SPECIFIED.
+    - DOC-015 does not specify whether a tenant context may be selected after login or how a selected context is transported; the existing resolver and tenant hierarchy remain authoritative.
+  - **Explicitly deferred**:
+    - Password reset via verified email (`AUTH-002`), MFA (`AUTH-007`), external API authentication (`AUTH-008`), Google/Microsoft/OTP login, lockout and rate limiting, and complete authentication-event coverage beyond the existing login events.
+    - Authorization/RBAC implementation changes, tenant hierarchy changes, database-per-tenant work, RLS policy work, schema changes, new migrations, and any modification to migration `0_init`.
+    - Browser UI redesign and tenant-specific application functionality.
+  - **Smallest next coding slice after approval**:
+    - Add the native JWT issue/verify adapter and cookie resolver in `apps/web/src/lib/auth`, using the approved configuration and existing `VerifiedSessionSource` boundary.
+    - Wire the existing email/password login service to issue the access cookie and refresh cookie, then add narrowly scoped refresh, single-session logout, and logout-all-devices handlers using transactional persistence and audit events.
+    - Register the resulting source through the existing `AuthenticationProvider` path and add focused tests for valid/invalid signature, issuer/audience rejection, expiry, missing/revoked session, refresh rotation/reuse, and logout revocation. This slice must not add a migration or modify migration `0_init`.
+  - **Consequences**:
+    - The first native integration can proceed without changing provider-neutral contracts, tenant hierarchy, authorization boundaries, Prisma schema, or migration `0_init`.
+    - Native browser authentication becomes a server-validated, revocable session flow rather than a JWT-only authorization mechanism.
+    - The proposed values require explicit approval and deployment key provisioning before implementation; this ADR itself performs no application or dependency changes.
