@@ -20,7 +20,7 @@ export interface EmailPasswordLoginResult {
   readonly refreshToken: string;
 }
 
-interface LoginPrismaClient {
+export interface LoginPrismaClient {
   readonly user: {
     findUnique: (args: {
       where: { email: string };

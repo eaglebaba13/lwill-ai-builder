@@ -39,7 +39,7 @@ interface PrismaTenantMembershipRecord {
   readonly isActive: boolean;
 }
 
-interface PrismaSessionClient {
+export interface PrismaSessionClient {
   readonly authenticationSession: {
     findUnique: (args: {
       where: { id: string };
