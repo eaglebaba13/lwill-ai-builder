@@ -2,8 +2,11 @@
 
 import { useState } from "react";
 import {
+  loginWithNativeAuthentication,
+  logoutFromNativeAuthentication,
+} from "@/lib/auth/native-auth-client";
+import {
   APPOINTMENT_STATUS_ORDER,
-  authenticateOperationalUser,
   createAppointmentRecord,
   createCustomerRecord,
   createInvoiceRecord,
@@ -70,8 +73,11 @@ const tabs = ["Overview", "Customers", "Services", "Staff", "Appointments", "Bil
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<(typeof tabs)[number]>("Overview");
-  const [session, setSession] = useState<ReturnType<typeof authenticateOperationalUser> | null>(null);
+  const [authenticated, setAuthenticated] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [customers, setCustomers] = useState<CustomerRecord[]>(initialCustomers);
   const [services, setServices] = useState(initialServices);
   const [staff, setStaff] = useState(initialStaff);
@@ -95,21 +101,31 @@ export default function Home() {
     gstCents: 180,
   });
 
-  const handleLogin = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-
+    setIsAuthenticating(true);
     try {
-      const nextSession = authenticateOperationalUser({
-        email: "owner@x-nail.local",
-        password: "Xnail2024!",
-        tenantId: "tenant-xnail",
-      });
-      setSession(nextSession);
-      setLoginError(null);
-    } catch (error) {
-      setLoginError(
-        error instanceof Error ? error.message : "Authentication failed.",
-      );
+      const authenticatedSuccessfully = await loginWithNativeAuthentication({ email, password });
+      setAuthenticated(authenticatedSuccessfully);
+      setLoginError(authenticatedSuccessfully ? null : "Authentication failed.");
+      if (authenticatedSuccessfully) {
+        setPassword("");
+      }
+    } catch {
+      setLoginError("Authentication failed.");
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      if (await logoutFromNativeAuthentication()) {
+        setAuthenticated(false);
+        setLoginError(null);
+      }
+    } catch {
+      setLoginError("Sign out failed.");
     }
   };
 
@@ -189,7 +205,7 @@ export default function Home() {
 
   const invoicePreview = createInvoiceRecord(selectedInvoice);
 
-  if (!session) {
+  if (!authenticated) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#fdf8f6] px-4 py-12 text-[#26171d]">
         <div className="w-full max-w-md rounded-[28px] border border-[#f0dfe6] bg-white p-8 shadow-[0_30px_80px_rgba(59,24,38,0.08)]">
@@ -202,8 +218,12 @@ export default function Home() {
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-[#5a3b48]">Email</span>
               <input
-                defaultValue="owner@x-nail.local"
-                readOnly
+                type="email"
+                name="email"
+                autoComplete="username"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                required
                 className="w-full rounded-xl border border-[#e8d8df] bg-[#fffafc] px-3 py-2.5 text-sm"
               />
             </label>
@@ -211,20 +231,14 @@ export default function Home() {
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-[#5a3b48]">Password</span>
               <input
-                defaultValue="Xnail2024!"
-                readOnly
+                type="password"
+                name="password"
+                autoComplete="current-password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                required
                 className="w-full rounded-xl border border-[#e8d8df] bg-[#fffafc] px-3 py-2.5 text-sm"
               />
-            </label>
-
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-[#5a3b48]">Tenant</span>
-              <select
-                defaultValue="tenant-xnail"
-                className="w-full rounded-xl border border-[#e8d8df] bg-[#fffafc] px-3 py-2.5 text-sm"
-              >
-                <option value="tenant-xnail">X Nail Main Branch</option>
-              </select>
             </label>
 
             {loginError ? (
@@ -235,9 +249,10 @@ export default function Home() {
 
             <button
               type="submit"
+              disabled={isAuthenticating}
               className="w-full rounded-xl bg-[#5a1838] px-4 py-3 text-sm font-semibold text-white"
             >
-              Sign in
+              {isAuthenticating ? "Signing in..." : "Sign in"}
             </button>
           </form>
         </div>
@@ -257,10 +272,10 @@ export default function Home() {
           </div>
 
           <div className="flex items-center gap-2 text-sm">
-            <span className="rounded-full bg-[#fceff4] px-3 py-1 text-[#6a2f4a]">{session.tenantId}</span>
+            <span className="rounded-full bg-[#fceff4] px-3 py-1 text-[#6a2f4a]">X Nail</span>
             <button
               className="rounded-full border border-[#ead0d9] px-3 py-1.5"
-              onClick={() => setSession(null)}
+              onClick={handleLogout}
             >
               Sign out
             </button>

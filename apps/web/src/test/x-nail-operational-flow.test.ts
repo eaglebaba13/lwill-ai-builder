@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  authenticateOperationalUser,
   createCustomerRecord,
   createInvoiceRecord,
   createServiceRecord,
@@ -29,17 +28,6 @@ describe("X Nail operational launch workflow", () => {
         activeTenantId: "tenant-xnail",
       }),
     ).toThrow(OperationalAccessError);
-  });
-
-  it("authenticates a valid X Nail user and preserves tenant membership", () => {
-    const session = authenticateOperationalUser({
-      email: "owner@x-nail.local",
-      password: "Xnail2024!",
-      tenantId: "tenant-xnail",
-    });
-
-    expect(session.authenticated).toBe(true);
-    expect(session.tenantId).toBe("tenant-xnail");
   });
 
   it("creates a customer within the tenant", () => {

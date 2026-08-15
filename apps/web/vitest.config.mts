@@ -10,6 +10,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
       // server-only throws in non-React-Server contexts; stub it out for Vitest.
       "server-only": fileURLToPath(
         new URL("./src/test/__mocks__/server-only.ts", import.meta.url),

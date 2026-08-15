@@ -761,3 +761,33 @@ Phase 1D remains focused on concrete authentication/session integration and asso
 - `pnpm build` — Passed.
 - `pnpm lint` — Passed.
 - Local Docker image build — Not run because Docker is not installed on this Windows workstation; Coolify must perform the clean-image confirmation.
+
+---
+
+## X-Nail Native Authentication Frontend Integration
+
+### Status: **Implemented locally; production tenant-domain configuration NOT IMPLEMENTED**
+
+- The temporary X-Nail login form now accepts user-entered email and password values and calls the approved `POST /api/auth/login` endpoint.
+- Hardcoded demo credentials and the client-side `authenticateOperationalUser()` mock were removed.
+- Authentication success is determined only by the native-auth API response; access and refresh tokens remain in the existing `HttpOnly` cookie mechanism and are not exposed to client code.
+- The existing sign-out control now calls `POST /api/auth/logout` before returning to the login screen.
+- The visual design and the separate temporary operational demo workflow remain otherwise unchanged.
+- Focused frontend integration tests cover blank credential fields, approved login request shape, rejected login behavior, successful dashboard entry, and approved logout behavior.
+
+### Required Production Configuration
+
+- ADR 013 resolves login tenancy from the request hostname through an active, verified `TenantDomain` belonging to an active tenant, followed by active `TenantMembership` validation.
+- The repository contains no evidence that `builder.lwill.in` is currently mapped to the X-Nail tenant. That production configuration is therefore `NOT IMPLEMENTED` and login will fail closed until an approved mapping exists.
+- No tenant-domain or membership data was created or modified by this task. Assigning `builder.lwill.in` to X-Nail requires an explicit operational decision consistent with ADR 010 and the planned separation of tenant-specific code and domains.
+
+### Verification Results
+
+- `pnpm test` — Passed: 6 successful monorepo test tasks; web suite passed 12 files and 72 tests.
+- `pnpm build` — Passed: Next.js production build and TypeScript compilation.
+- `pnpm lint` — Passed.
+- `git diff --check` — Passed.
+
+### Remaining Boundary
+
+- Restoring the temporary client page's visual authenticated state after a browser reload remains `NOT IMPLEMENTED`. No approved session-status route exists, and this task did not invent one. The server-side cookie/session mechanism remains authoritative for protected server operations.

@@ -29,40 +29,6 @@ export function ensureOperationalAccess(
   }
 }
 
-export function authenticateOperationalUser(input: {
-  email: string;
-  password: string;
-  tenantId: string;
-}): {
-  authenticated: true;
-  userId: string;
-  email: string;
-  tenantId: string;
-  activeTenantId: string;
-  branchId: string;
-} {
-  if (!input.email || !input.email.includes("@")) {
-    throw new OperationalAccessError("Valid user email is required.");
-  }
-
-  if (input.password !== "Xnail2024!") {
-    throw new OperationalAccessError("Invalid X Nail credentials.");
-  }
-
-  if (!input.tenantId || input.tenantId !== "tenant-xnail") {
-    throw new OperationalAccessError("Unknown X Nail tenant context.");
-  }
-
-  return {
-    authenticated: true,
-    userId: "owner-xnail",
-    email: input.email,
-    tenantId: input.tenantId,
-    activeTenantId: input.tenantId,
-    branchId: "branch-main",
-  };
-}
-
 function assertTenantScope(tenantId: string): void {
   if (tenantId !== "tenant-xnail") {
     throw new OperationalAccessError("Cross-tenant operations are not allowed.");
