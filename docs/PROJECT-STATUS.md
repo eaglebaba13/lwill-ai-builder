@@ -741,3 +741,23 @@ Phase 1D remains focused on concrete authentication/session integration and asso
 - `pnpm build` — Passed: Next.js production build and TypeScript compilation; all four authentication routes registered as dynamic server routes.
 - `pnpm lint` — Passed.
 - `git diff --check` — Passed.
+
+---
+
+## Docker Prisma Client Generation Fix
+
+### Status: **Implemented and verified locally**
+
+- Root cause: the Docker build installed dependencies and ran `pnpm build` without generating Prisma Client. Local builds passed because a previously generated client remained in `node_modules`, while a fresh Coolify build had no generated client.
+- The Docker build now runs `pnpm --filter @lwill/database run generate` before `pnpm build`, using the canonical schema at `packages/database/prisma/schema.prisma`.
+- A command-scoped, non-connecting placeholder `DATABASE_URL` is supplied only because Prisma requires the datasource environment variable while loading the schema. It is not a production credential and is not persisted as a runtime environment value.
+- No Prisma schema, migration, production database state, monorepo structure, or Turbo task was changed.
+
+### Verification Results
+
+- `pnpm install --frozen-lockfile` — Passed.
+- `pnpm --filter @lwill/database run generate` with the command-scoped placeholder URL — Passed; Prisma Client 6.19.3 generated from `prisma/schema.prisma`.
+- `pnpm test` — Passed: 6 successful monorepo test tasks, including 71 web tests.
+- `pnpm build` — Passed.
+- `pnpm lint` — Passed.
+- Local Docker image build — Not run because Docker is not installed on this Windows workstation; Coolify must perform the clean-image confirmation.

@@ -11,6 +11,7 @@ RUN npm install --global pnpm@11.20.0
 COPY . .
 
 RUN pnpm install --frozen-lockfile
+RUN DATABASE_URL=postgresql://localhost:5432/prisma_generate pnpm --filter @lwill/database run generate
 RUN pnpm build
 
 ENV PORT=8080
