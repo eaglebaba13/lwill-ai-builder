@@ -204,3 +204,144 @@ This file records key architectural decisions made for **LWILL AI BUILDER v1**.
     - Current-session logout derives identity from a verified access token or, when access is unavailable, a valid persisted refresh token. Logout-all requires a verified access token and active server session. Client-supplied session and user identifiers are never accepted.
     - Required audit actions for this slice are `auth.login.succeeded`, `auth.login.failed`, `auth.refresh.succeeded`, `auth.refresh.failed`, `auth.refresh.reuse_detected`, `auth.logout.succeeded`, and `auth.logout_all.succeeded`. Secrets and raw tokens must never be recorded.
     - No Prisma schema change or migration is required for this application-integration slice. Migration `0_init` remains unchanged.
+
+  ---
+
+  ## ADR 014: X Nail Bar FOCO Operating Model
+
+  - **Status**: Accepted for architecture and domain-foundation planning
+  - **Scope**: Organization, tenancy, ownership, operation, billing, data ownership, and authorization boundaries for X Nail Bar company-owned and FOCO outlets.
+
+  ### Context
+
+  Lwill Shivansh Corporation operates the LWILL AI BUILDER technology platform. HDK Beauty I Pvt. Ltd. is the client and legal entity operating the X Nail Bar business unit/brand. X Nail Bar requires both company-owned outlets and FOCO (Franchise-Owned, Company-Operated) outlets.
+
+  ADR 004 established the reusable `Tenant -> BusinessUnit -> Branch` hierarchy. ADR 006 requires provider-neutral integration boundaries. ADR 010 requires tenant-specific application code and configuration to remain physically separated from the reusable platform repository. DOC-017 requires X Nail branch and franchise management, GST-capable billing, inventory, staff, commission, and reporting. DOC-025 requires reusable franchise partner, agreement, territory, outlet, royalty, revenue-sharing, compliance, support, and performance capabilities.
+
+  The current hierarchy can locate and authorize an outlet, but it does not by itself express outlet ownership, FOCO operation, franchise counterparties, agreements, territories, legal invoice ownership, or commercial settlement rules. This ADR establishes the operating semantics needed before a schema or implementation proposal may be approved.
+
+  ### Decision
+
+  1. **Platform owner**: Lwill Shivansh Corporation is the owner and operator of the LWILL AI BUILDER platform. Platform ownership does not make Lwill the owner of HDK operational data or the issuer of X Nail customer invoices.
+  2. **Client and legal entity**: HDK Beauty I Pvt. Ltd. is the LWILL client organization and legal entity for the X Nail Bar operating model.
+  3. **Business unit and brand**: X Nail Bar is a business unit/brand operated within the HDK Beauty I Pvt. Ltd. tenant. It is not modeled as a separate LWILL tenant solely because it is a distinct brand.
+  4. **Outlet models**: X Nail Bar outlets may be classified as either company-owned or FOCO. Every outlet remains a branch under the X Nail Bar business unit for tenancy and authorization purposes.
+  5. **FOCO ownership and operation**: For a FOCO outlet, the franchise partner owns the franchise assets and business investment only to the extent defined by an explicitly approved franchise agreement. HDK Beauty I Pvt. Ltd. operates the outlet, controls operational execution, and owns the operational data held within its LWILL tenant.
+  6. **Billing ownership**: Customer invoices for company-owned and FOCO X Nail Bar outlets are legally issued by HDK Beauty I Pvt. Ltd. The franchise partner is not the customer invoice issuer under this operating model.
+  7. **Counterparty boundary**: A franchise partner is a commercial counterparty linked to one or more approved franchise arrangements. A franchise partner is not a separate LWILL tenant merely because it owns franchise assets or investment.
+  8. **Commercial-policy gate**: Royalty, revenue/profit sharing, and franchise settlement implementation must not begin until the applicable commercial rules listed as `NOT SPECIFIED` in this ADR are explicitly approved.
+
+  ### Organization Mapping
+
+  ```text
+  Lwill Shivansh Corporation                         Platform owner
+  └── HDK Beauty I Pvt. Ltd.                        LWILL tenant / client / legal entity
+    └── X Nail Bar                                Business unit / brand
+      └── Branch / outlet                       Company-owned or FOCO location
+        └── FOCO outlet profile               FOCO classification and operating context
+          ├── Franchise partner             Commercial counterparty
+          ├── Franchise agreement           Approved ownership and operating terms
+          └── Territory                     Approved location and operating rights
+  ```
+
+  The `Tenant -> BusinessUnit -> Branch` portion preserves ADR 004. The FOCO outlet profile, partner, agreement, and territory are required domain concepts associated with a branch; they do not add tenancy levels or replace the existing hierarchy.
+
+  ### FOCO Semantics
+
+  - The franchise partner's ownership is limited to the assets, investment, and rights explicitly established by the approved agreement.
+  - HDK Beauty I Pvt. Ltd. is the outlet operator and controls staffing, service delivery, customer operations, billing execution, and other operational activity within approved policies.
+  - Operational records created for the outlet remain owned and controlled by HDK Beauty I Pvt. Ltd. within its LWILL tenant, subject to applicable law and approved agreements.
+  - Customer billing must retain branch attribution while identifying HDK Beauty I Pvt. Ltd. and its applicable tax registration as the legal issuer.
+  - Company-owned and FOCO outlets share the same tenant and business-unit boundaries. Ownership classification must not weaken tenant isolation or authorization checks.
+  - Partner visibility into outlet information is permission-based and does not confer ownership of the tenant, platform account, source code, or unrestricted operational data.
+
+  ### Authorization Model
+
+  - Preserve the existing tenant, business-unit, and branch authorization scopes and their current inheritance rules.
+  - HDK tenant-level administrators may receive tenant-scoped permissions only through existing membership and role grants.
+  - X Nail Bar management roles may receive business-unit-scoped permissions only through explicit grants.
+  - Outlet managers, company-operated staff, and approved franchise users may receive branch-scoped permissions only through explicit grants.
+  - Franchise users must never receive access to another branch, another business unit, the wider HDK tenant, or another tenant unless a separate explicit role grant authorizes that exact scope.
+  - Franchise ownership or agreement participation must never imply an authorization grant. Commercial relationships and access-control grants remain separate concerns.
+  - Role names and permission codes for FOCO operations require separate approval; this ADR does not invent or automatically assign them.
+
+  ### Required Domain Foundation
+
+  The following concepts are required before a complete FOCO implementation can be built:
+
+  - **Legal entity**: identifies HDK Beauty I Pvt. Ltd. as the legal operator and invoice issuer.
+  - **Tax/GST registration**: identifies the applicable registration and tax identity used for legally compliant branch billing.
+  - **Franchise partner**: represents the commercial counterparty and approved contacts.
+  - **Franchise outlet profile**: associates a branch with its company-owned or FOCO operating model without changing tenancy levels.
+  - **Franchise agreement**: records the approved relationship, effective status, and governing documents or terms.
+  - **Territory**: records approved location or operating rights and provides a future basis for conflict validation.
+  - **Ownership/operating model**: distinguishes asset/investment ownership from operational control.
+  - **Branch attribution**: associates operational, billing, inventory, expense, audit, and reporting records with the responsible outlet where required.
+  - **Franchise roles and permissions**: defines explicit branch-scoped capabilities for partner and outlet users without bypassing existing RBAC.
+
+  These are approved domain requirements, not approved database designs. Potential schema entities, relations, enums, columns, identifiers, or field names remain **proposed implementation concepts** until separately reviewed and approved.
+
+  ### NOT SPECIFIED Commercial Rules
+
+  The following items are `NOT SPECIFIED`. No implementation, schema default, calculation, workflow, test expectation, or operational configuration may assume a value or rule for them:
+
+  - Royalty percentage
+  - Royalty calculation basis, exclusions, minimums, or adjustments
+  - Revenue-sharing or profit-sharing formula
+  - Settlement period, process, approval, payment, reconciliation, or dispute handling
+  - Expense responsibility between HDK Beauty I Pvt. Ltd. and the franchise partner
+  - Inventory funding, legal ownership, loss, wastage, replenishment, and transfer responsibility
+  - Tax treatment of royalty, sharing, reimbursements, and settlement transactions
+  - Territory exclusivity, overlap, transfer, and conflict rules
+  - Agreement renewal, termination, default, cure, and exit rules
+  - Franchise performance targets, scoring, and consequences
+  - Support service levels, response targets, escalation, and remedies
+
+  Royalty, sharing, and settlement implementation is explicitly blocked until the relevant commercial rules are documented and approved through a subsequent decision.
+
+  ### Consequences
+
+  - HDK Beauty I Pvt. Ltd. remains one tenant and X Nail Bar remains one business unit, avoiding tenant proliferation for individual franchise partners or outlets.
+  - Company-owned and FOCO locations can share reusable branch operations and authorization while retaining an explicit ownership/operating distinction.
+  - Franchise counterparties do not gain implicit tenant membership or access from commercial ownership.
+  - Billing and operational-data ownership remain anchored to HDK Beauty I Pvt. Ltd.
+  - The existing hierarchy remains necessary but is insufficient alone; FOCO requires additional reusable domain concepts.
+  - Future billing, inventory, expense, compliance, and reporting work must carry sufficient branch attribution to support outlet-level authorization and accountability.
+  - ADR 010 continues to govern code placement: reusable FOCO capabilities belong in platform modules, while HDK/X Nail-specific UI, configuration, and business customization belong in the future tenant repository.
+  - This ADR authorizes no application code, schema change, migration, database mutation, production configuration, or deployment.
+
+  ### Implementation Sequence
+
+  1. Approve the remaining open legal, tax, territory, agreement, access, and commercial decisions.
+  2. Produce a reusable domain and schema proposal for legal entity, tax registration, franchise partner, outlet profile, agreement, territory, operating model, and branch attribution.
+  3. Review the proposal against ADR 004 hierarchy rules, existing tenant isolation, and ADR 010 repository separation before authorizing database work.
+  4. Define FOCO roles and permission codes, then verify tenant-, business-unit-, and branch-scope behavior with deny-by-default tests.
+  5. Implement the minimum partner, agreement, territory, and FOCO outlet foundation through separately approved versioned migrations and reusable services.
+  6. Add branch attribution to operational domains only where required and approved, preserving existing tenant boundaries.
+  7. Implement compliance, support, and performance foundations from DOC-025 after their detailed workflows are approved.
+  8. Implement inventory and expense ownership/control only after responsibility rules are approved.
+  9. Implement royalty, sharing, and settlement only after all applicable commercial formulas and processes are explicitly approved.
+
+  ### Open Decisions
+
+  - Legal-entity master-data requirements and authoritative source
+  - Applicable GST registrations and branch-to-registration assignment
+  - Exact company-owned and FOCO classification lifecycle
+  - Franchise partner identity, contacts, verification, and lifecycle
+  - Agreement document storage, approval, effective dates, and status lifecycle
+  - Territory representation and conflict-validation method
+  - Required branch attribution for appointments, invoices, inventory, expenses, staff, and reports
+  - Franchise user roles, permission codes, approval process, and access-review policy
+  - Compliance evidence, audit frequency, findings, remediation, and renewal workflow
+  - Performance metric definitions and reporting cadence
+  - Support ticket ownership, categories, workflow, and escalation policy
+  - All commercial rules identified as `NOT SPECIFIED` above
+
+  ### References
+
+  - ADR 004: Dynamic Tenant Hierarchy (No Hard-Coded Branch Models)
+  - ADR 006: Provider-Neutral Integrations Architecture
+  - ADR 010: Tenant Code Physical Separation
+  - `LWILL-DOC-017-X-Nail-ERP-SRS-MVP-v1.0.docx`
+  - `LWILL-DOC-025-Franchise-Management-SRS-v1.0.docx`
+  - Supporting requirements: DOC-014 Multi-Tenant Engine, DOC-015 Authentication/RBAC, DOC-023 Finance/Accounting, DOC-024 Inventory/Warehouse, and DOC-030 Super Admin Control Center
