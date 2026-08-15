@@ -145,3 +145,6 @@ vite.config.ts.timestamp-*
 .turbo/
 
 .vscode/
+
+.lwill-jwt-private.pem
+.lwill-jwt-public.pem
