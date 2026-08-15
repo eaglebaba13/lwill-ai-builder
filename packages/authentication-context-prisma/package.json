@@ -4,13 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "bootstrap:initial-admin": "tsx src/initial-admin-bootstrap-cli.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@lwill/authentication-context": "workspace:*",
     "@lwill/database": "workspace:*",
-    "argon2": "^0.45.1"
+    "argon2": "^0.45.1",
+    "tsx": "^4.20.6"
   },
   "devDependencies": {
     "@types/node": "^20",

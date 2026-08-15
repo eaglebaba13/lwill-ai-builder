@@ -150,7 +150,7 @@ describe("native verified session source", () => {
     return createNativeVerifiedSessionSource({
       resolveAccessToken: () => token,
       jwt: createJwt(),
-      prismaOptions: { prismaClient: prisma as never },
+      prismaOptions: { prismaClient: prisma as never, now },
     });
   }
 

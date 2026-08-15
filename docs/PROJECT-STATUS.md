@@ -791,3 +791,34 @@ Phase 1D remains focused on concrete authentication/session integration and asso
 ### Remaining Boundary
 
 - Restoring the temporary client page's visual authenticated state after a browser reload remains `NOT IMPLEMENTED`. No approved session-status route exists, and this task did not invent one. The server-side cookie/session mechanism remains authoritative for protected server operations.
+
+---
+
+## HDK Initial Administrative Bootstrap
+
+### Status: **Implemented and verified locally; not executed against production**
+
+- A manual CLI-only bootstrap creates or reuses the initial administrator for the active `HDK Beauty I Pvt. Ltd. -> X Nail Bar` hierarchy.
+- The hierarchy is resolved by exact approved names from existing active tenant and business-unit records; no UUID is embedded in code.
+- The bootstrap requires an existing active `tenant-admin` role with at least one existing permission and assigns it at tenant scope. It creates no role or permission and fails closed when the approved role is absent or empty.
+- Credentials are read only at execution time from `LWILL_BOOTSTRAP_ADMIN_EMAIL`, `LWILL_BOOTSTRAP_ADMIN_PASSWORD`, and `LWILL_BOOTSTRAP_ADMIN_DISPLAY_NAME`.
+- Passwords are hashed through the existing Argon2-backed `createPasswordHash()` implementation. Plaintext passwords and hashes are excluded from command output.
+- The transaction is idempotent for users, credentials, memberships, and tenant-role assignments. Existing passwords remain unchanged unless the operator explicitly passes `--update-password`, which increments `passwordVersion`.
+- The command is not wired to Next.js startup, package installation, Docker build, deployment, or a public endpoint.
+
+### Manual Command
+
+- Initial execution: `pnpm --filter @lwill/authentication-context-prisma run bootstrap:initial-admin`
+- Explicit password update: `pnpm --filter @lwill/authentication-context-prisma run bootstrap:initial-admin -- --update-password`
+
+### Verification Results
+
+- Focused bootstrap suite — Passed: 9 tests covering Argon2 hashing, first creation, idempotency, explicit password update, each missing environment variable, missing hierarchy, missing/empty role, and secret-safe output.
+- Package strict TypeScript check — Passed.
+- Manual CLI fail-closed check with absent environment variables — Passed before any database transaction.
+- `pnpm test` — Passed: 6 successful monorepo test tasks; bootstrap package passed 10 files and 53 tests.
+- `pnpm build` — Passed: Next.js production build and TypeScript compilation.
+- `pnpm lint` — Passed.
+- `git diff --check` — Passed.
+- No Prisma schema or migration change was required.
+- No production database connection or mutation was performed.
