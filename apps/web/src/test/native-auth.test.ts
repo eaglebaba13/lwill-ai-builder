@@ -198,6 +198,7 @@ describe("native cookies and refresh lifecycle", () => {
       },
       user: { findUnique: vi.fn() },
       tenantMembership: { findFirst: vi.fn() },
+      auditLog: { create: vi.fn() },
       refreshToken: {
         findUnique: vi.fn(),
         update: vi.fn(),
@@ -231,17 +232,20 @@ describe("native cookies and refresh lifecycle", () => {
 
     prisma.refreshToken.findUnique = vi.fn().mockResolvedValue({
       id: "refresh-1", userId: "user-1", sessionId: "session-1", expiresAt: new Date("2099-01-01"), revokedAt: now,
-      session: { userId: "user-1", expiresAt: new Date("2099-01-01"), revokedAt: null },
+      session: { userId: "user-1", tenantId: "tenant-1", expiresAt: new Date("2099-01-01"), revokedAt: null },
     });
     expect(await refreshNativeSession(prisma, "revoked", createJwt(), cookies, now)).toBeNull();
     expect(prisma.authenticationSession.update).toHaveBeenCalled();
     expect(prisma.refreshToken.updateMany).toHaveBeenCalled();
+    expect(prisma.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ action: "auth.refresh.reuse_detected" }),
+    });
   });
 
   it("rotates a valid refresh token and revokes the presented token", async () => {
     prisma.refreshToken.findUnique = vi.fn().mockResolvedValue({
       id: "refresh-1", userId: "user-1", sessionId: "session-1", expiresAt: new Date("2026-09-01"), revokedAt: null,
-      session: { userId: "user-1", expiresAt: new Date("2026-09-15"), revokedAt: null },
+      session: { userId: "user-1", tenantId: "tenant-1", expiresAt: new Date("2026-09-15"), revokedAt: null },
     });
     prisma.user.findUnique = vi.fn().mockResolvedValue({ isActive: true });
     const result = await refreshNativeSession(prisma, "refresh", createJwt(), cookies, now);
@@ -249,14 +253,26 @@ describe("native cookies and refresh lifecycle", () => {
     expect(result?.refreshToken).not.toBe("refresh");
     expect(prisma.refreshToken.update).toHaveBeenCalledWith({ where: { id: "refresh-1" }, data: { revokedAt: now } });
     expect(prisma.refreshToken.create).toHaveBeenCalled();
+    expect(prisma.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ action: "auth.refresh.succeeded" }),
+    });
   });
 
   it("revokes one session or every session transactionally", async () => {
+    prisma.authenticationSession.findUnique = vi.fn().mockResolvedValue({
+      ...makeSession({ tenantId: "tenant-1" }),
+    });
     await revokeNativeSession(prisma, "session-1", now);
     expect(prisma.authenticationSession.update).toHaveBeenCalledWith({ where: { id: "session-1" }, data: { revokedAt: now } });
-    await revokeAllNativeSessions(prisma, "user-1", now);
+    expect(prisma.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ action: "auth.logout.succeeded" }),
+    });
+    await revokeAllNativeSessions(prisma, "user-1", now, undefined, "session-1");
     expect(prisma.authenticationSession.updateMany).toHaveBeenCalledWith({ where: { userId: "user-1", revokedAt: null }, data: { revokedAt: now } });
     expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({ where: { userId: "user-1", revokedAt: null }, data: { revokedAt: now } });
+    expect(prisma.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ action: "auth.logout_all.succeeded" }),
+    });
   });
 
   it("wires the existing login service and does not duplicate credential work", async () => {

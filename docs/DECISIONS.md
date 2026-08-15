@@ -139,8 +139,8 @@ This file records key architectural decisions made for **LWILL AI BUILDER v1**.
 
   ---
 
-  ## ADR 013: Proposed Phase 1D Native Authentication Integration Policy
-  - **Status**: Proposed — requires approval before application implementation
+  ## ADR 013: Phase 1D Native Authentication Integration Policy
+  - **Status**: Accepted
   - **Scope**: First native-authentication integration slice for `AUTH-001`, `AUTH-003`, and the core session/revocation portion of `AUTH-005`.
   - **Context**: DOC-015 requires secure login, JWT access tokens with refresh tokens, and session timeout/logout capability, but does not specify a JWT algorithm, token claims, token lifetimes, transport, cookie policy, key configuration, or refresh-token lifecycle. The repository already contains provider-neutral authentication contracts, a Prisma-backed session verifier, email/password login persistence, hashed refresh-token persistence, and tenant membership/context validation. The missing piece is application integration that obtains and verifies the request token, connects it to the existing session source, and exposes login/refresh/logout behavior. This ADR does not redesign those existing boundaries.
   - **Existing architecture**:
@@ -155,7 +155,7 @@ This file records key architectural decisions made for **LWILL AI BUILDER v1**.
     - Session verification is implemented behind `VerifiedSessionSource` and is fail-closed.
     - No application request resolver currently verifies a native JWT or reads a native session cookie, and no application login, refresh, or logout route is wired to the provider.
     - No JWT policy is currently implemented. The values below are proposed implementation decisions, not DOC-015 requirements.
-  - **Decision — proposed implementation policy**:
+  - **Decision — approved implementation policy**:
     - **JWT signing algorithm**: RS256 (`RSASSA-PKCS1-v1_5` with SHA-256). Access tokens are signed with a private key and verified with the corresponding public key. The JWT header includes `alg: RS256`, `typ: JWT`, and a configured `kid` to support key rotation.
     - **Issuer**: A required configured value, `LWILL_AUTH_JWT_ISSUER`, representing the deployed LWILL authentication authority. It is not inferred from the request host.
     - **Audience**: A required configured value, `LWILL_AUTH_JWT_AUDIENCE`, representing the LWILL web application/API resource boundary. It is not accepted from client input.
@@ -180,7 +180,7 @@ This file records key architectural decisions made for **LWILL AI BUILDER v1**.
   - **Still NOT SPECIFIED**:
     - DOC-015 does not specify any of the concrete JWT or refresh-token values chosen above.
     - Password policy, failed-login lockout thresholds, rate-limit algorithms/thresholds, email verification and password-reset delivery/provider, MFA enrollment/challenge policy, API-key format/lifecycle, audit retention, and operational key-rotation cadence remain NOT SPECIFIED.
-    - The exact CSRF mechanism, login/refresh/logout route names, UI behavior, error response contract, and production secret-manager product remain NOT SPECIFIED.
+    - Browser UI behavior and the production secret-manager product remain NOT SPECIFIED.
     - DOC-015 does not specify whether a tenant context may be selected after login or how a selected context is transported; the existing resolver and tenant hierarchy remain authoritative.
   - **Explicitly deferred**:
     - Password reset via verified email (`AUTH-002`), MFA (`AUTH-007`), external API authentication (`AUTH-008`), Google/Microsoft/OTP login, lockout and rate limiting, and complete authentication-event coverage beyond the existing login events.
@@ -193,4 +193,14 @@ This file records key architectural decisions made for **LWILL AI BUILDER v1**.
   - **Consequences**:
     - The first native integration can proceed without changing provider-neutral contracts, tenant hierarchy, authorization boundaries, Prisma schema, or migration `0_init`.
     - Native browser authentication becomes a server-validated, revocable session flow rather than a JWT-only authorization mechanism.
-    - The proposed values require explicit approval and deployment key provisioning before implementation; this ADR itself performs no application or dependency changes.
+    - Deployment still requires valid runtime key provisioning; private keys and real environment values remain outside source control.
+
+  - **Approved application integration decisions**:
+    - Native browser authentication uses `POST /api/auth/login`, `POST /api/auth/refresh`, `POST /api/auth/logout`, and `POST /api/auth/logout-all`.
+    - State-changing authentication requests require an `Origin` exactly matching `LWILL_AUTH_ALLOWED_ORIGIN`; missing, null, malformed, or mismatched origins fail with `403`. When present, `Sec-Fetch-Site` must be `same-origin`.
+    - Login accepts only email and password. Tenant identity is resolved server-side from an active, verified `TenantDomain` for the request hostname and is revalidated through active tenant membership.
+    - Runtime configuration uses `LWILL_AUTH_JWT_ISSUER`, `LWILL_AUTH_JWT_AUDIENCE`, `LWILL_AUTH_JWT_ACTIVE_KID`, `LWILL_AUTH_JWT_PRIVATE_KEY_PEM_B64`, and `LWILL_AUTH_JWT_VERIFICATION_KEYS_JSON`.
+    - Next.js Node instrumentation registers the provider once per server process through `setAuthenticationProvider()`. Cookie resolution remains request-scoped and is never cached across requests.
+    - Current-session logout derives identity from a verified access token or, when access is unavailable, a valid persisted refresh token. Logout-all requires a verified access token and active server session. Client-supplied session and user identifiers are never accepted.
+    - Required audit actions for this slice are `auth.login.succeeded`, `auth.login.failed`, `auth.refresh.succeeded`, `auth.refresh.failed`, `auth.refresh.reuse_detected`, `auth.logout.succeeded`, and `auth.logout_all.succeeded`. Secrets and raw tokens must never be recorded.
+    - No Prisma schema change or migration is required for this application-integration slice. Migration `0_init` remains unchanged.

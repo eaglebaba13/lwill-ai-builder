@@ -137,6 +137,8 @@ export async function loginWithEmailPassword(
           metadata: {
             reason: "invalid_password",
             email: normalizedEmail,
+            userAgent: input.userAgent ?? null,
+            ipAddress: input.ipAddress ?? null,
           },
         },
       });
@@ -177,6 +179,8 @@ export async function loginWithEmailPassword(
         metadata: {
           email: normalizedEmail,
           sessionId: session.id,
+          userAgent: input.userAgent ?? null,
+          ipAddress: input.ipAddress ?? null,
         },
       },
     });

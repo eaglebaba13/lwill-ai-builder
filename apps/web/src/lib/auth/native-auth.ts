@@ -186,9 +186,19 @@ interface RefreshTokenRecord {
   readonly revokedAt: Date | null;
   readonly session: {
     readonly userId: string;
+    readonly tenantId: string | null;
     readonly expiresAt: Date;
     readonly revokedAt: Date | null;
   };
+}
+
+interface NativeAuditInput {
+  readonly tenantId: string;
+  readonly actorUserId: string;
+  readonly action: string;
+  readonly entityType: string;
+  readonly entityId: string;
+  readonly metadata?: Record<string, unknown>;
 }
 
 export interface NativeRefreshPrismaClient extends PrismaSessionClient {
@@ -216,7 +226,64 @@ export interface NativeRefreshPrismaClient extends PrismaSessionClient {
   readonly user: PrismaSessionClient["user"] & {
     findUnique: (args: { where: { id: string } }) => Promise<{ isActive: boolean } | null>;
   };
+  readonly auditLog: {
+    create: (args: { data: NativeAuditInput }) => Promise<unknown>;
+  };
   readonly $transaction: <T>(callback: (client: NativeRefreshPrismaClient) => Promise<T>) => Promise<T>;
+}
+
+export async function resolveNativeAccessSession(
+  prisma: PrismaSessionClient,
+  accessToken: string | null,
+  jwt: NativeJwtService,
+): Promise<VerifiedSessionRecord | null> {
+  if (accessToken === null || accessToken.trim() === "") {
+    return null;
+  }
+  return createNativeVerifiedSessionSource({
+    resolveAccessToken: () => accessToken,
+    jwt,
+    prismaOptions: { prismaClient: prisma },
+  }).getVerifiedSession();
+}
+
+export async function resolveNativeRefreshSession(
+  prisma: NativeRefreshPrismaClient,
+  refreshToken: string | null,
+  now = new Date(),
+): Promise<{ sessionId: string; userId: string; tenantId: string } | null> {
+  if (refreshToken === null || refreshToken.trim() === "") {
+    return null;
+  }
+  try {
+    const stored = await prisma.refreshToken.findUnique({
+      where: { tokenHash: createTokenHash(refreshToken) },
+      include: { session: true },
+    });
+    const user = stored === null
+      ? null
+      : await prisma.user.findUnique({ where: { id: stored.userId } });
+    if (
+      stored === null ||
+      user === null ||
+      !user.isActive ||
+      stored.revokedAt !== null ||
+      stored.expiresAt <= now ||
+      stored.session.revokedAt !== null ||
+      stored.session.expiresAt <= now ||
+      stored.session.userId !== stored.userId ||
+      stored.session.tenantId === null
+    ) {
+      return null;
+    }
+    return {
+      sessionId: stored.sessionId,
+      userId: stored.userId,
+      tenantId: stored.session.tenantId,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export async function refreshNativeSession(
@@ -257,6 +324,18 @@ export async function refreshNativeSession(
         where: { sessionId: stored.sessionId, revokedAt: null },
         data: { revokedAt: now },
       });
+      if (stored.session.tenantId !== null) {
+        await transaction.auditLog.create({
+          data: {
+            tenantId: stored.session.tenantId,
+            actorUserId: stored.userId,
+            action: "auth.refresh.reuse_detected",
+            entityType: "AuthenticationSession",
+            entityId: stored.sessionId,
+            metadata: { sessionId: stored.sessionId, reason: "revoked_refresh_token" },
+          },
+        });
+      }
       return null;
     }
 
@@ -288,6 +367,18 @@ export async function refreshNativeSession(
         expiresAt: replacementExpiresAt,
       },
     });
+    if (stored.session.tenantId !== null) {
+      await transaction.auditLog.create({
+        data: {
+          tenantId: stored.session.tenantId,
+          actorUserId: stored.userId,
+          action: "auth.refresh.succeeded",
+          entityType: "AuthenticationSession",
+          entityId: stored.sessionId,
+          metadata: { sessionId: stored.sessionId },
+        },
+      });
+    }
     return {
       refreshToken: replacementToken,
       accessToken: jwt.issue({ userId: stored.userId, sessionId: stored.sessionId }),
@@ -317,6 +408,9 @@ export async function revokeNativeSession(
   cookies?: NativeCookieStore,
 ): Promise<void> {
   await prisma.$transaction(async (transaction) => {
+    const session = await transaction.authenticationSession.findUnique({
+      where: { id: sessionId },
+    });
     await transaction.authenticationSession.update({
       where: { id: sessionId },
       data: { revokedAt: now },
@@ -325,6 +419,18 @@ export async function revokeNativeSession(
       where: { sessionId, revokedAt: null },
       data: { revokedAt: now },
     });
+    if (session?.tenantId !== null && session?.tenantId !== undefined) {
+      await transaction.auditLog.create({
+        data: {
+          tenantId: session.tenantId,
+          actorUserId: session.userId,
+          action: "auth.logout.succeeded",
+          entityType: "AuthenticationSession",
+          entityId: session.id,
+          metadata: { sessionId: session.id },
+        },
+      });
+    }
   });
   if (cookies !== undefined) {
     clearNativeAuthCookies(cookies, now);
@@ -336,8 +442,14 @@ export async function revokeAllNativeSessions(
   userId: string,
   now = new Date(),
   cookies?: NativeCookieStore,
+  currentSessionId?: string,
 ): Promise<void> {
   await prisma.$transaction(async (transaction) => {
+    const currentSession = currentSessionId === undefined
+      ? null
+      : await transaction.authenticationSession.findUnique({
+          where: { id: currentSessionId },
+        });
     await transaction.authenticationSession.updateMany({
       where: { userId, revokedAt: null },
       data: { revokedAt: now },
@@ -346,6 +458,18 @@ export async function revokeAllNativeSessions(
       where: { userId, revokedAt: null },
       data: { revokedAt: now },
     });
+    if (currentSession?.tenantId !== null && currentSession?.tenantId !== undefined) {
+      await transaction.auditLog.create({
+        data: {
+          tenantId: currentSession.tenantId,
+          actorUserId: userId,
+          action: "auth.logout_all.succeeded",
+          entityType: "User",
+          entityId: userId,
+          metadata: { sessionId: currentSession.id },
+        },
+      });
+    }
   });
   if (cookies !== undefined) {
     clearNativeAuthCookies(cookies, now);

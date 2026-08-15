@@ -710,3 +710,34 @@ No Prisma major-version upgrade was performed. The repository remains on Prisma 
 ### Current Next Development Target
 
 Phase 1D remains focused on concrete authentication/session integration and associated production-safe verification. Do not proceed to ERP/business modules until the Phase 1 authentication, tenant context, authorization, and audit foundation requirements are verified.
+
+---
+
+## Phase 1D Native Authentication Application Integration
+
+### Status: **Complete — application integration verified locally**
+
+### Implemented Slice
+
+- Node-runtime JWT configuration loader with fail-closed RSA key validation and active-`kid` verification.
+- Request-scoped native authentication provider registration through Next.js instrumentation and the existing provider-neutral server-context boundary.
+- Same-origin protection for all native authentication mutations.
+- `POST /api/auth/login`, `/api/auth/refresh`, `/api/auth/logout`, and `/api/auth/logout-all` route handlers.
+- Server-resolved login tenant identity using active, verified tenant-domain records and existing tenant-membership validation.
+- Trusted access/refresh session derivation for logout without accepting client-supplied user or session identifiers.
+- Authentication audit events for login, refresh, refresh-token reuse, current-session logout, and logout-all.
+- Focused route, runtime-configuration, origin-policy, JWT, cookie, refresh, and revocation tests.
+
+### Boundaries Preserved
+
+- No provider-neutral authentication contract, tenant hierarchy, or authorization boundary was changed.
+- No Prisma schema or migration was changed; migration `0_init` remains unchanged.
+- Password reset, MFA, API-key authentication, lockout/rate-limit policy, browser UI redesign, and production secret-manager selection remain deferred or NOT SPECIFIED.
+
+### Verification Results
+
+- `pnpm --filter web test` — Passed: 11 test files, 71 tests.
+- `pnpm test` — Passed: 6 successful monorepo test tasks.
+- `pnpm build` — Passed: Next.js production build and TypeScript compilation; all four authentication routes registered as dynamic server routes.
+- `pnpm lint` — Passed.
+- `git diff --check` — Passed.
