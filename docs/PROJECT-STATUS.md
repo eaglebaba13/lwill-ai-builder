@@ -878,7 +878,7 @@ Phase 1D remains focused on concrete authentication/session integration and asso
 ### Runtime Consequence
 
 - A newly created row will be active but `pending`, not verified. `createNativeAuthRouteServices()` and `resolveTenantByHostname()` continue to reject it, so `/api/auth/login` will still return `401` before password verification.
-- The repository does not define a DNS ownership challenge, certificate check, or approved command that changes `verificationStatus` to `verified`. That verification transition remains a manual deployment blocker requiring a separately approved mechanism; it must not be performed through an ad hoc production update.
+- The later controlled tenant-domain verification section now defines the approved manual transition to `verified`; direct SQL remains prohibited.
 - Coolify must continue routing HTTPS for `builder.lwill.in` to this application and provide `DATABASE_URL`, `LWILL_AUTH_ALLOWED_ORIGIN=https://builder.lwill.in`, and the existing required native-auth JWT configuration. These runtime values are not committed to the repository.
 
 ### Verification Results
@@ -887,5 +887,36 @@ Phase 1D remains focused on concrete authentication/session integration and asso
 - Package strict TypeScript check — Passed.
 - `pnpm test` — Passed: 6 successful monorepo tasks; authentication-context-prisma passed 12 files and 65 tests.
 - `pnpm build` — Passed: Next.js production build and TypeScript compilation.
+- `pnpm lint` — Passed.
+- `git diff --check` — Passed.
+
+---
+
+## Controlled `builder.lwill.in` Domain Verification
+
+### Status: **Implemented and verified locally; not executed against production**
+
+- Repository review classified tenant-domain verification as `NOT IMPLEMENTED`: the schema represented `pending` and `verified`, and runtime resolution rejected pending domains, but no ownership challenge or privileged transition existed.
+- ADR 015 now defines the initial controlled workflow as manual operator attestation. DNS and HTTPS presence are explicitly not treated as application-level ownership proof.
+- Verification is available only through a deployment CLI. No Next.js startup hook, public HTTP route, or unauthenticated promotion path was added.
+- The CLI requires protected runtime/database access, exact `--confirm=builder.lwill.in` input, and `LWILL_VERIFY_TENANT_DOMAIN_ADMIN_EMAIL` identifying an active user.
+- Inside one transaction, the verifier requires the canonical active HDK tenant, the exact active same-tenant domain mapping, and an active HDK tenant membership with an active tenant-scoped role granting the existing `tenant.manage` permission.
+- Only `pending` transitions to `verified`. An already verified mapping is an authorized idempotent success. Inactive, cross-tenant, missing, ambiguous, and unknown-state records fail closed.
+- The first transition writes `AuditLog.action = tenant-domain.verified`, attributes the administrator user, and records only the hostname, prior status, and `operator-attestation` method.
+- Native-auth hostname resolution is unchanged and continues to require an active tenant plus active, verified domain. `isPrimary` remains unchanged (`false` for the current production record).
+- No schema or migration change was required.
+
+### Production Operation
+
+- Run manually in the deployed application environment after the commit is approved, pushed, and deployed:
+   `LWILL_VERIFY_TENANT_DOMAIN_ADMIN_EMAIL=lwillshivansh@gmail.com pnpm --filter @lwill/authentication-context-prisma run verify:initial-tenant-domain -- --confirm=builder.lwill.in`
+- This command has not been run against production by repository development. When run against the confirmed current state, it is expected to change only `verificationStatus` from `pending` to `verified` and create the audit record.
+
+### Verification Results
+
+- Focused tenant-domain verification suite — Passed: 1 file, 8 tests covering pending rejection, active verified acceptance, inactive rejection, cross-tenant rejection, unauthorized rejection, authorized verification, idempotency, and protected CLI input.
+- Package strict TypeScript check — Passed.
+- `pnpm test` — Passed: 6 successful monorepo tasks; authentication-context-prisma passed 13 files and 73 tests.
+- `pnpm build` — Passed: Next.js production build and TypeScript compilation; no domain-verification route was added.
 - `pnpm lint` — Passed.
 - `git diff --check` — Passed.

@@ -345,3 +345,26 @@ This file records key architectural decisions made for **LWILL AI BUILDER v1**.
   - `LWILL-DOC-017-X-Nail-ERP-SRS-MVP-v1.0.docx`
   - `LWILL-DOC-025-Franchise-Management-SRS-v1.0.docx`
   - Supporting requirements: DOC-014 Multi-Tenant Engine, DOC-015 Authentication/RBAC, DOC-023 Finance/Accounting, DOC-024 Inventory/Warehouse, and DOC-030 Super Admin Control Center
+
+---
+
+## ADR 015: Controlled Tenant-Domain Verification
+
+- **Status**: Accepted for the initial `builder.lwill.in` verification workflow
+- **Context**: ADR 013 requires login tenancy to resolve only from active, verified `TenantDomain` records. The repository provides pending domain registration and fail-closed hostname resolution, but no ownership challenge, verification transition, or privileged domain-management UI/API. Production has an approved active pending `builder.lwill.in` mapping owned by the HDK tenant. DNS and HTTPS routing alone do not establish application-level tenant ownership.
+- **Decision**:
+  - Initial verification is a manual operator attestation performed only through a deployment CLI with access to the protected application runtime and production `DATABASE_URL`; no public HTTP verification route is introduced.
+  - The operator must explicitly confirm `builder.lwill.in` and identify an existing active HDK administrator by email through protected runtime input.
+  - The identified actor must be active and have an active HDK tenant membership with an active tenant-scoped role granting the existing `tenant.manage` permission. Business-unit and branch grants do not authorize domain verification.
+  - Verification fails closed unless the canonical HDK tenant is uniquely resolved and active, the exact active domain mapping exists, and that mapping belongs to the HDK tenant.
+  - Only `pending` may transition to `verified`. An already verified mapping is an authorized idempotent success; unknown states are rejected.
+  - The first successful transition and its actor are recorded in `AuditLog` as `tenant-domain.verified`. No secret or credential is recorded.
+  - Existing native-auth hostname resolution remains unchanged: only active, verified domain records belonging to active tenants resolve. Pending and inactive records remain rejected.
+- **Security boundary**:
+  - Runtime/database access is the operator boundary; tenant RBAC validation and exact hostname confirmation provide application-level authorization and attribution.
+  - Administrator email is an actor selector, not a credential and not a standalone authorization mechanism. Possession of an email address cannot invoke verification without protected runtime access.
+  - DNS resolution, TLS availability, request hostname, and public HTTP access do not authorize or automatically trigger verification.
+- **Consequences**:
+  - The initial approved hostname can be verified without schema or migration changes and without weakening login resolution.
+  - Future self-service domain verification still requires a separate approved ownership-challenge design and authenticated management boundary.
+  - The CLI must be run manually in the deployed application environment; it is not wired into startup, deployment, or a public endpoint.
