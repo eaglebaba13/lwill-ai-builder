@@ -1,8 +1,14 @@
 import { createPasswordHash } from "./auth-persistence";
+import {
+  INITIAL_BUSINESS_UNIT,
+  INITIAL_TENANT,
+  INITIAL_TENANT_ADMIN_PERMISSION_CODES,
+  INITIAL_TENANT_ADMIN_ROLE,
+} from "./initial-hierarchy-bootstrap";
 
-export const INITIAL_ADMIN_TENANT_NAME = "HDK Beauty I Pvt. Ltd.";
-export const INITIAL_ADMIN_BUSINESS_UNIT_NAME = "X Nail Bar";
-export const INITIAL_ADMIN_ROLE_CODE = "tenant-admin";
+export const INITIAL_ADMIN_TENANT_NAME = INITIAL_TENANT.name;
+export const INITIAL_ADMIN_BUSINESS_UNIT_NAME = INITIAL_BUSINESS_UNIT.name;
+export const INITIAL_ADMIN_ROLE_CODE = INITIAL_TENANT_ADMIN_ROLE.code;
 
 export class InitialAdminBootstrapError extends Error {
   constructor(message: string) {
@@ -76,12 +82,14 @@ interface BootstrapTransactionClient {
       select: {
         id: true;
         code: true;
-        permissions: { select: { permissionId: true } };
+        permissions: {
+          select: { permission: { select: { code: true } } };
+        };
       };
     }): Promise<{
       id: string;
       code: string;
-      permissions: Array<{ permissionId: string }>;
+      permissions: Array<{ permission: { code: string } }>;
     } | null>;
   };
   readonly user: {
@@ -196,7 +204,9 @@ export async function bootstrapInitialAdmin(
       select: {
         id: true,
         code: true,
-        permissions: { select: { permissionId: true } },
+        permissions: {
+          select: { permission: { select: { code: true } } },
+        },
       },
     });
     if (role === null) {
@@ -204,9 +214,16 @@ export async function bootstrapInitialAdmin(
         `Missing approved active tenant administrative role: ${INITIAL_ADMIN_ROLE_CODE}`,
       );
     }
-    if (role.permissions.length === 0) {
+    const actualPermissionCodes = role.permissions
+      .map(({ permission }) => permission.code)
+      .sort();
+    const approvedPermissionCodes = [...INITIAL_TENANT_ADMIN_PERMISSION_CODES].sort();
+    if (
+      actualPermissionCodes.length !== approvedPermissionCodes.length
+      || actualPermissionCodes.some((code, index) => code !== approvedPermissionCodes[index])
+    ) {
       throw new InitialAdminBootstrapError(
-        `Approved tenant administrative role has no permissions: ${INITIAL_ADMIN_ROLE_CODE}`,
+        `Tenant administrative role does not have the approved permission set: ${INITIAL_ADMIN_ROLE_CODE}`,
       );
     }
 

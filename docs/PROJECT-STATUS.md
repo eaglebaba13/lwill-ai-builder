@@ -800,7 +800,7 @@ Phase 1D remains focused on concrete authentication/session integration and asso
 
 - A manual CLI-only bootstrap creates or reuses the initial administrator for the active `HDK Beauty I Pvt. Ltd. -> X Nail Bar` hierarchy.
 - The hierarchy is resolved by exact approved names from existing active tenant and business-unit records; no UUID is embedded in code.
-- The bootstrap requires an existing active `tenant-admin` role with at least one existing permission and assigns it at tenant scope. It creates no role or permission and fails closed when the approved role is absent or empty.
+- The bootstrap requires the existing active `tenant-admin` role to have exactly the approved `tenant.manage` permission and assigns it at tenant scope. It creates no role or permission and fails closed when the role or permission set differs.
 - Credentials are read only at execution time from `LWILL_BOOTSTRAP_ADMIN_EMAIL`, `LWILL_BOOTSTRAP_ADMIN_PASSWORD`, and `LWILL_BOOTSTRAP_ADMIN_DISPLAY_NAME`.
 - Passwords are hashed through the existing Argon2-backed `createPasswordHash()` implementation. Plaintext passwords and hashes are excluded from command output.
 - The transaction is idempotent for users, credentials, memberships, and tenant-role assignments. Existing passwords remain unchanged unless the operator explicitly passes `--update-password`, which increments `passwordVersion`.
@@ -821,4 +821,37 @@ Phase 1D remains focused on concrete authentication/session integration and asso
 - `pnpm lint` — Passed.
 - `git diff --check` — Passed.
 - No Prisma schema or migration change was required.
+- No production database connection or mutation was performed.
+
+---
+
+## HDK / X Nail Initial Hierarchy Bootstrap
+
+### Status: **Implemented and verified locally; not executed against production**
+
+- A manual CLI-only bootstrap creates or reuses the approved `HDK Beauty I Pvt. Ltd.` tenant and `X Nail Bar` business unit in one transaction.
+- Canonical bootstrap identifiers are explicit: tenant slug `hdk-beauty-i-pvt-ltd` and business-unit slug `x-nail-bar`.
+- The bootstrap creates or reuses the active `tenant-admin` role with the repository's existing `tenant.manage` permission code. It rejects unexpected role permissions rather than widening administrator access.
+- Existing records are matched by both approved name and slug. Ambiguous, inactive, or conflicting tenant, business-unit, or role records fail closed.
+- Repeated execution is idempotent and reports which records or assignments were created.
+- No user or credential is created. Administrator credentials remain exclusively in the separate initial-admin bootstrap CLI.
+- No branch is created because ADR 014 requires outlets to be branches but does not approve an initial outlet identity.
+- No `builder.lwill.in` `TenantDomain` is created because ADR 010 and the current domain status leave that tenant assignment/cutover unresolved.
+- The command is not connected to Next.js startup, HTTP routes, package installation, Docker build, migrations, or deployment.
+
+### Manual Sequence
+
+1. Hierarchy and role data: `pnpm --filter @lwill/authentication-context-prisma run bootstrap:initial-hierarchy`
+2. Administrator identity and credentials: `pnpm --filter @lwill/authentication-context-prisma run bootstrap:initial-admin`
+
+### Verification Results
+
+- Focused hierarchy and administrator bootstrap suites — Passed: 2 files, 15 tests.
+- Package strict TypeScript check — Passed.
+- `pnpm test` — Passed: 6 successful monorepo tasks; bootstrap package passed 11 files and 59 tests; web passed 12 files and 72 tests.
+- `pnpm lint` — Passed.
+- `pnpm build` — Passed: Next.js production build and TypeScript compilation.
+- `pnpm --filter @lwill/database exec prisma validate --schema prisma/schema.prisma` — Passed with a command-scoped, non-connecting placeholder `DATABASE_URL`.
+- `git diff --check` — Passed.
+- Prisma schema and all existing migrations remain unchanged.
 - No production database connection or mutation was performed.

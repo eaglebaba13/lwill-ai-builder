@@ -34,7 +34,9 @@ function createFixture(overrides: {
           : {
               id: "role-1",
               code: "tenant-admin",
-              permissions: overrides.emptyRole ? [] : [{ permissionId: "permission-1" }],
+              permissions: overrides.emptyRole
+                ? []
+                : [{ permission: { code: "tenant.manage" } }],
             },
       ),
     },
@@ -174,7 +176,9 @@ describe("initial administrative bootstrap", () => {
     ).rejects.toThrow("Missing approved active tenant administrative role: tenant-admin");
     await expect(
       bootstrapInitialAdmin(createFixture({ emptyRole: true }).prisma, input),
-    ).rejects.toThrow("Approved tenant administrative role has no permissions: tenant-admin");
+    ).rejects.toThrow(
+      "Tenant administrative role does not have the approved permission set: tenant-admin",
+    );
   });
 
   it("does not return or log plaintext credentials or hashes", async () => {
