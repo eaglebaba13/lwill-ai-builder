@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "bootstrap:initial-hierarchy": "tsx src/initial-hierarchy-bootstrap-cli.ts",
+    "bootstrap:initial-tenant-domain": "tsx src/initial-tenant-domain-bootstrap-cli.ts",
     "bootstrap:initial-admin": "tsx src/initial-admin-bootstrap-cli.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"

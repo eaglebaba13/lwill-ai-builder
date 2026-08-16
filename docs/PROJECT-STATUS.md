@@ -778,8 +778,8 @@ Phase 1D remains focused on concrete authentication/session integration and asso
 ### Required Production Configuration
 
 - ADR 013 resolves login tenancy from the request hostname through an active, verified `TenantDomain` belonging to an active tenant, followed by active `TenantMembership` validation.
-- The repository contains no evidence that `builder.lwill.in` is currently mapped to the X-Nail tenant. That production configuration is therefore `NOT IMPLEMENTED` and login will fail closed until an approved mapping exists.
-- No tenant-domain or membership data was created or modified by this task. Assigning `builder.lwill.in` to X-Nail requires an explicit operational decision consistent with ADR 010 and the planned separation of tenant-specific code and domains.
+- Production verification found no `TenantDomain` row for `builder.lwill.in`; login therefore fails closed before password verification.
+- The later HDK tenant-domain bootstrap section records the approved ownership-mapping operation. That operation does not itself verify the domain, so a newly created `pending` record remains ineligible for login resolution.
 
 ### Verification Results
 
@@ -855,3 +855,37 @@ Phase 1D remains focused on concrete authentication/session integration and asso
 - `git diff --check` — Passed.
 - Prisma schema and all existing migrations remain unchanged.
 - No production database connection or mutation was performed.
+
+---
+
+## HDK `builder.lwill.in` Tenant-Domain Bootstrap
+
+### Status: **Implemented and verified locally; not executed against production**
+
+- The explicit operational mapping approved for native authentication is `builder.lwill.in` -> `HDK Beauty I Pvt. Ltd.`.
+- A manual CLI-only bootstrap resolves the approved tenant by its exact canonical name and slug, then creates or reuses the domain mapping in one transaction.
+- The operation fails closed when the tenant is missing, inactive, ambiguous, or conflicting, when the hostname belongs to another tenant, or when an existing same-tenant mapping is inactive.
+- New records set `domain = builder.lwill.in`, the resolved HDK `tenantId`, and `isActive = true`.
+- The operation intentionally omits `verificationStatus` and `isPrimary`, preserving the Prisma defaults `pending` and `false`. It never promotes an existing record or changes existing verification/primary state.
+- A same-tenant active mapping is idempotently reused, including an already verified mapping.
+- This approval is limited to the authentication hostname ownership mapping. It does not resolve ADR 010's separate tenant-UI migration, interim homepage, deployment cutover, or rollback decisions.
+- No Prisma schema, migration, Next.js startup hook, public route, credential, or administrator record is changed.
+
+### Production Command
+
+- Run once in the deployed application environment with its configured production `DATABASE_URL`: `pnpm --filter @lwill/authentication-context-prisma run bootstrap:initial-tenant-domain`
+
+### Runtime Consequence
+
+- A newly created row will be active but `pending`, not verified. `createNativeAuthRouteServices()` and `resolveTenantByHostname()` continue to reject it, so `/api/auth/login` will still return `401` before password verification.
+- The repository does not define a DNS ownership challenge, certificate check, or approved command that changes `verificationStatus` to `verified`. That verification transition remains a manual deployment blocker requiring a separately approved mechanism; it must not be performed through an ad hoc production update.
+- Coolify must continue routing HTTPS for `builder.lwill.in` to this application and provide `DATABASE_URL`, `LWILL_AUTH_ALLOWED_ORIGIN=https://builder.lwill.in`, and the existing required native-auth JWT configuration. These runtime values are not committed to the repository.
+
+### Verification Results
+
+- Focused tenant-domain bootstrap suite — Passed: 1 file, 6 tests covering creation, idempotency, conflicting ownership, missing tenant, ambiguous tenant, and inactive tenant.
+- Package strict TypeScript check — Passed.
+- `pnpm test` — Passed: 6 successful monorepo tasks; authentication-context-prisma passed 12 files and 65 tests.
+- `pnpm build` — Passed: Next.js production build and TypeScript compilation.
+- `pnpm lint` — Passed.
+- `git diff --check` — Passed.
