@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   bootstrapInitialTenantDomain,
+  bootstrapTenantDomain,
   type InitialTenantDomainBootstrapPrismaClient,
 } from "./initial-tenant-domain-bootstrap";
 
@@ -126,5 +127,56 @@ describe("initial tenant domain bootstrap", () => {
     await expect(bootstrapInitialTenantDomain(createFixture({
       tenants: [{ ...approvedTenant, isActive: false }],
     }).prisma)).rejects.toThrow("Approved tenant is inactive");
+  });
+});
+
+describe("bootstrapTenantDomain (generalized)", () => {
+  it("registers an additional domain against the same canonical tenant", async () => {
+    const fixture = createFixture();
+
+    const result = await bootstrapTenantDomain(fixture.prisma, "xnail.makemeartist.com");
+
+    expect(result).toEqual({
+      tenantId: "tenant-1",
+      domain: "xnail.makemeartist.com",
+      domainCreated: true,
+      isPrimary: false,
+      verificationStatus: "pending",
+      isActive: true,
+    });
+    expect(fixture.transaction.tenantDomain.create).toHaveBeenCalledWith({
+      data: {
+        tenantId: "tenant-1",
+        domain: "xnail.makemeartist.com",
+        isActive: true,
+      },
+      select: expect.any(Object),
+    });
+  });
+
+  it("normalizes casing/whitespace and rejects an empty domain", async () => {
+    const fixture = createFixture();
+
+    const result = await bootstrapTenantDomain(fixture.prisma, "  XNail.MakeMeArtist.com  ");
+
+    expect(result.domain).toBe("xnail.makemeartist.com");
+    await expect(bootstrapTenantDomain(createFixture().prisma, "   "))
+      .rejects.toThrow("Domain must not be empty");
+  });
+
+  it("still fails closed for cross-tenant ownership on the new domain", async () => {
+    const fixture = createFixture({
+      domain: {
+        id: "domain-1",
+        tenantId: "tenant-2",
+        domain: "xnail.makemeartist.com",
+        isPrimary: false,
+        verificationStatus: "verified",
+        isActive: true,
+      },
+    });
+
+    await expect(bootstrapTenantDomain(fixture.prisma, "xnail.makemeartist.com"))
+      .rejects.toThrow("xnail.makemeartist.com is assigned to another tenant");
   });
 });

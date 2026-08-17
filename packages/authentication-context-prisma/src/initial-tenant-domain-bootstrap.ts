@@ -95,9 +95,15 @@ function resolveApprovedTenant(records: readonly TenantRecord[]): TenantRecord {
   return tenant;
 }
 
-export async function bootstrapInitialTenantDomain(
+export async function bootstrapTenantDomain(
   prisma: InitialTenantDomainBootstrapPrismaClient,
+  domain: string,
 ): Promise<InitialTenantDomainBootstrapResult> {
+  const normalizedDomain = domain.trim().toLowerCase();
+  if (normalizedDomain === "") {
+    throw new InitialTenantDomainBootstrapError("Domain must not be empty");
+  }
+
   return prisma.$transaction(async (transaction) => {
     const tenant = resolveApprovedTenant(await transaction.tenant.findMany({
       where: {
@@ -107,7 +113,7 @@ export async function bootstrapInitialTenantDomain(
     }));
 
     let tenantDomain = await transaction.tenantDomain.findUnique({
-      where: { domain: INITIAL_TENANT_DOMAIN },
+      where: { domain: normalizedDomain },
       select: {
         id: true,
         tenantId: true,
@@ -121,19 +127,19 @@ export async function bootstrapInitialTenantDomain(
 
     if (tenantDomain !== null && tenantDomain.tenantId !== tenant.id) {
       throw new InitialTenantDomainBootstrapError(
-        `${INITIAL_TENANT_DOMAIN} is assigned to another tenant`,
+        `${normalizedDomain} is assigned to another tenant`,
       );
     }
     if (tenantDomain !== null && !tenantDomain.isActive) {
       throw new InitialTenantDomainBootstrapError(
-        `${INITIAL_TENANT_DOMAIN} mapping is inactive`,
+        `${normalizedDomain} mapping is inactive`,
       );
     }
 
     tenantDomain ??= await transaction.tenantDomain.create({
       data: {
         tenantId: tenant.id,
-        domain: INITIAL_TENANT_DOMAIN,
+        domain: normalizedDomain,
         isActive: true,
       },
       select: {
@@ -155,6 +161,12 @@ export async function bootstrapInitialTenantDomain(
       isActive: tenantDomain.isActive,
     };
   });
+}
+
+export async function bootstrapInitialTenantDomain(
+  prisma: InitialTenantDomainBootstrapPrismaClient,
+): Promise<InitialTenantDomainBootstrapResult> {
+  return bootstrapTenantDomain(prisma, INITIAL_TENANT_DOMAIN);
 }
 
 export function formatInitialTenantDomainBootstrapResult(

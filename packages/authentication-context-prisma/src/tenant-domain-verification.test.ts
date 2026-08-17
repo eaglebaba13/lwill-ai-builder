@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import { resolveTenantByHostname } from "./tenant-domain";
 import {
   readTenantDomainVerificationInput,
+  readTenantDomainVerificationInputForDomain,
   verifyInitialTenantDomain,
+  verifyTenantDomain,
   type TenantDomainVerificationPrismaClient,
 } from "./tenant-domain-verification";
 
@@ -149,6 +151,52 @@ describe("tenant domain verification", () => {
       "--confirm=builder.lwill.in",
     ])).toThrow("LWILL_VERIFY_TENANT_DOMAIN_ADMIN_EMAIL");
     expect(() => readTenantDomainVerificationInput({
+      LWILL_VERIFY_TENANT_DOMAIN_ADMIN_EMAIL: "admin@example.test",
+    }, [])).toThrow("Explicit confirmation required");
+  });
+});
+
+describe("verifyTenantDomain (generalized)", () => {
+  it("verifies an additional domain against the same canonical tenant only", async () => {
+    const fixture = createFixture();
+    fixture.transaction.tenantDomain.findUnique = vi.fn(async () => ({
+      id: "domain-2",
+      tenantId: "tenant-1",
+      domain: "xnail.makemeartist.com",
+      verificationStatus: "pending",
+      isActive: true,
+    }));
+
+    const result = await verifyTenantDomain(fixture.prisma, {
+      actorEmail: "admin@example.test",
+      confirmedDomain: "xnail.makemeartist.com",
+    });
+
+    expect(result).toMatchObject({
+      tenantId: "tenant-1",
+      domain: "xnail.makemeartist.com",
+      verificationChanged: true,
+    });
+  });
+
+  it("rejects an empty confirmed domain", async () => {
+    await expect(verifyTenantDomain(createFixture().prisma, {
+      actorEmail: "admin@example.test",
+      confirmedDomain: "   ",
+    })).rejects.toThrow("Tenant domain confirmation does not match");
+  });
+
+  it("parses --confirm=<domain> generically and requires the protected actor email", () => {
+    expect(() => readTenantDomainVerificationInputForDomain({}, [
+      "--confirm=xnail.makemeartist.com",
+    ])).toThrow("LWILL_VERIFY_TENANT_DOMAIN_ADMIN_EMAIL");
+    expect(readTenantDomainVerificationInputForDomain({
+      LWILL_VERIFY_TENANT_DOMAIN_ADMIN_EMAIL: "admin@example.test",
+    }, ["--confirm=xnail.makemeartist.com"])).toEqual({
+      actorEmail: "admin@example.test",
+      confirmedDomain: "xnail.makemeartist.com",
+    });
+    expect(() => readTenantDomainVerificationInputForDomain({
       LWILL_VERIFY_TENANT_DOMAIN_ADMIN_EMAIL: "admin@example.test",
     }, [])).toThrow("Explicit confirmation required");
   });

@@ -137,11 +137,12 @@ export function readTenantDomainVerificationInput(
   return { actorEmail, confirmedDomain: INITIAL_TENANT_DOMAIN };
 }
 
-export async function verifyInitialTenantDomain(
+export async function verifyTenantDomain(
   prisma: TenantDomainVerificationPrismaClient,
   input: TenantDomainVerificationInput,
 ): Promise<TenantDomainVerificationResult> {
-  if (input.confirmedDomain !== INITIAL_TENANT_DOMAIN) {
+  const confirmedDomain = input.confirmedDomain.trim().toLowerCase();
+  if (confirmedDomain === "") {
     throw new TenantDomainVerificationError("Tenant domain confirmation does not match");
   }
 
@@ -162,7 +163,7 @@ export async function verifyInitialTenantDomain(
     }
 
     const tenantDomain = await transaction.tenantDomain.findUnique({
-      where: { domain: INITIAL_TENANT_DOMAIN },
+      where: { domain: confirmedDomain },
       select: {
         id: true,
         tenantId: true,
@@ -257,6 +258,38 @@ export async function verifyInitialTenantDomain(
       actorUserId: actor.id,
     };
   });
+}
+
+export async function verifyInitialTenantDomain(
+  prisma: TenantDomainVerificationPrismaClient,
+  input: TenantDomainVerificationInput,
+): Promise<TenantDomainVerificationResult> {
+  if (input.confirmedDomain !== INITIAL_TENANT_DOMAIN) {
+    throw new TenantDomainVerificationError("Tenant domain confirmation does not match");
+  }
+  return verifyTenantDomain(prisma, input);
+}
+
+export function readTenantDomainVerificationInputForDomain(
+  environment: TenantDomainVerificationEnvironment,
+  arguments_: readonly string[],
+): TenantDomainVerificationInput {
+  const actorEmail = environment.LWILL_VERIFY_TENANT_DOMAIN_ADMIN_EMAIL?.trim().toLowerCase();
+  if (!actorEmail) {
+    throw new TenantDomainVerificationError(
+      "Missing required environment variable: LWILL_VERIFY_TENANT_DOMAIN_ADMIN_EMAIL",
+    );
+  }
+  const confirmArgument = arguments_.length === 1 ? arguments_[0] : undefined;
+  const confirmedDomain = confirmArgument?.startsWith("--confirm=")
+    ? confirmArgument.slice("--confirm=".length).trim().toLowerCase()
+    : "";
+  if (confirmedDomain === "") {
+    throw new TenantDomainVerificationError(
+      "Explicit confirmation required: --confirm=<domain>",
+    );
+  }
+  return { actorEmail, confirmedDomain };
 }
 
 export function formatTenantDomainVerificationResult(
