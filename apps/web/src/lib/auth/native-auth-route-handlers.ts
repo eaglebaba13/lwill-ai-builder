@@ -15,7 +15,7 @@ export interface TrustedLogoutSession {
 }
 
 export interface NativeAuthRouteServices {
-  readonly hasValidOrigin: (request: Request) => boolean;
+  readonly hasValidOrigin: (request: Request) => Promise<boolean>;
   readonly cookies: NativeCookieStore;
   readonly resolveTenantId: (hostname: string) => Promise<string | null>;
   readonly login: (input: {
@@ -90,7 +90,7 @@ export async function handleNativeLogin(
   request: Request,
   services: NativeAuthRouteServices,
 ): Promise<Response> {
-  if (!services.hasValidOrigin(request)) {
+  if (!(await services.hasValidOrigin(request))) {
     return response(403);
   }
 
@@ -132,7 +132,7 @@ export async function handleNativeRefresh(
   request: Request,
   services: NativeAuthRouteServices,
 ): Promise<Response> {
-  if (!services.hasValidOrigin(request)) {
+  if (!(await services.hasValidOrigin(request))) {
     return response(403);
   }
   const result = await services.refresh(
@@ -149,7 +149,7 @@ export async function handleNativeLogout(
   request: Request,
   services: NativeAuthRouteServices,
 ): Promise<Response> {
-  if (!services.hasValidOrigin(request)) {
+  if (!(await services.hasValidOrigin(request))) {
     return response(403);
   }
   const accessSession = await services.resolveAccessSession(
@@ -170,7 +170,7 @@ export async function handleNativeLogoutAll(
   request: Request,
   services: NativeAuthRouteServices,
 ): Promise<Response> {
-  if (!services.hasValidOrigin(request)) {
+  if (!(await services.hasValidOrigin(request))) {
     return response(403);
   }
   const accessSession = await services.resolveAccessSession(

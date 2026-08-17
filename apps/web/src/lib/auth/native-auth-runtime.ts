@@ -5,7 +5,7 @@ import {
   normalizeHostname,
   resolveTenantByHostname,
 } from "../../../../../packages/authentication-context-prisma/src/tenant-domain";
-import { hasValidAuthenticationOrigin } from "./auth-origin";
+import { hasValidMultiTenantAuthenticationOrigin } from "./auth-origin";
 import { loadNativeAuthRuntimeConfig } from "./native-auth-config";
 import {
   clearNativeAuthCookies,
@@ -65,26 +65,28 @@ export async function createNativeAuthRouteServices(
   const loginPrisma = prisma as unknown as LoginPrismaClient;
   const userAgent = request.headers.get("user-agent");
 
+  const resolveTenantId = async (hostname: string): Promise<string | null> => {
+    const domain = normalizeHostname(hostname);
+    if (domain === null) {
+      return null;
+    }
+    const records = await prisma.tenantDomain.findMany({
+      where: {
+        domain: { in: [domain, `www.${domain}`] },
+        isActive: true,
+        verificationStatus: "verified",
+        tenant: { isActive: true },
+      },
+      include: { tenant: { select: { id: true, isActive: true } } },
+    });
+    return resolveTenantByHostname(hostname, records)?.tenantId ?? null;
+  };
+
   return {
     hasValidOrigin: (candidate) =>
-      hasValidAuthenticationOrigin(candidate, config.allowedOrigin),
+      hasValidMultiTenantAuthenticationOrigin(candidate, config.allowedOrigin, resolveTenantId),
     cookies: cookieStore,
-    async resolveTenantId(hostname) {
-      const domain = normalizeHostname(hostname);
-      if (domain === null) {
-        return null;
-      }
-      const records = await prisma.tenantDomain.findMany({
-        where: {
-          domain: { in: [domain, `www.${domain}`] },
-          isActive: true,
-          verificationStatus: "verified",
-          tenant: { isActive: true },
-        },
-        include: { tenant: { select: { id: true, isActive: true } } },
-      });
-      return resolveTenantByHostname(hostname, records)?.tenantId ?? null;
-    },
+    resolveTenantId,
     login: (input) => loginWithNativeCookies(loginPrisma, input, jwt, cookieStore),
     refresh: (refreshToken) => refreshNativeSession(nativePrisma, refreshToken, jwt, cookieStore),
     resolveAccessSession: (accessToken) => resolveNativeAccessSession(nativePrisma, accessToken, jwt),

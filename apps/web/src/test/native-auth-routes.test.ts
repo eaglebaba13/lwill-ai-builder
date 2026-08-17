@@ -47,7 +47,7 @@ function createServices(): NativeAuthRouteServices {
     set: (name, value) => { values.set(name, value); },
   };
   return {
-    hasValidOrigin: vi.fn().mockReturnValue(true),
+    hasValidOrigin: vi.fn().mockResolvedValue(true),
     cookies,
     resolveTenantId: vi.fn().mockResolvedValue("tenant-1"),
     login: vi.fn().mockResolvedValue({ accessToken: "access", refreshToken: "refresh", verifiedSession: {} }),
@@ -69,7 +69,7 @@ describe("native authentication routes", () => {
   });
 
   it("rejects cross-origin requests before authentication work", async () => {
-    vi.mocked(services.hasValidOrigin).mockReturnValue(false);
+    vi.mocked(services.hasValidOrigin).mockResolvedValue(false);
     expect((await handleNativeLogin(request("/api/auth/login", {}), services)).status).toBe(403);
     expect(services.login).not.toHaveBeenCalled();
   });
