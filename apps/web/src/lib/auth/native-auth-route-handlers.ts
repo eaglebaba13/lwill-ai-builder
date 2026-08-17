@@ -46,6 +46,13 @@ function response(status: number): Response {
 }
 
 function requestHostname(request: Request): string {
+  // Behind Coolify/Traefik the app is not directly internet-reachable, so any
+  // request it receives has already passed through the proxy; request.url's
+  // own hostname reflects the container's internal address, not the public one.
+  const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
+  if (forwardedHost !== undefined && forwardedHost !== "") {
+    return forwardedHost;
+  }
   return new URL(request.url).hostname;
 }
 

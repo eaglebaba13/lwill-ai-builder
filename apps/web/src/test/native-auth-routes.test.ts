@@ -20,6 +20,23 @@ function request(path: string, body?: unknown): Request {
   });
 }
 
+function requestWithHeaders(
+  path: string,
+  headers: Record<string, string>,
+  body?: unknown,
+): Request {
+  return new Request(`https://builder.lwill.in${path}`, {
+    method: "POST",
+    headers: {
+      origin: "https://builder.lwill.in",
+      "sec-fetch-site": "same-origin",
+      "content-type": "application/json",
+      ...headers,
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+}
+
 function createServices(): NativeAuthRouteServices {
   const values = new Map<string, string>();
   const cookies: NativeCookieStore = {
@@ -109,5 +126,41 @@ describe("native authentication routes", () => {
     });
     expect((await handleNativeLogoutAll(request("/api/auth/logout-all"), services)).status).toBe(204);
     expect(services.revokeAllSessions).toHaveBeenCalledWith("user-1", "session-1");
+  });
+
+  it("resolves tenancy from the trusted reverse-proxy X-Forwarded-Host header", async () => {
+    await handleNativeLogin(requestWithHeaders("/api/auth/login", {
+      "x-forwarded-host": "xnail.makemeartist.com",
+    }, { email: "user@example.com", password: "password" }), services);
+    expect(services.resolveTenantId).toHaveBeenCalledWith("xnail.makemeartist.com");
+  });
+
+  it("resolves a different proxied production hostname the same way", async () => {
+    await handleNativeLogin(requestWithHeaders("/api/auth/login", {
+      "x-forwarded-host": "builder.lwill.in",
+    }, { email: "user@example.com", password: "password" }), services);
+    expect(services.resolveTenantId).toHaveBeenCalledWith("builder.lwill.in");
+  });
+
+  it("takes only the first hop of a multi-value X-Forwarded-Host header", async () => {
+    await handleNativeLogin(requestWithHeaders("/api/auth/login", {
+      "x-forwarded-host": "xnail.makemeartist.com, internal-proxy.local",
+    }, { email: "user@example.com", password: "password" }), services);
+    expect(services.resolveTenantId).toHaveBeenCalledWith("xnail.makemeartist.com");
+  });
+
+  it("falls back to the request URL hostname when no proxy header is present", async () => {
+    await handleNativeLogin(request("/api/auth/login", {
+      email: "user@example.com",
+      password: "password",
+    }), services);
+    expect(services.resolveTenantId).toHaveBeenCalledWith("builder.lwill.in");
+  });
+
+  it("ignores a blank X-Forwarded-Host header and falls back safely", async () => {
+    await handleNativeLogin(requestWithHeaders("/api/auth/login", {
+      "x-forwarded-host": "   ",
+    }, { email: "user@example.com", password: "password" }), services);
+    expect(services.resolveTenantId).toHaveBeenCalledWith("builder.lwill.in");
   });
 });

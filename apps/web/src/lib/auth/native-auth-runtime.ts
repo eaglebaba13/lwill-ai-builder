@@ -72,12 +72,6 @@ export async function createNativeAuthRouteServices(
     async resolveTenantId(hostname) {
       const domain = normalizeHostname(hostname);
       if (domain === null) {
-        console.log(JSON.stringify({
-          event: "LWILL_TENANT_RESOLUTION_DIAGNOSTIC",
-          hostnameSeen: hostname,
-          normalizedHostname: null,
-          matchedTenantId: null,
-        }));
         return null;
       }
       const records = await prisma.tenantDomain.findMany({
@@ -89,15 +83,7 @@ export async function createNativeAuthRouteServices(
         },
         include: { tenant: { select: { id: true, isActive: true } } },
       });
-      const matchedTenantId = resolveTenantByHostname(hostname, records)?.tenantId ?? null;
-      // TEMPORARY: remove after tenant-resolution diagnosis is complete.
-      console.log(JSON.stringify({
-        event: "LWILL_TENANT_RESOLUTION_DIAGNOSTIC",
-        hostnameSeen: hostname,
-        normalizedHostname: domain,
-        matchedTenantId,
-      }));
-      return matchedTenantId;
+      return resolveTenantByHostname(hostname, records)?.tenantId ?? null;
     },
     login: (input) => loginWithNativeCookies(loginPrisma, input, jwt, cookieStore),
     refresh: (refreshToken) => refreshNativeSession(nativePrisma, refreshToken, jwt, cookieStore),
