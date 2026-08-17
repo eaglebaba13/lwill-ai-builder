@@ -56,6 +56,33 @@ describe("customer/service/appointment bootstrap", () => {
     expect(service.name).toBe("Manicure");
   });
 
+  it("rejects invalid service duration and pricing before persistence", async () => {
+    const create = async ({ data }: { data: Record<string, unknown> }) => ({ id: "service-1", ...data });
+    const serviceService = createServiceService({
+      service: {
+        create,
+        findUnique: async () => null,
+        findMany: async () => [],
+        update: async ({ data }: { data: Record<string, unknown> }) => ({ id: "service-1", ...data }),
+        delete: async () => ({ id: "service-1" }),
+      },
+    } as never);
+
+    await expect(serviceService.createService({
+      tenantId: "tenant-1",
+      name: "Invalid duration",
+      durationMinutes: 0,
+      priceCents: 5000,
+    })).rejects.toThrow("service duration must be a positive whole number of minutes");
+
+    await expect(serviceService.createService({
+      tenantId: "tenant-1",
+      name: "Invalid price",
+      durationMinutes: 45,
+      priceCents: -1,
+    })).rejects.toThrow("service price must be a non-negative whole number of cents");
+  });
+
   it("creates an appointment with tenant-valid customer and service", async () => {
     const appointmentService = createAppointmentService({
       appointment: {

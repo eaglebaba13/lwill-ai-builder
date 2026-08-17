@@ -36,6 +36,16 @@ interface ServicePrismaClient {
 export function createServiceService(prisma: ServicePrismaClient): ServiceService {
   return {
     async createService(input) {
+      if (!input.name || input.name.trim().length === 0) {
+        throw new Error("service name is required");
+      }
+      if (!Number.isInteger(input.durationMinutes) || input.durationMinutes <= 0) {
+        throw new Error("service duration must be a positive whole number of minutes");
+      }
+      if (!Number.isInteger(input.priceCents) || input.priceCents < 0) {
+        throw new Error("service price must be a non-negative whole number of cents");
+      }
+
       return prisma.service.create({
         data: {
           tenantId: input.tenantId,
