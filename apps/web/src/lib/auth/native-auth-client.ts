@@ -17,6 +17,17 @@ export async function loginWithNativeAuthentication(
   return response.ok;
 }
 
+export async function restoreNativeAuthentication(
+  fetcher: typeof fetch = fetch,
+): Promise<boolean> {
+  const response = await fetcher("/api/auth/refresh", {
+    method: "POST",
+    credentials: "same-origin",
+    cache: "no-store",
+  });
+  return response.ok;
+}
+
 export async function logoutFromNativeAuthentication(
   fetcher: typeof fetch = fetch,
 ): Promise<boolean> {

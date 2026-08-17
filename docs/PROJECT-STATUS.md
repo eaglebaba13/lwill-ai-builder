@@ -4,9 +4,9 @@
 
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
-- **Current Branch**: `main`
-- **Current HEAD Commit**: `dea96b3`
-- **Last Stable Commit**: `dea96b3`
+- **Current Branch**: `phase-1d-native-auth`
+- **Current HEAD Commit**: `8be0d691fe6167603dd6d2a9c1d8f4b8cb39f7b2`
+- **Last Stable Commit**: `8be0d69` (working tree contains uncommitted native-auth and unrelated customer/RBAC changes)
 
 ## State Breakdown
 
@@ -34,12 +34,12 @@
 ## Application & Workspace Architecture Status
 
 - **Current Applications**: `apps/web` only.
-- **Current Packages / Modules / Services**: No shared `packages`, business `modules`, or backend `services` are currently implemented.
+- **Current Packages / Modules / Services**: Shared authentication, authorization, database, Prisma-backed service, and web API modules are implemented in scoped slices; the broader backend/services target remains incomplete.
 - **Database Status**: Prisma database foundation and migration baseline are present in the repository; no live production database connection has been verified.
 - **Migration Status**: Initial migration baseline exists under `packages/database/prisma/migrations/0_init`; no production database has been applied or verified.
-- **Authentication Status**: Provider-neutral authentication contracts are implemented, and a concrete email/password login flow plus Prisma-backed session verification are now implemented and verified.
+- **Authentication Status**: Provider-neutral authentication contracts, native email/password login, Prisma-backed session verification, cookie-based refresh, and browser refresh/session restoration are implemented and verified locally. Production browser verification remains pending.
 - **Authorization Status**: Provider-neutral authorization contracts are implemented; no production-backed authorization adapter has been connected.
-- **Test Status**: `pnpm test` verified, but no test tasks are currently defined. Turborepo reports `0 successful, 0 total`. Automated test coverage is not yet implemented.
+- **Test Status**: Automated Vitest coverage is implemented. The latest native-auth verification passed `pnpm --filter web test` with 13 files and 96 tests, and `pnpm test` with 6 successful workspace tasks.
 - **TypeScript Status**: Verified passing through the Next.js production build.
 - **Lint Status**: Verified passing with `pnpm lint`.
 - **Build Status**: Verified passing with `pnpm build`.
@@ -58,8 +58,8 @@
 
 ## Known Issues
 
-- No automated test suite currently exists.
-- Database, migrations, authentication, and authorization are not implemented.
+- The repository has automated tests; broader SRS coverage remains incomplete.
+- Production database application/verification, complete SRS authentication coverage, and production browser verification remain outstanding; the implemented native-auth slice is locally verified.
 - Production deployment is not configured.
 - Dyad preview currently has a root Turborepo `--port` forwarding incompatibility; this does not affect verified `pnpm lint` or `pnpm build`.
 - `builder.lwill.in` currently serves the HDK Beauty / X Nail tenant preview page (`apps/web/src/app/page.tsx`), not a LWILL AI Builder platform homepage. No actual LWILL AI Builder platform UI exists anywhere in this repository yet.
@@ -790,7 +790,7 @@ Phase 1D remains focused on concrete authentication/session integration and asso
 
 ### Remaining Boundary
 
-- Restoring the temporary client page's visual authenticated state after a browser reload remains `NOT IMPLEMENTED`. No approved session-status route exists, and this task did not invent one. The server-side cookie/session mechanism remains authoritative for protected server operations.
+- Production browser verification of login, browser reload restoration, refresh-token rotation, and logout remains pending. No production deployment, production database mutation, or new session-status route was introduced.
 
 ---
 
@@ -821,6 +821,31 @@ Phase 1D remains focused on concrete authentication/session integration and asso
 - `pnpm lint` — Passed.
 - `git diff --check` — Passed.
 - No Prisma schema or migration change was required.
+- No production database connection or mutation was performed.
+
+---
+
+## X Nail Customer RBAC Permission Bootstrap
+
+### Status: **Implemented and verified locally; not executed against production**
+
+- Added a manual CLI-only, transactional bootstrap for the approved X Nail operational role.
+- The bootstrap reuses only the pre-existing active tenant-scoped `x-nail-operations` role, creates only `customer.read` and `customer.write`, assigns them to that role, and is idempotent.
+- Invalid or unapproved permission sets fail closed before any transaction. The existing `tenant.manage` hierarchy/admin bootstrap allowlist remains unchanged.
+- Customer API authorization continues to require `customer.read` for reads and `customer.write` for writes; no user grant or unrestricted permission-management tool was added.
+- No schema, migration, production data, deployment, or GitHub state was changed.
+
+### Manual Command
+
+- `pnpm --filter @lwill/authentication-context-prisma run bootstrap:initial-customer-permissions`
+
+### Verification Results
+
+- Focused RBAC/customer tests — Passed: 5 customer-permission bootstrap tests, 6 hierarchy-bootstrap tests, and 9 customer-route tests.
+- Full `pnpm test` — Passed: 6 successful monorepo tasks; 88 authentication-context-prisma tests and 9 customer-route tests included.
+- `pnpm build` — Passed.
+- `pnpm lint` — Passed.
+- `git diff --check` — Passed.
 - No production database connection or mutation was performed.
 
 ---
@@ -920,3 +945,23 @@ Phase 1D remains focused on concrete authentication/session integration and asso
 - `pnpm build` — Passed: Next.js production build and TypeScript compilation; no domain-verification route was added.
 - `pnpm lint` — Passed.
 - `git diff --check` — Passed.
+
+---
+
+## Authenticated Browser Refresh Persistence Fix
+
+### Status: **Complete — all requested local verification passed**
+
+- Root cause: the temporary X Nail page initialized its client-only `authenticated` state to `false` and had no session-restoration request. A full browser reload therefore rendered the login screen immediately, even though the native `lwill_access` and `lwill_refresh` cookies persisted correctly.
+- The native provider intentionally verifies only the access cookie for server-side authentication. The existing refresh route and refresh-token rotation were present, but the browser UI never called that route during initialization.
+- The page now starts in an indeterminate authentication state, calls `POST /api/auth/refresh` with same-origin credentials on mount, and renders the dashboard only after refresh succeeds. The native refresh service validates the persisted refresh token, preserves session and tenant checks, rotates the token, and sets replacement access/refresh cookies.
+- Added a focused frontend regression test covering login, authenticated dashboard state, simulated page reload, refresh-based session restoration, and continued dashboard authentication.
+- No database schema, migration, tenant-domain record, RBAC role/permission, deployment configuration, or production data was changed.
+
+### Verification Results
+
+- `pnpm --filter web test` — Passed: 13 test files, 96 tests.
+- `pnpm test` — Passed: 6 successful workspace test tasks; web passed 13 files and 96 tests.
+- `pnpm build` — Passed: Next.js production build and TypeScript compilation; `/api/auth/refresh` remains registered as a dynamic route.
+- `pnpm lint` — Passed.
+- `git diff --check` — Passed; only normal Git line-ending notices were emitted by the working tree status/diff command.

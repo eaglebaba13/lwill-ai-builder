@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   loginWithNativeAuthentication,
   logoutFromNativeAuthentication,
+  restoreNativeAuthentication,
 } from "@/lib/auth/native-auth-client";
 import {
   APPOINTMENT_STATUS_ORDER,
@@ -73,7 +74,7 @@ const tabs = ["Overview", "Customers", "Services", "Staff", "Appointments", "Bil
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<(typeof tabs)[number]>("Overview");
-  const [authenticated, setAuthenticated] = useState(false);
+  const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -100,6 +101,25 @@ export default function Home() {
     discountCents: 200,
     gstCents: 180,
   });
+
+  useEffect(() => {
+    let mounted = true;
+    void restoreNativeAuthentication()
+      .then((restored) => {
+        if (mounted) {
+          setAuthenticated(restored);
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setAuthenticated(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -204,6 +224,10 @@ export default function Home() {
   };
 
   const invoicePreview = createInvoiceRecord(selectedInvoice);
+
+  if (authenticated === null) {
+    return null;
+  }
 
   if (!authenticated) {
     return (
