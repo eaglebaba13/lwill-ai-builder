@@ -104,7 +104,13 @@ export default function Home() {
 
   useEffect(() => {
     let mounted = true;
-    void restoreNativeAuthentication()
+
+    const restoreAuthentication = () => {
+      if (mounted) {
+        setAuthenticated(null);
+      }
+
+      void restoreNativeAuthentication()
       .then((restored) => {
         if (mounted) {
           setAuthenticated(restored);
@@ -115,9 +121,19 @@ export default function Home() {
           setAuthenticated(false);
         }
       });
+    };
+
+    restoreAuthentication();
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        restoreAuthentication();
+      }
+    };
+    window.addEventListener("pageshow", handlePageShow);
 
     return () => {
       mounted = false;
+      window.removeEventListener("pageshow", handlePageShow);
     };
   }, []);
 

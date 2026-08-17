@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import Home from "../app/page";
@@ -89,5 +89,35 @@ describe("X Nail native authentication integration", () => {
       "/api/auth/refresh",
       expect.objectContaining({ method: "POST", credentials: "same-origin" }),
     );
+  });
+
+  it("revalidates a browser-restored document after logout before showing the dashboard", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(new Response(null, { status: 401 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<Home />);
+    await user.type(await screen.findByLabelText("Email"), "operator@example.test");
+    await user.type(await screen.findByLabelText("Password"), "test-password");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(await screen.findByText("Operations dashboard")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Sign out" }));
+    expect(await screen.findByText("Operations login")).toBeInTheDocument();
+
+    await act(async () => {
+      window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true }));
+    });
+
+    await waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith(
+      "/api/auth/refresh",
+      expect.objectContaining({ method: "POST", credentials: "same-origin" }),
+    ));
+    expect(await screen.findByText("Operations login")).toBeInTheDocument();
+    expect(screen.queryByText("Operations dashboard")).not.toBeInTheDocument();
   });
 });

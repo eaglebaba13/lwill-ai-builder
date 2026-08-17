@@ -5,8 +5,8 @@
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
 - **Current Branch**: `phase-1d-native-auth`
-- **Current HEAD Commit**: `8be0d691fe6167603dd6d2a9c1d8f4b8cb39f7b2`
-- **Last Stable Commit**: `8be0d69` (working tree contains uncommitted native-auth and unrelated customer/RBAC changes)
+- **Current HEAD Commit**: `ffcef3c` (`fix(auth): restore session after browser refresh`)
+- **Git State**: `phase-1d-native-auth` is at `ffcef3c`, which is pushed to `origin`; the working tree contains the uncommitted auth-navigation fix, its documentation, and unrelated customer/CRM/RBAC changes.
 
 ## State Breakdown
 
@@ -37,9 +37,9 @@
 - **Current Packages / Modules / Services**: Shared authentication, authorization, database, Prisma-backed service, and web API modules are implemented in scoped slices; the broader backend/services target remains incomplete.
 - **Database Status**: Prisma database foundation and migration baseline are present in the repository; no live production database connection has been verified.
 - **Migration Status**: Initial migration baseline exists under `packages/database/prisma/migrations/0_init`; no production database has been applied or verified.
-- **Authentication Status**: Provider-neutral authentication contracts, native email/password login, Prisma-backed session verification, cookie-based refresh, and browser refresh/session restoration are implemented and verified locally. Production browser verification remains pending.
+- **Authentication Status**: Provider-neutral authentication contracts, native email/password login, Prisma-backed session verification, cookie-based refresh, browser refresh/session restoration, server-session revocation, cookie clearing, and local Back/BFCache revalidation are implemented and verified. Production verification covers login, hard refresh, and logout; the new navigation fix remains pending deployment verification.
 - **Authorization Status**: Provider-neutral authorization contracts are implemented; no production-backed authorization adapter has been connected.
-- **Test Status**: Automated Vitest coverage is implemented. The latest native-auth verification passed `pnpm --filter web test` with 13 files and 96 tests, and `pnpm test` with 6 successful workspace tasks.
+- **Test Status**: Automated Vitest coverage is implemented. The latest native-auth verification passed `pnpm --filter web test` with 13 files and 97 tests, and `pnpm test` with 6 successful workspace tasks.
 - **TypeScript Status**: Verified passing through the Next.js production build.
 - **Lint Status**: Verified passing with `pnpm lint`.
 - **Build Status**: Verified passing with `pnpm build`.
@@ -965,3 +965,55 @@ Phase 1D remains focused on concrete authentication/session integration and asso
 - `pnpm build` — Passed: Next.js production build and TypeScript compilation; `/api/auth/refresh` remains registered as a dynamic route.
 - `pnpm lint` — Passed.
 - `git diff --check` — Passed; only normal Git line-ending notices were emitted by the working tree status/diff command.
+
+---
+
+## Logout Navigation Restoration Verification
+
+### Status: **Implemented locally — production re-verification pending deployment**
+
+### Root Cause
+
+- The native logout route and persistence layer were not leaving a usable server session. `POST /api/auth/logout` derives the current session from a verified access token or valid refresh token, revokes the `AuthenticationSession` and its active refresh tokens transactionally, and clears both `lwill_access` and `lwill_refresh` cookies with the existing `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`, and expired/zero-max-age contract.
+- The existing access-session verifier rejects revoked sessions, and refresh resolution rejects revoked refresh tokens or revoked/expired sessions. Focused tests verify both paths.
+- The observed dashboard after browser Back/revisit is a client-rendered stale document restoration issue. `apps/web/src/app/page.tsx` renders the dashboard from client React state, while logout only changes that state in the current document. There was no `pageshow` handler or history-restoration revalidation. A browser/Next.js BFCache or document restoration can therefore repaint the previous dashboard without a new server authentication request. That stale paint is not evidence that the server session remains valid.
+- BFCache was not assumed as the server-session cause: the repository source proves revocation and cookie clearing, and the regression test models persisted-document restoration explicitly. Browser-engine BFCache behavior still requires deployment-level browser verification.
+
+### Exact Files Changed
+
+- `apps/web/src/app/page.tsx` — revalidates authentication on `pageshow` when `event.persisted` is true, temporarily returns to the indeterminate state, and renders login when the revoked session cannot refresh.
+- `apps/web/src/test/x-nail-native-auth.test.tsx` — adds a regression covering login, dashboard, logout, persisted-document restoration, refresh rejection, and absence of the dashboard after logout.
+- `docs/PROJECT-STATUS.md` — records the verified root cause, security behavior, scope, progress, blockers, and next task.
+- `docs/HANDOVER.md` — records the completed verification handover state.
+
+### Security and Session Behavior
+
+- Server-side session revocation remains authoritative and unchanged.
+- Access and refresh cookies remain cleared according to ADR 013; no token is exposed to client JavaScript.
+- A browser-restored stale dashboard is revalidated through the existing `/api/auth/refresh` path. A revoked session returns to login and cannot authenticate again through access or refresh validation.
+- No Prisma schema/migration, `TenantDomain` production data, RBAC roles/permissions, production database, deployment, or unrelated uncommitted customer/CRM/RBAC work was modified.
+
+### Verification Results
+
+- Focused native-auth/frontend tests — Passed: 13 files, 97 tests.
+- Full `pnpm test` — Passed: 6 successful workspace tasks; web passed 13 files and 97 tests.
+- `pnpm build` — Passed: Next.js production build and TypeScript compilation.
+- `pnpm lint` — Passed.
+- `git diff --check` — Passed; only normal Git line-ending notices were emitted.
+
+### Production Verification Status
+
+- Previously verified in production on `xnail.makemeartist.com`: login works, hard refresh preserves the authenticated dashboard, and logout returns to login.
+- The post-logout Back/revisit behavior was investigated from source and covered locally, but this new client fix has not been deployed or production-tested. No production claim is made for the fix.
+
+### Progress Snapshot (planning estimates, not a formal completion metric)
+
+- **LWILL AI BUILDER overall:** 35% — shared monorepo, database foundation, authentication/session slice, authorization foundation, tenant-domain controls, and initial X Nail operational slices are verified; the platform UI, complete SRS coverage, production hardening, and most target modules remain incomplete.
+- **X Nail MVP:** 55% — authenticated operational shell plus verified customer, service, staff, attendance, appointment, package/membership, and POS/billing foundations exist; production-grade ERP workflows, inventory, scheduling depth, payments, reporting, and tenant-specific repository separation remain incomplete.
+- **Phase 1D:** 90% for the implemented native-auth/session slice — login, JWT/refresh integration, revocation, cookie contract, tenant resolution, browser refresh restoration, and logout navigation restoration are locally verified; production re-verification and broader SRS items such as MFA, password reset, lockout/rate limiting, API keys, and full audit coverage remain blockers.
+
+### Remaining Blockers and Next Smallest Production-Safe Task
+
+- Blocker: the fix is not deployed, and browser-engine behavior for Back/BFCache/revisit has not been rechecked on `xnail.makemeartist.com`.
+- Blocker: production database/session and deployment operations remain separately controlled; no production mutation was performed here.
+- Next smallest production-safe task: deploy this already-verified commit through the existing controlled release process, then run a browser matrix on `xnail.makemeartist.com` covering login → dashboard → logout → Back, direct revisit, hard refresh, and a second-tab stale-document case; confirm every restored view requires the refresh route and revoked sessions remain rejected. Do not alter schema, tenant-domain data, RBAC, or production records.
