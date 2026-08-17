@@ -37,3 +37,7 @@ Upon finishing your assigned task:
 1. Ensure all new or modified code passes type checks, linting (`pnpm lint`), and builds (`pnpm build`).
 2. Update `docs/PROJECT-STATUS.md` with accurate details of what was verified, changed, or left pending.
 3. Provide exact verification commands and git diff summary in your handover note.
+
+## Current X Nail handover constraint
+
+The X Nail native-auth navigation nail is locally implemented on `phase-1d-native-auth` at `c66bbb8` with uncommitted changes. Review only the scoped auth page/test/documentation changes; do not touch unrelated customer/CRM/RBAC/bootstrap work, Prisma schema/migrations, TenantDomain production data, production DB state, or deployment configuration.

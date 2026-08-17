@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   loginWithNativeAuthentication,
   logoutFromNativeAuthentication,
@@ -75,6 +75,7 @@ const tabs = ["Overview", "Customers", "Services", "Staff", "Appointments", "Bil
 export default function Home() {
   const [activeTab, setActiveTab] = useState<(typeof tabs)[number]>("Overview");
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
+  const authenticationRequestId = useRef(0);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -106,58 +107,70 @@ export default function Home() {
     let mounted = true;
 
     const restoreAuthentication = () => {
+      const requestId = ++authenticationRequestId.current;
+
       if (mounted) {
         setAuthenticated(null);
       }
 
       void restoreNativeAuthentication()
       .then((restored) => {
-        if (mounted) {
+        if (mounted && requestId === authenticationRequestId.current) {
           setAuthenticated(restored);
         }
       })
       .catch(() => {
-        if (mounted) {
+        if (mounted && requestId === authenticationRequestId.current) {
           setAuthenticated(false);
         }
       });
     };
 
     restoreAuthentication();
-    const handlePageShow = (event: PageTransitionEvent) => {
-      if (event.persisted) {
-        restoreAuthentication();
-      }
-    };
+    const handlePageShow = () => restoreAuthentication();
+    const handlePopState = () => restoreAuthentication();
     window.addEventListener("pageshow", handlePageShow);
+    window.addEventListener("popstate", handlePopState);
 
     return () => {
       mounted = false;
+      authenticationRequestId.current += 1;
       window.removeEventListener("pageshow", handlePageShow);
+      window.removeEventListener("popstate", handlePopState);
     };
   }, []);
 
   const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const requestId = ++authenticationRequestId.current;
     setIsAuthenticating(true);
     try {
       const authenticatedSuccessfully = await loginWithNativeAuthentication({ email, password });
-      setAuthenticated(authenticatedSuccessfully);
-      setLoginError(authenticatedSuccessfully ? null : "Authentication failed.");
-      if (authenticatedSuccessfully) {
-        setPassword("");
+      if (requestId === authenticationRequestId.current) {
+        setAuthenticated(authenticatedSuccessfully);
+        setLoginError(authenticatedSuccessfully ? null : "Authentication failed.");
+        if (authenticatedSuccessfully) {
+          setPassword("");
+        }
       }
     } catch {
-      setLoginError("Authentication failed.");
+      if (requestId === authenticationRequestId.current) {
+        setAuthenticated(false);
+        setLoginError("Authentication failed.");
+      }
     } finally {
-      setIsAuthenticating(false);
+      if (requestId === authenticationRequestId.current) {
+        setIsAuthenticating(false);
+      }
     }
   };
 
   const handleLogout = async () => {
+    authenticationRequestId.current += 1;
+    setAuthenticated(false);
+
     try {
       if (await logoutFromNativeAuthentication()) {
-        setAuthenticated(false);
         setLoginError(null);
       }
     } catch {

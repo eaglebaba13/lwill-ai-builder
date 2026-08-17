@@ -41,3 +41,8 @@ These requirements are tested and verified for the current repository baseline s
 - **Redis / BullMQ**: Target caching and background queue system (Future phases when load demands).
 - **Docker / Containerization**: Target deployment container specifications (Phase 3).
 - **Object Storage (S3 / MinIO)**: Target document and asset media storage (Future phases).
+# X Nail native-auth verification environment note
+
+- Local verification target: Windows development workspace, Node.js, pnpm workspace, and the `phase-1d-native-auth` branch.
+- Required commands for this slice: `pnpm --filter web test`, `pnpm test`, `pnpm build`, `pnpm lint`, and `git diff --check`.
+- Production deployment and browser verification are intentionally pending; no production database or deployment configuration was changed.

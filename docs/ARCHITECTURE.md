@@ -45,6 +45,10 @@ lwill-ai-builder/
 - **State**: Verified build and lint clean; Prisma/database and native authentication integrations exist in the repository, while no production database connection is verified. **[VERIFIED]**
 - **Actual LWILL AI Builder platform UI**: **NOT IMPLEMENTED** — no route, page, or component in this repository renders platform-branded (as opposed to tenant-branded) UI.
 
+### Native-auth navigation boundary [VERIFIED]
+
+The client page keeps authentication indeterminate until `restoreNativeAuthentication()` resolves, revalidates on initial mount, `pageshow`, and `popstate`, and uses a monotonically increasing request generation. Logout invalidates that generation before changing client state, so an older refresh response cannot restore the dashboard. The server logout/session revocation and `/api/auth/refresh` contract remain authoritative.
+
 ---
 
 ## 4. Intended Target Architecture [TARGET / NOT YET IMPLEMENTED]

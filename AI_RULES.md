@@ -15,5 +15,9 @@
 - **Monorepo Task Runner**: Use Turborepo (`turbo run <task>`) for orchestrating builds, linting, testing, and formatting across workspace apps/packages.
 - **Package Manager**: Use `pnpm` exclusively. Never run `npm` or `yarn` and never generate or commit `package-lock.json` or `yarn.lock`.
 - **Database & Persistence [Target / Not Yet Implemented]**: Prisma / PostgreSQL will be used when database persistence is introduced in Phase 1. Do not add mock database ORMs or premature database drivers.
-- **Authentication & RBAC [Target / Not Yet Implemented]**: Provider-neutral authentication and tenant-aware role-based access control will be implemented in Phase 1.
+- **Authentication & RBAC**: Provider-neutral native authentication/session validation and tenant-aware RBAC foundations exist in verified scoped slices; do not weaken server session validation or introduce client token storage.
 - **Third-Party Dependencies**: Keep dependencies minimal. Validate against `package.json` before adding external packages.
+
+## X Nail MVP status note
+
+The current X Nail auth-navigation implementation is local-only and does not authorize deployment. Client restoration uses the existing server refresh endpoint, keeps authentication indeterminate until resolution, and rejects stale asynchronous results by request generation.

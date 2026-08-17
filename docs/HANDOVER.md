@@ -25,16 +25,16 @@ This guide provides step-by-step instructions for any developer or AI assistant 
 
 ### Current Auth Navigation Handover (2026-08-17)
 
-- The logout/session investigation is complete locally. Root cause was stale client-document restoration after logout, not an active server session: the logout route revokes the persisted session and refresh tokens and clears both native cookies, while the client had no `pageshow` revalidation guard.
-- `apps/web/src/app/page.tsx` now revalidates persisted browser restorations through the existing refresh route and returns to the login state when the revoked session is rejected.
-- `apps/web/src/test/x-nail-native-auth.test.tsx` covers the persisted-document restoration regression.
+- The logout/session investigation is complete locally. Root cause is stale App Router/client-document and browser-history restoration after logout, not an active server session: the logout route revokes the persisted session and refresh tokens and clears both native cookies, while the client previously only revalidated a BFCache `pageshow` case.
+- `apps/web/src/app/page.tsx` now invalidates in-flight restoration results on logout and revalidates through the existing refresh route on initial mount, every `pageshow`, and history `popstate`, returning to login when the revoked session is rejected. Login results and unmount cleanup are generation guarded as well.
+- `apps/web/src/test/x-nail-native-auth.test.tsx` covers login, hard refresh, logout, BFCache restoration, Back/history restoration, direct revisit/remount, stale-document/second-tab revalidation, and stale in-flight restoration after logout.
 - Native server implementation was inspected and not changed: the existing logout handler derives the session only from verified access/refresh credentials, revokes the server session, and clears `lwill_access`/`lwill_refresh`; the existing session verifier and refresh path continue to reject revoked sessions.
-- Verified: `pnpm --filter web test` — 13 files / 97 tests; full `pnpm test` — 6 successful workspace tasks; `pnpm build` — passed; `pnpm lint` — passed; `git diff --check` — passed.
+- Verified: `pnpm --filter web test -- x-nail-native-auth.test.tsx` — 13 files / 100 tests, including 7 X Nail auth-navigation tests; `pnpm test` — 6 successful workspace tasks; `pnpm build` — passed; `pnpm lint` — passed; `git diff --check` — passed.
 - Production status: the earlier login, hard-refresh, and logout checks passed on `xnail.makemeartist.com`; this un-deployed navigation-restoration fix still requires controlled production browser verification.
-- Progress estimates (engineering estimates, not formal completion metrics): LWILL AI BUILDER overall 35%; X Nail MVP 55%; Phase 1D native-auth/session slice 90%.
+- Progress estimate (X Nail MVP only; engineering estimate, not a formal completion metric): 60%. This task reports no overall LWILL AI BUILDER percentage.
 - Remaining blockers: controlled deployment and browser-matrix verification of Back/BFCache/direct revisit/second-tab restoration; broader Phase 1D SRS items remain deferred, including password reset, MFA, API keys, lockout/rate limiting, and complete audit coverage.
-- Exact next task: after review and an explicit release decision, deploy the auth-navigation fix through the controlled release process, then verify login → dashboard → logout → Back/direct revisit/hard refresh/second-tab behavior on `xnail.makemeartist.com`, without production DB mutation.
-- Current Git state: branch `phase-1d-native-auth`, HEAD `ffcef3c`, pushed to `origin`; no commit or push has been performed for this latest auth-navigation fix, and unrelated customer/CRM/RBAC changes remain unstaged.
+- Exact next task: complete review of the local verification results, then—only after explicit release approval—deploy through the controlled release process and verify login → dashboard → logout → Back/direct revisit/hard refresh/second-tab behavior on `xnail.makemeartist.com`, without production DB mutation.
+- Current Git state: branch `phase-1d-native-auth`, HEAD `c66bbb8`, equal to `origin/phase-1d-native-auth`; no commit or push has been performed for these latest auth-navigation changes, and unrelated customer/CRM/RBAC changes remain unstaged.
 - Do not modify the unrelated uncommitted customer/CRM/RBAC files, Prisma schema/migrations, TenantDomain production data, RBAC roles/permissions, or production database state.
 
 ---

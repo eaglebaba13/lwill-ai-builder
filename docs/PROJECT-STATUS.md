@@ -5,8 +5,8 @@
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
 - **Current Branch**: `phase-1d-native-auth`
-- **Current HEAD Commit**: `ffcef3c` (`fix(auth): restore session after browser refresh`)
-- **Git State**: `phase-1d-native-auth` is at `ffcef3c`, which is pushed to `origin`; the working tree contains the uncommitted auth-navigation fix, its documentation, and unrelated customer/CRM/RBAC changes.
+- **Current HEAD Commit**: `c66bbb8` (`fix(auth): protect logout navigation restoration`)
+- **Git State**: `phase-1d-native-auth` and `origin/phase-1d-native-auth` are both at `c66bbb8`; the working tree contains the uncommitted X Nail auth-navigation correction, focused tests, documentation, and unrelated customer/CRM/RBAC changes.
 
 ## State Breakdown
 
@@ -37,9 +37,9 @@
 - **Current Packages / Modules / Services**: Shared authentication, authorization, database, Prisma-backed service, and web API modules are implemented in scoped slices; the broader backend/services target remains incomplete.
 - **Database Status**: Prisma database foundation and migration baseline are present in the repository; no live production database connection has been verified.
 - **Migration Status**: Initial migration baseline exists under `packages/database/prisma/migrations/0_init`; no production database has been applied or verified.
-- **Authentication Status**: Provider-neutral authentication contracts, native email/password login, Prisma-backed session verification, cookie-based refresh, browser refresh/session restoration, server-session revocation, cookie clearing, and local Back/BFCache revalidation are implemented and verified. Production verification covers login, hard refresh, and logout; the new navigation fix remains pending deployment verification.
+- **Authentication Status**: Provider-neutral authentication contracts, native email/password login, Prisma-backed session verification, cookie-based refresh, browser refresh/session restoration, server-session revocation, cookie clearing, and generation-safe client revalidation on initial mount, `pageshow`, and history `popstate` are implemented and locally verified. Production verification covers login, hard refresh, and logout; this un-deployed navigation correction still requires controlled production browser verification.
 - **Authorization Status**: Provider-neutral authorization contracts are implemented; no production-backed authorization adapter has been connected.
-- **Test Status**: Automated Vitest coverage is implemented. The latest native-auth verification passed `pnpm --filter web test` with 13 files and 97 tests, and `pnpm test` with 6 successful workspace tasks.
+- **Test Status**: Automated Vitest coverage is implemented. The focused X Nail native-auth verification passed `pnpm --filter web test -- x-nail-native-auth.test.tsx` with 13 files and 100 tests, including 7 navigation regression tests. `pnpm test` passed with 6 successful workspace tasks.
 - **TypeScript Status**: Verified passing through the Next.js production build.
 - **Lint Status**: Verified passing with `pnpm lint`.
 - **Build Status**: Verified passing with `pnpm build`.
@@ -81,6 +81,17 @@
 1. Finish Phase 0A documentation verification.
 2. Establish automated baseline tests before core business implementation.
 3. Design Phase 1 authentication, tenant hierarchy, permissions, and database foundation from verified requirements.
+
+## X Nail MVP Native-Auth Navigation Nail — 2026-08-17
+
+- **X Nail MVP progress only**: 60% engineering estimate; remaining 40% is controlled production deployment/browser verification and broader MVP scope, not an overall platform percentage.
+- **Root cause**: Server logout/session revocation was authoritative, but stale App Router/client documents and browser history could restore dashboard UI; an older in-flight refresh could also resolve after logout and overwrite state.
+- **Implementation**: `apps/web/src/app/page.tsx` preserves `restoreNativeAuthentication()` and `/api/auth/refresh`, sets authentication to indeterminate during revalidation, revalidates on initial mount, every `pageshow`, and `popstate`, and uses a monotonically increasing request generation. Logout invalidates the generation before setting Login state; stale login/restore results and unmount results are ignored; refresh rejection fails closed.
+- **Focused tests**: `apps/web/src/test/x-nail-native-auth.test.tsx` verifies login → dashboard, hard refresh restoration, logout → Login, BFCache/pageshow, Back/popstate, direct remount, stale second-tab/document revalidation, and stale in-flight restore suppression.
+- **Files changed for this nail**: `apps/web/src/app/page.tsx`, `apps/web/src/test/x-nail-native-auth.test.tsx`, and the scoped status/governance documentation listed in the handover. Unrelated customer/CRM/RBAC/bootstrap changes were not touched.
+- **Production status**: Not deployed and not production-browser verified. No production DB, TenantDomain data, Prisma schema/migrations, RBAC, cookie security policy, or deployment configuration was changed.
+- **Current blocker**: Controlled production deployment and browser verification require review and explicit release approval; local tests, build, lint, and diff checks are complete.
+- **Next smallest production-safe task**: Review the completed local diff and verification results; only with explicit approval, deploy through the existing controlled process and run the browser matrix for login, hard refresh, logout, Back, direct revisit, BFCache, and second-tab behavior without production DB mutation.
 
 ## Verification Evidence
 

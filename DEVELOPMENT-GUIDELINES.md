@@ -20,6 +20,10 @@
 9. Every commit must keep the project buildable.
 10. Production-first development only.
 
+## Current X Nail verification note
+
+The current X Nail MVP priority is native-auth navigation hardening. Changes remain limited to the existing client page and focused tests, preserve the `/api/auth/refresh` contract, and must be verified with `pnpm --filter web test`, `pnpm test`, `pnpm build`, `pnpm lint`, and `git diff --check`. Production verification remains a separate controlled task.
+
 ## Repository Review Checklist
 
 - Folder Structure

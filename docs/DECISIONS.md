@@ -195,6 +195,13 @@ This file records key architectural decisions made for **LWILL AI BUILDER v1**.
     - Native browser authentication becomes a server-validated, revocable session flow rather than a JWT-only authorization mechanism.
     - Deployment still requires valid runtime key provisioning; private keys and real environment values remain outside source control.
 
+### ADR 015: Native-auth browser restoration invalidation
+
+- **Status**: Accepted for the X Nail MVP navigation hardening slice.
+- **Context**: Server logout already revokes the persisted session and clears native cookies, but a browser may restore a stale App Router/client document or history entry. An older in-flight refresh can also resolve after logout.
+- **Decision**: Preserve the existing `restoreNativeAuthentication()` and `/api/auth/refresh` contract. Revalidate on initial mount, every `pageshow`, and `popstate`; render no authenticated content while state is indeterminate; and guard every restoration result with a client request generation. Increment the generation before/while logout changes authenticated state, and fail refresh rejection closed to Login.
+- **Constraints**: No token storage, cookie-policy change, server-session bypass, RBAC change, Prisma schema/migration change, TenantDomain change, production DB mutation, or deployment is part of this decision.
+
   - **Approved application integration decisions**:
     - Native browser authentication uses `POST /api/auth/login`, `POST /api/auth/refresh`, `POST /api/auth/logout`, and `POST /api/auth/logout-all`.
     - State-changing authentication requests require an `Origin` exactly matching `LWILL_AUTH_ALLOWED_ORIGIN`; missing, null, malformed, or mismatched origins fail with `403`. When present, `Sec-Fetch-Site` must be `same-origin`.

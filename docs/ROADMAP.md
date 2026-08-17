@@ -20,12 +20,17 @@ This roadmap outlines the phased development sequence for **LWILL AI BUILDER v1*
 
 ---
 
-## Phase 1: Authentication & Multi-Tenancy Engine [TARGET / NOT YET IMPLEMENTED]
+## Phase 1: Authentication & Multi-Tenancy Engine [PARTIALLY IMPLEMENTED]
 - **Data Persistence**: Initialize Prisma ORM / PostgreSQL schema.
 - **Tenant Context**: Implement Tenant → Business Unit → Branch hierarchy.
 - **Authentication**: Provider-neutral identity management and session handling.
 - **Role-Based Access Control (RBAC)**: Fine-grained permissions per tenant and branch.
 - **Audit Engine**: Immutable audit log recorder for data mutations.
+
+### X Nail MVP native-auth nail [LOCALLY VERIFIED]
+
+- Login, hard-refresh restoration, logout, BFCache/pageshow, history Back/popstate, direct remount, and stale-document revalidation are covered by focused tests.
+- Remaining work is controlled production browser verification after an approved deployment; this task does not deploy.
 
 ---
 

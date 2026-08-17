@@ -30,3 +30,7 @@ Authoritative source: "Multi-Tenant Repository Isolation & Client Portability" i
 ## Long-Term Vision
 
 NOT SPECIFIED as a single consolidated statement. The closest verified evidence of intended direction is the phase sequence in `docs/ROADMAP.md` (Foundation -> Authentication/Multi-Tenancy -> X Nail Release 1 -> Production Hardening -> Academy/Retail/Distribution -> Marketplace -> AI Builder Generation Engine -> Native Mobile Apps). No document defines an end-state vision beyond this phase list.
+
+## Current X Nail MVP status
+
+The native-auth navigation slice is locally verified. It uses the existing server-authoritative session and refresh contract and protects the client against stale browser-document/history restoration and stale in-flight restore results. Production verification and deployment remain pending.
