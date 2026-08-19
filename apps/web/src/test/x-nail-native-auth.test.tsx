@@ -215,4 +215,31 @@ describe("X Nail native authentication integration", () => {
     expect(screen.queryByText("Operations dashboard")).not.toBeInTheDocument();
     expect(screen.getByText("Operations login")).toBeInTheDocument();
   });
+
+  it("revalidates through refresh when pageshow fires while authenticated", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(new Response(null, { status: 403 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ customers: [] }));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<Home />);
+    await user.type(await screen.findByLabelText("Email"), "operator@example.test");
+    await user.type(await screen.findByLabelText("Password"), "test-password");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(await screen.findByText("Operations dashboard")).toBeInTheDocument();
+
+    await act(async () => {
+      window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true }));
+    });
+
+    expect(await screen.findByText("Operations dashboard")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/auth/refresh",
+      expect.objectContaining({ method: "POST", credentials: "same-origin" }),
+    );
+  });
 });

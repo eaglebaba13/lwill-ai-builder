@@ -242,6 +242,20 @@ describe("native cookies and refresh lifecycle", () => {
     });
   });
 
+  it("does not clear cookies when refresh token is null or empty (prevents stale-refresh race condition)", async () => {
+    const writesBeforeNull = cookies.writes.length;
+    expect(await refreshNativeSession(prisma, null, createJwt(), cookies, now)).toBeNull();
+    expect(cookies.writes).toHaveLength(writesBeforeNull);
+
+    const writesBeforeEmpty = cookies.writes.length;
+    expect(await refreshNativeSession(prisma, "  ", createJwt(), cookies, now)).toBeNull();
+    expect(cookies.writes).toHaveLength(writesBeforeEmpty);
+
+    const writesBeforeBlank = cookies.writes.length;
+    expect(await refreshNativeSession(prisma, "", createJwt(), cookies, now)).toBeNull();
+    expect(cookies.writes).toHaveLength(writesBeforeBlank);
+  });
+
   it("rotates a valid refresh token and revokes the presented token", async () => {
     prisma.refreshToken.findUnique = vi.fn().mockResolvedValue({
       id: "refresh-1", userId: "user-1", sessionId: "session-1", expiresAt: new Date("2026-09-01"), revokedAt: null,

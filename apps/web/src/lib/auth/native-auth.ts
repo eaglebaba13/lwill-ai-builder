@@ -294,7 +294,14 @@ export async function refreshNativeSession(
   now = new Date(),
 ): Promise<NativeRefreshResult | null> {
   if (refreshToken === null || refreshToken.trim() === "") {
-    clearNativeAuthCookies(cookies, now);
+    // Do not clear cookies here. A null/empty refresh token means the browser
+    // already has no refresh cookie, so clearing is unnecessary. More
+    // importantly, clearing cookies here creates a race condition: the initial
+    // page-mount refresh request (sent before login) may return after a
+    // concurrent login has already set fresh cookies. If the stale refresh
+    // response clears those cookies, the next authenticated fetch (e.g.
+    // /api/customers) arrives without credentials and returns 401, causing
+    // the client to log the user out immediately after login.
     return null;
   }
 
