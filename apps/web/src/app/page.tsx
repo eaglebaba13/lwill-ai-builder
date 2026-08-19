@@ -9,7 +9,6 @@ import {
 import {
   APPOINTMENT_STATUS_ORDER,
   createAppointmentRecord,
-  createCustomerRecord,
   createInvoiceRecord,
   createServiceRecord,
   createStaffRecord,
@@ -18,10 +17,13 @@ import {
 } from "@/lib/x-nail/operational-workflow";
 
 type CustomerRecord = {
+  id: string;
   tenantId: string;
   name: string;
-  phone?: string;
-  email?: string;
+  phone: string | null;
+  email: string | null;
+  notes?: string | null;
+  isActive: boolean;
 };
 
 type AppointmentRecord = {
@@ -34,11 +36,6 @@ type AppointmentRecord = {
   status: AppointmentStatus;
 };
 
-const initialCustomers: CustomerRecord[] = [
-  { tenantId: "tenant-xnail", name: "Priya Sharma", phone: "9876543210" },
-  { tenantId: "tenant-xnail", name: "Neha Verma", phone: "9988776655" },
-];
-
 const initialServices = [
   { tenantId: "tenant-xnail", name: "Classic Manicure", durationMinutes: 45, priceCents: 1500 },
   { tenantId: "tenant-xnail", name: "Gel Polish", durationMinutes: 60, priceCents: 2200 },
@@ -47,27 +44,6 @@ const initialServices = [
 const initialStaff = [
   { tenantId: "tenant-xnail", displayName: "Mina Patel", branchId: "branch-main" },
   { tenantId: "tenant-xnail", displayName: "Aisha Khan", branchId: "branch-main" },
-];
-
-const initialAppointments: AppointmentRecord[] = [
-  {
-    tenantId: "tenant-xnail",
-    customerId: "cust-1",
-    serviceId: "svc-1",
-    staffId: "staff-1",
-    startsAt: "2026-08-12T10:30:00.000Z",
-    endsAt: "2026-08-12T11:15:00.000Z",
-    status: "Booked",
-  },
-  {
-    tenantId: "tenant-xnail",
-    customerId: "cust-2",
-    serviceId: "svc-2",
-    staffId: "staff-2",
-    startsAt: "2026-08-12T14:00:00.000Z",
-    endsAt: "2026-08-12T15:00:00.000Z",
-    status: "Confirmed",
-  },
 ];
 
 const tabs = ["Overview", "Customers", "Services", "Staff", "Appointments", "Billing"] as const;
@@ -80,21 +56,23 @@ export default function Home() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isAuthenticating, setIsAuthenticating] = useState(false);
-  const [customers, setCustomers] = useState<CustomerRecord[]>(initialCustomers);
+  const [customers, setCustomers] = useState<CustomerRecord[]>([]);
+  const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
+  const [customerError, setCustomerError] = useState<string | null>(null);
   const [services, setServices] = useState(initialServices);
   const [staff, setStaff] = useState(initialStaff);
-  const [appointments, setAppointments] = useState<AppointmentRecord[]>(initialAppointments);
+  const [appointments, setAppointments] = useState<AppointmentRecord[]>([]);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [serviceName, setServiceName] = useState("");
   const [servicePrice, setServicePrice] = useState("1500");
   const [staffName, setStaffName] = useState("");
-  const [appointmentCustomer, setAppointmentCustomer] = useState("cust-1");
+  const [appointmentCustomer, setAppointmentCustomer] = useState("");
   const [appointmentService, setAppointmentService] = useState("svc-1");
   const [appointmentStaff, setAppointmentStaff] = useState("staff-1");
   const [selectedInvoice, setSelectedInvoice] = useState({
     tenantId: "tenant-xnail",
-    customerId: "cust-1",
+    customerId: "",
     items: [
       { description: "Classic Manicure", quantity: 1, unitPriceCents: 1500 },
       { description: "Gel Polish", quantity: 1, unitPriceCents: 2200 },
@@ -140,6 +118,58 @@ export default function Home() {
     };
   }, []);
 
+  useEffect(() => {
+    if (authenticated !== true) {
+      return;
+    }
+
+    let mounted = true;
+    const loadingTimer = window.setTimeout(() => {
+      if (mounted) {
+        setIsLoadingCustomers(true);
+        setCustomerError(null);
+      }
+    }, 0);
+    void fetch("/api/customers", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        if (result.status === 401) {
+          setCustomers([]);
+          setAuthenticated(false);
+          return;
+        }
+        if (result.status === 403) {
+          setCustomers([]);
+          setCustomerError("You are not authorized to view customers.");
+          return;
+        }
+        if (!result.ok) {
+          throw new Error("Customer list request failed");
+        }
+        const body = await result.json() as { customers?: CustomerRecord[] };
+        const loadedCustomers = Array.isArray(body.customers) ? body.customers : [];
+        setCustomers(loadedCustomers);
+        if (loadedCustomers[0]) {
+          setAppointmentCustomer((current) => current || loadedCustomers[0].id);
+          setSelectedInvoice((current) => ({ ...current, customerId: current.customerId || loadedCustomers[0].id }));
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setCustomers([]);
+          setCustomerError("Customers could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) setIsLoadingCustomers(false);
+      });
+
+    return () => {
+      mounted = false;
+      window.clearTimeout(loadingTimer);
+    };
+  }, [authenticated]);
+
   const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const requestId = ++authenticationRequestId.current;
@@ -178,16 +208,31 @@ export default function Home() {
     }
   };
 
-  const addCustomer = () => {
+  const addCustomer = async () => {
     if (!customerName.trim()) return;
-
-    const record = createCustomerRecord({
-      tenantId: "tenant-xnail",
-      name: customerName,
-      phone: customerPhone,
+    setCustomerError(null);
+    const result = await fetch("/api/customers", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: customerName, phone: customerPhone || null }),
     });
-
-    setCustomers((current) => [{ ...record }, ...current]);
+    if (result.status === 401) {
+      setCustomers([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setCustomers([]);
+      setCustomerError("You are not authorized to create customers.");
+      return;
+    }
+    if (!result.ok) {
+      setCustomerError("Customer could not be saved.");
+      return;
+    }
+    const body = await result.json() as { customer: CustomerRecord };
+    setCustomers((current) => [body.customer, ...current]);
     setCustomerName("");
     setCustomerPhone("");
   };
@@ -252,7 +297,9 @@ export default function Home() {
     });
   };
 
-  const invoicePreview = createInvoiceRecord(selectedInvoice);
+  const invoicePreview = selectedInvoice.customerId
+    ? createInvoiceRecord(selectedInvoice)
+    : { subtotalCents: 0, discountCents: 0, gstCents: 0, totalCents: 0 };
 
   if (authenticated === null) {
     return null;
@@ -381,8 +428,11 @@ export default function Home() {
             <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
               <h2 className="text-xl font-semibold">Customer list</h2>
               <div className="mt-4 space-y-3">
-                {customers.map((customer, index) => (
-                  <div key={`${customer.name}-${index}`} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                {isLoadingCustomers ? <div className="text-sm text-[#736067]">Loading customers...</div> : null}
+                {!isLoadingCustomers && customerError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{customerError}</div> : null}
+                {!isLoadingCustomers && !customerError && customers.length === 0 ? <div className="text-sm text-[#736067]">No customers yet.</div> : null}
+                {customers.map((customer) => (
+                  <div key={customer.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
                     <div>
                       <div className="font-medium">{customer.name}</div>
                       <div className="text-sm text-[#736067]">{customer.phone}</div>
@@ -531,8 +581,8 @@ export default function Home() {
                   onChange={(event) => setAppointmentCustomer(event.target.value)}
                   className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
                 >
-                  {customers.map((customer, index) => (
-                    <option key={`${customer.name}-${index}`} value={`cust-${index + 1}`}>
+                  {customers.map((customer) => (
+                    <option key={customer.id} value={customer.id}>
                       {customer.name}
                     </option>
                   ))}

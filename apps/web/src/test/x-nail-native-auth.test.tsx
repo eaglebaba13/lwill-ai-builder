@@ -11,7 +11,8 @@ describe("X Nail native authentication integration", () => {
   it("submits user-entered credentials to the approved login route", async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
-      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ customers: [] }));
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
 
@@ -45,6 +46,7 @@ describe("X Nail native authentication integration", () => {
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ customers: [] }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }));
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
@@ -71,7 +73,9 @@ describe("X Nail native authentication integration", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
-      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+      .mockResolvedValueOnce(Response.json({ customers: [] }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ customers: [] }));
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
 
@@ -85,7 +89,7 @@ describe("X Nail native authentication integration", () => {
     render(<Home />);
 
     expect(await screen.findByText("Operations dashboard")).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenLastCalledWith(
+    expect(fetchMock).toHaveBeenCalledWith(
       "/api/auth/refresh",
       expect.objectContaining({ method: "POST", credentials: "same-origin" }),
     );

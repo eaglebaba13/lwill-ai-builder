@@ -17,6 +17,15 @@ importers:
       '@lwill/authentication-context':
         specifier: workspace:*
         version: link:../../packages/authentication-context
+      '@lwill/authorization':
+        specifier: workspace:*
+        version: link:../../packages/authorization
+      '@lwill/authorization-prisma':
+        specifier: workspace:*
+        version: link:../../packages/authorization-prisma
+      '@lwill/authorization-service':
+        specifier: workspace:*
+        version: link:../../packages/authorization-service
       next:
         specifier: 16.3.0
         version: 16.3.0(@babel/core@7.29.7(supports-color@7.2.0))(@types/node@20.19.43)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -30,12 +39,6 @@ importers:
         specifier: ^0.0.1
         version: 0.0.1
     devDependencies:
-      '@lwill/authorization':
-        specifier: workspace:*
-        version: link:../../packages/authorization
-      '@lwill/authorization-service':
-        specifier: workspace:*
-        version: link:../../packages/authorization-service
       '@tailwindcss/postcss':
         specifier: ^4
         version: 4.3.3
