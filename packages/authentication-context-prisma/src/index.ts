@@ -16,3 +16,12 @@ export {
   createTokenHash,
   verifyPasswordHash,
 } from "./auth-persistence";
+
+export type {
+  ServiceRecord,
+  ServiceCreateInput,
+  ServiceUpdateInput,
+  ServiceService,
+} from "./service-service";
+
+export { createServiceService } from "./service-service";
