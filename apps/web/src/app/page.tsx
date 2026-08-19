@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
+  invalidatePendingRefresh,
   loginWithNativeAuthentication,
   logoutFromNativeAuthentication,
   restoreNativeAuthentication,
@@ -52,6 +53,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<(typeof tabs)[number]>("Overview");
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const authenticationRequestId = useRef(0);
+  const isLoginInProgress = useRef(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -85,6 +87,7 @@ export default function Home() {
     let mounted = true;
 
     const restoreAuthentication = () => {
+      if (isLoginInProgress.current) return;
       const requestId = ++authenticationRequestId.current;
 
       if (mounted) {
@@ -172,6 +175,8 @@ export default function Home() {
 
   const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    invalidatePendingRefresh();
+    isLoginInProgress.current = true;
     const requestId = ++authenticationRequestId.current;
     setIsAuthenticating(true);
     try {
@@ -189,6 +194,7 @@ export default function Home() {
         setLoginError("Authentication failed.");
       }
     } finally {
+      isLoginInProgress.current = false;
       if (requestId === authenticationRequestId.current) {
         setIsAuthenticating(false);
       }
@@ -196,6 +202,7 @@ export default function Home() {
   };
 
   const handleLogout = async () => {
+    invalidatePendingRefresh();
     authenticationRequestId.current += 1;
     setAuthenticated(false);
 

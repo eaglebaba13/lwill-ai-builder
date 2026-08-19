@@ -286,6 +286,11 @@ export async function resolveNativeRefreshSession(
   }
 }
 
+/** Time window (ms) in which a recently-rotated token is treated as a stale
+ *  sibling rather than a replayed stolen token. See Fix 2 in the auth race
+ *  condition patch. */
+const GRACE_WINDOW_MS = 10_000;
+
 export async function refreshNativeSession(
   prisma: NativeRefreshPrismaClient,
   refreshToken: string | null,
@@ -323,6 +328,15 @@ export async function refreshNativeSession(
     }
 
     if (stored.revokedAt !== null) {
+      const revokedMsAgo = now.getTime() - stored.revokedAt.getTime();
+      if (revokedMsAgo >= 0 && revokedMsAgo <= GRACE_WINDOW_MS) {
+        // Token was revoked very recently (within the grace window). This is
+        // consistent with normal token-rotation race in multi-tab scenarios
+        // where Tab B presents the old token just after Tab A rotated it.
+        // Return 401 without destroying the session — the caller will simply
+        // need to log in again or present the new token from the cookie.
+        return null;
+      }
       await transaction.authenticationSession.update({
         where: { id: stored.sessionId },
         data: { revokedAt: now },

@@ -225,13 +225,16 @@ describe("native cookies and refresh lifecycle", () => {
     });
   });
 
-  it("rejects an invalid or revoked refresh token and clears cookies", async () => {
+  it("rejects an invalid refresh token and clears cookies", async () => {
     prisma.refreshToken.findUnique = vi.fn().mockResolvedValue(null);
     expect(await refreshNativeSession(prisma, "invalid", createJwt(), cookies, now)).toBeNull();
     expect(cookies.writes.at(-1)?.options.maxAge).toBe(0);
+  });
 
+  it("revokes session on revoked refresh token outside the grace window (reuse detection)", async () => {
+    const revokedAt = new Date(now.getTime() - 15_000); // 15 seconds ago — outside grace window
     prisma.refreshToken.findUnique = vi.fn().mockResolvedValue({
-      id: "refresh-1", userId: "user-1", sessionId: "session-1", expiresAt: new Date("2099-01-01"), revokedAt: now,
+      id: "refresh-1", userId: "user-1", sessionId: "session-1", expiresAt: new Date("2099-01-01"), revokedAt,
       session: { userId: "user-1", tenantId: "tenant-1", expiresAt: new Date("2099-01-01"), revokedAt: null },
     });
     expect(await refreshNativeSession(prisma, "revoked", createJwt(), cookies, now)).toBeNull();
@@ -240,6 +243,45 @@ describe("native cookies and refresh lifecycle", () => {
     expect(prisma.auditLog.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ action: "auth.refresh.reuse_detected" }),
     });
+  });
+
+  it("returns 401 without revoking session for recently-rotated token within grace window", async () => {
+    const revokedAt = new Date(now.getTime() - 3_000); // 3 seconds ago — within grace window
+    prisma.refreshToken.findUnique = vi.fn().mockResolvedValue({
+      id: "refresh-1", userId: "user-1", sessionId: "session-1", expiresAt: new Date("2099-01-01"), revokedAt,
+      session: { userId: "user-1", tenantId: "tenant-1", expiresAt: new Date("2099-01-01"), revokedAt: null },
+    });
+    expect(await refreshNativeSession(prisma, "recent", createJwt(), cookies, now)).toBeNull();
+    // Session must NOT be revoked (no reuse detection triggered)
+    expect(prisma.authenticationSession.update).not.toHaveBeenCalled();
+    expect(prisma.refreshToken.updateMany).not.toHaveBeenCalled();
+    expect(prisma.auditLog.create).not.toHaveBeenCalled();
+    // Cookies must still be cleared (the token is invalid)
+    expect(cookies.writes.at(-1)?.options.maxAge).toBe(0);
+  });
+
+  it("fires reuse detection for token revoked exactly at the grace window boundary (11 seconds ago)", async () => {
+    const revokedAt = new Date(now.getTime() - 11_000); // 11 seconds ago — just outside grace window
+    prisma.refreshToken.findUnique = vi.fn().mockResolvedValue({
+      id: "refresh-1", userId: "user-1", sessionId: "session-1", expiresAt: new Date("2099-01-01"), revokedAt,
+      session: { userId: "user-1", tenantId: "tenant-1", expiresAt: new Date("2099-01-01"), revokedAt: null },
+    });
+    expect(await refreshNativeSession(prisma, "boundary", createJwt(), cookies, now)).toBeNull();
+    expect(prisma.authenticationSession.update).toHaveBeenCalled();
+    expect(prisma.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ action: "auth.refresh.reuse_detected" }),
+    });
+  });
+
+  it("preserves session for token revoked exactly at the start of the grace window (1 second ago)", async () => {
+    const revokedAt = new Date(now.getTime() - 1_000); // 1 second ago — within grace window
+    prisma.refreshToken.findUnique = vi.fn().mockResolvedValue({
+      id: "refresh-1", userId: "user-1", sessionId: "session-1", expiresAt: new Date("2099-01-01"), revokedAt,
+      session: { userId: "user-1", tenantId: "tenant-1", expiresAt: new Date("2099-01-01"), revokedAt: null },
+    });
+    expect(await refreshNativeSession(prisma, "recent2", createJwt(), cookies, now)).toBeNull();
+    expect(prisma.authenticationSession.update).not.toHaveBeenCalled();
+    expect(prisma.auditLog.create).not.toHaveBeenCalled();
   });
 
   it("does not clear cookies when refresh token is null or empty (prevents stale-refresh race condition)", async () => {

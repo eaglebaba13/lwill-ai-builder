@@ -2,9 +2,11 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import Home from "../app/page";
+import { invalidatePendingRefresh } from "../lib/auth/native-auth-client";
 
 describe("X Nail native authentication integration", () => {
   afterEach(() => {
+    invalidatePendingRefresh();
     vi.unstubAllGlobals();
   });
 
@@ -99,6 +101,7 @@ describe("X Nail native authentication integration", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(new Response(null, { status: 403 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
       .mockResolvedValueOnce(new Response(null, { status: 401 }));
     vi.stubGlobal("fetch", fetchMock);
@@ -129,6 +132,7 @@ describe("X Nail native authentication integration", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(new Response(null, { status: 403 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
       .mockResolvedValueOnce(new Response(null, { status: 401 }));
     vi.stubGlobal("fetch", fetchMock);
@@ -158,6 +162,7 @@ describe("X Nail native authentication integration", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(new Response(null, { status: 403 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
       .mockResolvedValueOnce(new Response(null, { status: 401 }));
     vi.stubGlobal("fetch", fetchMock);
@@ -241,5 +246,130 @@ describe("X Nail native authentication integration", () => {
       "/api/auth/refresh",
       expect.objectContaining({ method: "POST", credentials: "same-origin" }),
     );
+  });
+
+  it("preserves login result when pageshow fires during login (race condition fix)", async () => {
+    let resolveLogin: ((response: Response) => void) | undefined;
+    const loginRequest = new Promise<Response>((resolve) => {
+      resolveLogin = resolve;
+    });
+    let resolveCustomers: ((response: Response) => void) | undefined;
+    const customersRequest = new Promise<Response>((resolve) => {
+      resolveCustomers = resolve;
+    });
+
+    const fetchMock = vi.fn()
+      // Mount refresh resolves immediately so the login form appears
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      // Login request is controllable so we can fire pageshow during login
+      .mockReturnValueOnce(loginRequest)
+      // Customers request is controllable
+      .mockReturnValueOnce(customersRequest);
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<Home />);
+    const email = await screen.findByLabelText("Email");
+    const password = await screen.findByLabelText("Password");
+    await user.type(email, "operator@example.test");
+    await user.type(password, "test-password");
+
+    // Use fireEvent.click to trigger the login WITHOUT awaiting the async handler.
+    // This lets handleLogin start (setting isLoginInProgress.current = true)
+    // and then suspend at the await for loginRequest.
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+
+    // While login is in flight, fire pageshow.
+    // The isLoginInProgress guard should prevent restoreAuthentication from running.
+    await act(async () => {
+      window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true }));
+    });
+
+    // Complete login with success
+    await act(async () => {
+      resolveLogin?.(new Response(null, { status: 204 }));
+    });
+
+    // Complete customers fetch
+    await act(async () => {
+      resolveCustomers?.(Response.json({ customers: [] }));
+    });
+
+    // The login result should be preserved — we should see the dashboard.
+    // Only 3 fetches: mount refresh + login + customers.
+    // If the guard were missing, pageshow would trigger a 4th refresh that
+    // arrives after login and overwrites authenticated=false.
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    expect(await screen.findByText("Operations dashboard")).toBeInTheDocument();
+  });
+
+  it("keeps authenticated dashboard after pageshow with valid cookies", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ customers: [] }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ customers: [] }));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<Home />);
+    await user.type(await screen.findByLabelText("Email"), "operator@example.test");
+    await user.type(await screen.findByLabelText("Password"), "test-password");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(await screen.findByText("Operations dashboard")).toBeInTheDocument();
+
+    await act(async () => {
+      window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true }));
+    });
+
+    await waitFor(() => expect(screen.getByText("Operations dashboard")).toBeInTheDocument());
+  });
+
+  it("keeps authenticated dashboard after popstate with valid cookies", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ customers: [] }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ customers: [] }));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<Home />);
+    await user.type(await screen.findByLabelText("Email"), "operator@example.test");
+    await user.type(await screen.findByLabelText("Password"), "test-password");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(await screen.findByText("Operations dashboard")).toBeInTheDocument();
+
+    await act(async () => {
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+
+    await waitFor(() => expect(screen.getByText("Operations dashboard")).toBeInTheDocument());
+  });
+
+  it("logout still revokes the session and shows login page", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ customers: [] }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<Home />);
+    await user.type(await screen.findByLabelText("Email"), "operator@example.test");
+    await user.type(await screen.findByLabelText("Password"), "test-password");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(await screen.findByText("Operations dashboard")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Sign out" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenLastCalledWith(
+      "/api/auth/logout",
+      expect.objectContaining({ method: "POST", credentials: "same-origin" }),
+    ));
+    expect(await screen.findByText("Operations login")).toBeInTheDocument();
   });
 });
