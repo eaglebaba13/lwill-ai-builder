@@ -21,15 +21,25 @@ export interface AppointmentCreateInput {
   readonly notes?: string | null;
 }
 
+export interface AppointmentUpdateInput {
+  readonly startsAt?: Date;
+  readonly endsAt?: Date;
+  readonly status?: string;
+  readonly notes?: string | null;
+}
+
 export interface AppointmentService {
   createAppointment(input: AppointmentCreateInput): Promise<AppointmentRecord>;
+  getAppointment(args: { tenantId: string; appointmentId: string }): Promise<AppointmentRecord | null>;
+  listAppointments(args: { tenantId: string }): Promise<AppointmentRecord[]>;
+  updateAppointment(args: { tenantId: string; appointmentId: string; input: AppointmentUpdateInput }): Promise<AppointmentRecord | null>;
 }
 
 interface AppointmentPrismaClient {
   readonly appointment: {
     create: (args: { data: Record<string, unknown> }) => Promise<AppointmentRecord>;
     findUnique: (args: { where: { id: string } }) => Promise<AppointmentRecord | null>;
-    findMany: (args: { where?: Record<string, unknown> }) => Promise<AppointmentRecord[]>;
+    findMany: (args: { where?: Record<string, unknown>; orderBy?: Record<string, unknown> }) => Promise<AppointmentRecord[]>;
     update: (args: { data: Record<string, unknown>; where: { id: string } }) => Promise<AppointmentRecord>;
   };
   readonly customer: {
@@ -61,6 +71,58 @@ export function createAppointmentService(prisma: AppointmentPrismaClient): Appoi
           notes: input.notes ?? null,
         },
       });
+    },
+    async getAppointment({ tenantId, appointmentId }) {
+      const appointment = await prisma.appointment.findUnique({ where: { id: appointmentId } });
+      if (appointment === null) {
+        return null;
+      }
+      if (appointment.tenantId !== tenantId) {
+        return null;
+      }
+      return appointment;
+    },
+    async listAppointments({ tenantId }) {
+      return prisma.appointment.findMany({
+        where: { tenantId },
+        orderBy: { startsAt: "desc" },
+      });
+    },
+    async updateAppointment({ tenantId, appointmentId, input }) {
+      const existing = await prisma.appointment.findUnique({ where: { id: appointmentId } });
+      if (existing === null || existing.tenantId !== tenantId) {
+        return null;
+      }
+      const data: Record<string, unknown> = {};
+      if (input.startsAt !== undefined) {
+        if (!(input.startsAt instanceof Date) || Number.isNaN(input.startsAt.getTime())) {
+          throw new Error("appointment startsAt must be a valid date");
+        }
+        data.startsAt = input.startsAt;
+      }
+      if (input.endsAt !== undefined) {
+        if (!(input.endsAt instanceof Date) || Number.isNaN(input.endsAt.getTime())) {
+          throw new Error("appointment endsAt must be a valid date");
+        }
+        const startsAt = (input.startsAt ?? existing.startsAt) as Date;
+        if (input.endsAt <= startsAt) {
+          throw new Error("appointment endsAt must be after startsAt");
+        }
+        data.endsAt = input.endsAt;
+      }
+      if (input.status !== undefined) {
+        if (typeof input.status !== "string" || input.status.trim().length === 0) {
+          throw new Error("appointment status is required");
+        }
+        data.status = input.status;
+      }
+      if (input.notes !== undefined) {
+        if (input.notes !== null && (typeof input.notes !== "string" || input.notes.trim().length === 0)) {
+          throw new Error("appointment notes must be null or a non-empty string");
+        }
+        data.notes = input.notes;
+      }
+      return prisma.appointment.update({ where: { id: appointmentId }, data });
     },
   };
 }

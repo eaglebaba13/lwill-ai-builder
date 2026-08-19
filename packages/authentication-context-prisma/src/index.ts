@@ -25,3 +25,12 @@ export type {
 } from "./service-service";
 
 export { createServiceService } from "./service-service";
+
+export type {
+  AppointmentRecord,
+  AppointmentCreateInput,
+  AppointmentUpdateInput,
+  AppointmentService,
+} from "./appointment-service";
+
+export { createAppointmentService } from "./appointment-service";
