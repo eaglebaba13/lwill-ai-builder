@@ -11,10 +11,16 @@ const customerService = createCustomerService(prisma as never);
 
 async function authorize(): Promise<CustomerAuthorization> {
   const context = await getAuthenticationContext();
-  if (!context.authenticated || context.tenantContext === null) {
+  if (!context.authenticated) {
     return { outcome: "unauthenticated" };
   }
-
+  // Authenticated sessions without a resolved tenant context are forbidden,
+  // not unauthenticated. Returning "unauthenticated" (401) here would cause
+  // the client to treat the user as having no session and redirect to login,
+  // even though a valid session exists.
+  if (context.tenantContext === null) {
+    return { outcome: "forbidden" };
+  }
   // Customer permission codes and grants are not present in the approved
   // authorization catalog. Keep this release candidate fail-closed until an
   // approved catalog change supplies the canonical permission contract.

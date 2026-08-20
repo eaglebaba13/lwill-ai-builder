@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import {
   handleCreateCustomer,
   handleGetCustomer,
@@ -7,6 +7,9 @@ import {
   type CustomerAuthorization,
   type CustomerRouteServices,
 } from "../lib/crm/customer-route-handlers";
+import {
+  setAuthenticationProvider,
+} from "../lib/auth/server-context";
 
 function request(body?: unknown): Request {
   return new Request("https://builder.lwill.in/api/customers", {
@@ -41,6 +44,57 @@ describe("customer route handlers: authentication/authorization gating", () => {
     expect((await handleListCustomers(request(), services)).status).toBe(403);
     expect((await handleCreateCustomer(request({ name: "A" }), services)).status).toBe(403);
     expect(services.createCustomer).not.toHaveBeenCalled();
+  });
+});
+
+describe("customer-runtime authorize(): authentication vs authorization outcome", () => {
+  beforeEach(() => {
+    setAuthenticationProvider(null);
+  });
+
+  it("returns 'unauthenticated' when the session is not authenticated", async () => {
+    setAuthenticationProvider({
+      async getAuthenticationContext() {
+        return { authenticated: false } as never;
+      },
+    });
+    const { createCustomerRouteServices } = await import("../lib/crm/customer-runtime");
+    const services = createCustomerRouteServices();
+    expect(await services.authorize()).toEqual({ outcome: "unauthenticated" });
+  });
+
+  it("returns 'forbidden' when the session is authenticated but tenant context is null", async () => {
+    setAuthenticationProvider({
+      async getAuthenticationContext() {
+        return {
+          authenticated: true,
+          user: { userId: "user-1", externalAuthId: "ext-1", displayName: null, email: null },
+          tenantContext: null,
+          expiresAt: new Date(Date.now() + 3_600_000),
+          sessionId: "sess-1",
+        } as never;
+      },
+    });
+    const { createCustomerRouteServices } = await import("../lib/crm/customer-runtime");
+    const services = createCustomerRouteServices();
+    expect(await services.authorize()).toEqual({ outcome: "forbidden" });
+  });
+
+  it("returns 'forbidden' when the session is authenticated with a valid tenant context (fail-closed until permission catalog exists)", async () => {
+    setAuthenticationProvider({
+      async getAuthenticationContext() {
+        return {
+          authenticated: true,
+          user: { userId: "user-1", externalAuthId: "ext-1", displayName: "Admin", email: "admin@test.com" },
+          tenantContext: { tenantId: "tenant-1", businessUnitId: "bu-1", branchId: "branch-1" },
+          expiresAt: new Date(Date.now() + 3_600_000),
+          sessionId: "sess-1",
+        } as never;
+      },
+    });
+    const { createCustomerRouteServices } = await import("../lib/crm/customer-runtime");
+    const services = createCustomerRouteServices();
+    expect(await services.authorize()).toEqual({ outcome: "forbidden" });
   });
 });
 

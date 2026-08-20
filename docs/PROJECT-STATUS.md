@@ -5,8 +5,8 @@
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
 - **Current Branch**: `phase-1d-native-auth`
-- **Current HEAD Commit**: `c66bbb8` (`fix(auth): protect logout navigation restoration`)
-- **Git State**: `phase-1d-native-auth` and `origin/phase-1d-native-auth` are both at `c66bbb8`; the working tree contains the uncommitted X Nail auth-navigation correction, focused tests, documentation, and unrelated customer/CRM/RBAC changes.
+- **Current HEAD Commit**: `298ceab` (stale-refresh null-token cookie-clear race fix)
+- **Git State**: `phase-1d-native-auth` at `298ceab`; the working tree contains the uncommitted authentication-redirect fix (`customer-runtime.ts` and `instrumentation.ts`), focused tests, and documentation updates. Unrelated customer/CRM/RBAC/bootstrap changes remain unstaged.
 
 ## State Breakdown
 
@@ -1028,6 +1028,49 @@ Phase 1D remains focused on concrete authentication/session integration and asso
 - Blocker: the fix is not deployed, and browser-engine behavior for Back/BFCache/revisit has not been rechecked on `xnail.makemeartist.com`.
 - Blocker: production database/session and deployment operations remain separately controlled; no production mutation was performed here.
 - Next smallest production-safe task: deploy this already-verified commit through the existing controlled release process, then run a browser matrix on `xnail.makemeartist.com` covering login → dashboard → logout → Back, direct revisit, hard refresh, and a second-tab stale-document case; confirm every restored view requires the refresh route and revoked sessions remain rejected. Do not alter schema, tenant-domain data, RBAC, or production records.
+
+---
+
+## X Nail Authentication Redirect Fix — 2026-08-19
+
+### Status: **Implemented locally — production verification pending**
+
+### Root Cause
+
+- `apps/web/src/lib/crm/customer-runtime.ts` `authorize()` returned `{ outcome: "unauthenticated" }` for **both** unauthenticated sessions and authenticated sessions with `tenantContext === null`. The `||` condition on line 14 conflated authentication failure (no session) with authorization failure (valid session, no tenant context).
+- The client at `apps/web/src/app/page.tsx` line 139 treats 401 as "no session" and calls `setAuthenticated(false)`, redirecting to login. An authenticated user without tenant context was therefore incorrectly logged out after every `/api/customers` request returned 401.
+
+### Fix Applied
+
+- **`apps/web/src/lib/crm/customer-runtime.ts`**: The `authorize()` function now separates the two conditions: `!context.authenticated` returns `"unauthenticated"` (→ 401); `context.tenantContext === null` returns `"forbidden"` (→ 403). Authenticated sessions without a tenant context stay on the dashboard with a "You are not authorized to view customers." message instead of being redirected to login.
+- **`apps/web/src/instrumentation.ts`**: `registerNativeAuthenticationProvider()` is now wrapped in try/catch. Success and failure are logged with `[auth]` prefix. The `throw error` ensures the server fails closed (won't start with broken auth).
+- **`apps/web/src/lib/auth/native-auth.ts`**: No change needed. The 298ceab commit already correctly handles null/empty refresh tokens (returns null without clearing cookies). The catch block (line 411-413) and null-result path (line 416-418) correctly clear cookies for non-null token failures.
+
+### Tests Added
+
+- **`apps/web/src/test/customer-route-handlers.test.ts`**: Three new integration tests verify the real `authorize()` function returns `"unauthenticated"` for unauthenticated sessions, `"forbidden"` for authenticated + null tenant context, and `"forbidden"` for authenticated + valid tenant context.
+- **`apps/web/src/test/x-nail-native-auth.test.tsx`**: Two new client integration tests verify that 401 from `/api/customers` redirects to login and 403 keeps the user on the dashboard with an error message.
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `apps/web/src/lib/crm/customer-runtime.ts` | Split `||` condition in `authorize()` to separate authentication from authorization |
+| `apps/web/src/instrumentation.ts` | Added try/catch, success/fail logging, fail-closed rethrow |
+| `apps/web/src/test/customer-route-handlers.test.ts` | Added 3 integration tests for `authorize()` outcome behavior |
+| `apps/web/src/test/x-nail-native-auth.test.tsx` | Added 2 tests for 401 redirect vs 403 dashboard stay |
+| `docs/PROJECT-STATUS.md` | Updated HEAD commit and added this section |
+| `docs/ENVIRONMENT.md` | Added `LWILL_AUTH_*` environment variable documentation |
+| `docs/HANDOVER.md` | Updated handover state |
+| `AGENTS.md` | Updated HEAD reference |
+
+### Verification Results
+
+- Pending: `pnpm test`, `pnpm build`, `pnpm lint`, `git diff --check`.
+
+### Remaining Limitation
+
+- Customer API remains 403 for all authenticated sessions until an approved customer permission/grant catalog is supplied through the existing authorization mechanism.
 
 ---
 

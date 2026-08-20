@@ -372,4 +372,49 @@ describe("X Nail native authentication integration", () => {
     ));
     expect(await screen.findByText("Operations login")).toBeInTheDocument();
   });
+
+  it("redirects to login when GET /api/customers returns 401 (unauthenticated)", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(new Response(null, { status: 401 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<Home />);
+    await user.type(await screen.findByLabelText("Email"), "operator@example.test");
+    await user.type(await screen.findByLabelText("Password"), "test-password");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+
+    // After login succeeds, the customer fetch returns 401.
+    // The client treats 401 as "no session" and redirects to login.
+    expect(await screen.findByText("Operations login")).toBeInTheDocument();
+    expect(screen.queryByText("Operations dashboard")).not.toBeInTheDocument();
+  });
+
+  it("stays on dashboard when GET /api/customers returns 403 (forbidden, not unauthenticated)", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(new Response(null, { status: 403 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<Home />);
+    await user.type(await screen.findByLabelText("Email"), "operator@example.test");
+    await user.type(await screen.findByLabelText("Password"), "test-password");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+
+    // After login succeeds, the customer fetch returns 403.
+    // The client treats 403 as "authorized session, insufficient permission" —
+    // the user stays on the dashboard and is NOT redirected to login.
+    // (Before the authorize() fix, 403 was incorrectly returned as 401,
+    // which caused the client to set authenticated=false and show the login screen.)
+    expect(await screen.findByText("Operations dashboard")).toBeInTheDocument();
+    expect(screen.queryByText("Operations login")).not.toBeInTheDocument();
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      "/api/customers",
+      expect.objectContaining({ credentials: "same-origin" }),
+    );
+  });
 });

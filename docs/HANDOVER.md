@@ -23,19 +23,17 @@ This guide provides step-by-step instructions for any developer or AI assistant 
    3. `docs/ARCHITECTURE.md` - Verified architecture vs. target designs.
 4. `docs/DECISIONS.md` - Architectural Decision Records (ADRs).
 
-### Current Auth Navigation Handover (2026-08-17)
+### Current Auth Navigation Handover (2026-08-19)
 
-- The logout/session investigation is complete locally. Root cause is stale App Router/client-document and browser-history restoration after logout, not an active server session: the logout route revokes the persisted session and refresh tokens and clears both native cookies, while the client previously only revalidated a BFCache `pageshow` case.
-- `apps/web/src/app/page.tsx` now invalidates in-flight restoration results on logout and revalidates through the existing refresh route on initial mount, every `pageshow`, and history `popstate`, returning to login when the revoked session is rejected. Login results and unmount cleanup are generation guarded as well.
-- `apps/web/src/test/x-nail-native-auth.test.tsx` covers login, hard refresh, logout, BFCache restoration, Back/history restoration, direct revisit/remount, stale-document/second-tab revalidation, and stale in-flight restoration after logout.
-- Native server implementation was inspected and not changed: the existing logout handler derives the session only from verified access/refresh credentials, revokes the server session, and clears `lwill_access`/`lwill_refresh`; the existing session verifier and refresh path continue to reject revoked sessions.
-- Verified: `pnpm --filter web test -- x-nail-native-auth.test.tsx` — 13 files / 100 tests, including 7 X Nail auth-navigation tests; `pnpm test` — 6 successful workspace tasks; `pnpm build` — passed; `pnpm lint` — passed; `git diff --check` — passed.
-- Production status: the earlier login, hard-refresh, and logout checks passed on `xnail.makemeartist.com`; this un-deployed navigation-restoration fix still requires controlled production browser verification.
-- Progress estimate (X Nail MVP only; engineering estimate, not a formal completion metric): 60%. This task reports no overall LWILL AI BUILDER percentage.
-- Remaining blockers: controlled deployment and browser-matrix verification of Back/BFCache/direct revisit/second-tab restoration; broader Phase 1D SRS items remain deferred, including password reset, MFA, API keys, lockout/rate limiting, and complete audit coverage.
-- Exact next task: complete review of the local verification results, then—only after explicit release approval—deploy through the controlled release process and verify login → dashboard → logout → Back/direct revisit/hard refresh/second-tab behavior on `xnail.makemeartist.com`, without production DB mutation.
-- Current Git state: branch `phase-1d-native-auth`, HEAD `c66bbb8`, equal to `origin/phase-1d-native-auth`; no commit or push has been performed for these latest auth-navigation changes, and unrelated customer/CRM/RBAC changes remain unstaged.
-- Do not modify the unrelated uncommitted customer/CRM/RBAC files, Prisma schema/migrations, TenantDomain production data, RBAC roles/permissions, or production database state.
+- The authentication redirect root cause is fixed. `apps/web/src/lib/crm/customer-runtime.ts` `authorize()` was returning `"unauthenticated"` (401) for authenticated sessions with `tenantContext === null`, which caused the client to redirect to login even though a valid session existed. The fix splits the `||` condition: `!context.authenticated` → `"unauthenticated"` (401); `context.tenantContext === null` → `"forbidden"` (403).
+- `apps/web/src/instrumentation.ts` is hardened with try/catch around `registerNativeAuthenticationProvider()`, logging success/failure with `[auth]` prefix, and fail-closed rethrow.
+- `apps/web/src/lib/auth/native-auth.ts` was inspected and confirmed correct at `298ceab`: null/empty refresh tokens return null without clearing cookies, and the catch block correctly clears cookies for non-null token exceptions.
+- `apps/web/src/test/customer-route-handlers.test.ts` — 3 new integration tests verify `authorize()` returns `"unauthenticated"` for unauthenticated sessions, `"forbidden"` for authenticated + null tenant context, and `"forbidden"` for authenticated + valid tenant context.
+- `apps/web/src/test/x-nail-native-auth.test.tsx` — 2 new tests verify that 401 from `/api/customers` redirects to login and 403 keeps the user on the dashboard with an error message.
+- Customer API remains 403 for all authenticated sessions until an approved customer permission/grant catalog is supplied through the existing authorization mechanism.
+- Verification: pending `pnpm test`, `pnpm build`, `pnpm lint`.
+- Current Git state: branch `phase-1d-native-auth`, HEAD `298ceab`; local changes not committed or pushed.
+- Do not modify Prisma schema/migrations, TenantDomain production data, RBAC roles/permissions, or production database state.
 
 ---
 

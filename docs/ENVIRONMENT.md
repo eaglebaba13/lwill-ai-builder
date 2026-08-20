@@ -46,3 +46,18 @@ These requirements are tested and verified for the current repository baseline s
 - Local verification target: Windows development workspace, Node.js, pnpm workspace, and the `phase-1d-native-auth` branch.
 - Required commands for this slice: `pnpm --filter web test`, `pnpm test`, `pnpm build`, `pnpm lint`, and `git diff --check`.
 - Production deployment and browser verification are intentionally pending; no production database or deployment configuration was changed.
+
+---
+
+## Required Native Authentication Environment Variables
+
+The following `LWILL_AUTH_*` environment variables must be configured in the production deployment environment. **No values, example keys, or secrets are recorded here — variable names and semantic descriptions only.**
+
+| Variable | Purpose |
+|----------|---------|
+| `LWILL_AUTH_ALLOWED_ORIGIN` | HTTPS origin for authentication (e.g., `https://builder.lwill.in`) |
+| `LWILL_AUTH_JWT_ISSUER` | JWT issuer claim |
+| `LWILL_AUTH_JWT_AUDIENCE` | JWT audience claim |
+| `LWILL_AUTH_JWT_ACTIVE_KID` | Active key ID for JWT signing |
+| `LWILL_AUTH_JWT_PRIVATE_KEY_PEM_B64` | Base64-encoded PKCS8 RSA private key |
+| `LWILL_AUTH_JWT_VERIFICATION_KEYS_JSON` | JSON object mapping kid to Base64-encoded SPKI public key |

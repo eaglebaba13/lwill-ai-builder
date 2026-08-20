@@ -40,4 +40,4 @@ Upon finishing your assigned task:
 
 ## Current X Nail handover constraint
 
-The X Nail native-auth navigation nail is locally implemented on `phase-1d-native-auth` at `c66bbb8` with uncommitted changes. Review only the scoped auth page/test/documentation changes; do not touch unrelated customer/CRM/RBAC/bootstrap work, Prisma schema/migrations, TenantDomain production data, production DB state, or deployment configuration.
+The X Nail native-auth navigation nail and authentication redirect fix are locally implemented on `phase-1d-native-auth` at `298ceab` with uncommitted changes. Review only the scoped auth redirect fix, instrumentation hardening, tests, and documentation changes; do not touch unrelated customer/CRM/RBAC/bootstrap work, Prisma schema/migrations, TenantDomain production data, production DB state, or deployment configuration.
