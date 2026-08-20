@@ -1175,3 +1175,86 @@ Phase 1D remains focused on concrete authentication/session integration and asso
 - The bootstrap has not been executed against production.
 - No `customer.delete` permission exists (no delete API exists).
 - No new roles were introduced; permissions are assigned to the existing `tenant-admin` role.
+
+---
+
+## X Nail Services API Vertical Slice — 2026-08-20
+
+### Status: **Implemented and verified locally; not executed against production**
+
+### Implemented Slice
+
+- [`service-runtime.ts`](apps/web/src/lib/crm/service-runtime.ts) mirrors [`customer-runtime.ts`](apps/web/src/lib/crm/customer-runtime.ts) exactly: wires to the real authorization pipeline via [`authorizeFromContext()`](apps/web/src/lib/auth/authorization-boundary.ts:27), [`createAuthorizationService()`](packages/authorization-service/src/authorization-service.ts:23), and [`loadPermissionGrants()`](packages/authorization-prisma/src/load-permission-grants.ts:6).
+- [`authorize(permissionCode)`](apps/web/src/lib/crm/service-runtime.ts:19) returns `"authorized"` with `tenantId` when a matching grant exists, `"forbidden"` when denied, and `"unauthenticated"` when no session exists.
+- [`service-route-handlers.ts`](apps/web/src/lib/crm/service-route-handlers.ts) passes `"service.read"` for list/get and `"service.write"` for create/update operations through the `authorize` call.
+- Input validation enforces non-blank `name`, positive integer `durationMinutes`, and non-negative integer `priceCents` for create; same rules for partial update fields.
+- API routes: [`GET/POST /api/services`](apps/web/src/app/api/services/route.ts) and [`GET/PATCH /api/services/[id]`](apps/web/src/app/api/services/[id]/route.ts).
+- A new idempotent CLI bootstrap creates `service.read` and `service.write` Permission records and assigns both to the existing `tenant-admin` role via [`bootstrapServicePermissions()`](packages/authentication-context-prisma/src/initial-service-permissions-bootstrap.ts:79).
+- CLI entry: [`initial-service-permissions-bootstrap-cli.ts`](packages/authentication-context-prisma/src/initial-service-permissions-bootstrap-cli.ts).
+- Package script: `bootstrap:initial-service-permissions`.
+- [`page.tsx`](apps/web/src/app/page.tsx) Services tab now fetches from `GET /api/services` when authenticated and the Services tab is active, with loading/empty/401/403 states. `addService()` POSTs to `POST /api/services`. Service dropdown in Appointments tab uses real service IDs.
+- Deny-by-default and tenant isolation are preserved. The authorization boundary fails closed on any error, missing context, unauthenticated state, or missing tenant context.
+
+### New Files
+
+| File | Purpose |
+|------|---------|
+| `apps/web/src/lib/crm/service-runtime.ts` | Authorization wiring for service routes |
+| `apps/web/src/lib/crm/service-route-handlers.ts` | Route handlers: list, get, create, update with input validation |
+| `apps/web/src/app/api/services/route.ts` | `GET` (list) and `POST` (create) API route |
+| `apps/web/src/app/api/services/[id]/route.ts` | `GET` (get by id) and `PATCH` (update) API route |
+| `packages/authentication-context-prisma/src/initial-service-permissions-bootstrap.ts` | Idempotent bootstrap creating `service.read` and `service.write` permissions, assigned to `tenant-admin` |
+| `packages/authentication-context-prisma/src/initial-service-permissions-bootstrap-cli.ts` | CLI entry for the service permissions bootstrap |
+| `packages/authentication-context-prisma/src/initial-service-permissions-bootstrap.test.ts` | 7 deterministic tests covering first creation, idempotency, missing/inactive tenant, missing/conflicting/ambiguous role |
+| `apps/web/src/test/service-route-handlers.test.ts` | 21 tests covering auth gating, permission forwarding, runtime authorize outcomes, input validation, and authorized operations |
+
+### Modified Files
+
+| File | Change |
+|------|--------|
+| `packages/authentication-context-prisma/package.json` | Added `bootstrap:initial-service-permissions` script |
+| `apps/web/src/app/page.tsx` | Added `ServiceRecord` type; replaced mock `initialServices` with API-backed fetch; added `isLoadingServices`/`serviceError` states; `addService()` POSTs to `/api/services`; service dropdown uses real IDs; removed unused `createServiceRecord` import |
+
+### Tests Added
+
+| Package / Location | Test File | Count |
+|-------------------|-----------|-------|
+| `@lwill/authentication-context-prisma` | `src/initial-service-permissions-bootstrap.test.ts` | 7 |
+| `apps/web` | `src/test/service-route-handlers.test.ts` | 21 |
+| **Total new tests** | | **28** |
+
+**Test coverage by requirement:**
+
+- ✅ `service.read` permission created and assigned to `tenant-admin`
+- ✅ `service.write` permission created and assigned to `tenant-admin`
+- ✅ Bootstrap idempotency (skip if already exists)
+- ✅ Bootstrap fail-closed on missing/inactive tenant
+- ✅ Bootstrap fail-closed on missing/conflicting/ambiguous role
+- ✅ Route handlers pass `"service.read"` for list/get
+- ✅ Route handlers pass `"service.write"` for create/update
+- ✅ Authorized access with matching grant returns `"authorized"` with `tenantId`
+- ✅ Wrong permission code returns `"forbidden"`
+- ✅ Cross-tenant grant returns `"forbidden"`
+- ✅ Grant loader failure fails closed
+- ✅ Input validation: non-blank name, positive integer durationMinutes, non-negative integer priceCents
+- ✅ Unknown keys rejected (tenantId injection prevention)
+- ✅ 404 for non-existent/cross-tenant service
+- ✅ Zero priceCents accepted
+
+### Verification Results
+
+- `pnpm test` — Passed: 6 successful workspace tasks; web 15 files / 157 tests; authentication-context-prisma 18 files / 145 tests.
+- `pnpm lint` — Passed.
+- `pnpm build` — Passed: Next.js production build and TypeScript compilation; `/api/services` and `/api/services/[id]` registered as dynamic routes.
+
+### Important Boundary
+
+- No Prisma schema or migration was changed.
+- No authentication code was modified.
+- No authorization code was modified.
+- No Customer module was modified.
+- No `service-service.ts` or its tests were modified.
+- No production database connection or mutation was performed.
+- The bootstrap has not been executed against production.
+- No `service.delete` permission exists (no delete API exists).
+- No new roles were introduced; permissions are assigned to the existing `tenant-admin` role.

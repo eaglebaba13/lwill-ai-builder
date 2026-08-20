@@ -11,7 +11,6 @@ import {
   APPOINTMENT_STATUS_ORDER,
   createAppointmentRecord,
   createInvoiceRecord,
-  createServiceRecord,
   createStaffRecord,
   transitionAppointmentStatus,
   type AppointmentStatus,
@@ -27,6 +26,16 @@ type CustomerRecord = {
   isActive: boolean;
 };
 
+type ServiceRecord = {
+  id: string;
+  tenantId: string;
+  name: string;
+  durationMinutes: number;
+  priceCents: number;
+  description: string | null;
+  isActive: boolean;
+};
+
 type AppointmentRecord = {
   tenantId: string;
   customerId: string;
@@ -36,11 +45,6 @@ type AppointmentRecord = {
   endsAt: string;
   status: AppointmentStatus;
 };
-
-const initialServices = [
-  { tenantId: "tenant-xnail", name: "Classic Manicure", durationMinutes: 45, priceCents: 1500 },
-  { tenantId: "tenant-xnail", name: "Gel Polish", durationMinutes: 60, priceCents: 2200 },
-];
 
 const initialStaff = [
   { tenantId: "tenant-xnail", displayName: "Mina Patel", branchId: "branch-main" },
@@ -61,7 +65,9 @@ export default function Home() {
   const [customers, setCustomers] = useState<CustomerRecord[]>([]);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
   const [customerError, setCustomerError] = useState<string | null>(null);
-  const [services, setServices] = useState(initialServices);
+  const [services, setServices] = useState<ServiceRecord[]>([]);
+  const [isLoadingServices, setIsLoadingServices] = useState(false);
+  const [serviceError, setServiceError] = useState<string | null>(null);
   const [staff, setStaff] = useState(initialStaff);
   const [appointments, setAppointments] = useState<AppointmentRecord[]>([]);
   const [customerName, setCustomerName] = useState("");
@@ -70,7 +76,7 @@ export default function Home() {
   const [servicePrice, setServicePrice] = useState("1500");
   const [staffName, setStaffName] = useState("");
   const [appointmentCustomer, setAppointmentCustomer] = useState("");
-  const [appointmentService, setAppointmentService] = useState("svc-1");
+  const [appointmentService, setAppointmentService] = useState("");
   const [appointmentStaff, setAppointmentStaff] = useState("staff-1");
   const [selectedInvoice, setSelectedInvoice] = useState({
     tenantId: "tenant-xnail",
@@ -173,6 +179,57 @@ export default function Home() {
     };
   }, [authenticated]);
 
+  useEffect(() => {
+    if (authenticated !== true || activeTab !== "Services") {
+      return;
+    }
+
+    let mounted = true;
+    const loadingTimer = window.setTimeout(() => {
+      if (mounted) {
+        setIsLoadingServices(true);
+        setServiceError(null);
+      }
+    }, 0);
+    void fetch("/api/services", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        if (result.status === 401) {
+          setServices([]);
+          setAuthenticated(false);
+          return;
+        }
+        if (result.status === 403) {
+          setServices([]);
+          setServiceError("You are not authorized to view services.");
+          return;
+        }
+        if (!result.ok) {
+          throw new Error("Service list request failed");
+        }
+        const body = await result.json() as { services?: ServiceRecord[] };
+        const loadedServices = Array.isArray(body.services) ? body.services : [];
+        setServices(loadedServices);
+        if (loadedServices[0]) {
+          setAppointmentService((current) => current || loadedServices[0].id);
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setServices([]);
+          setServiceError("Services could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) setIsLoadingServices(false);
+      });
+
+    return () => {
+      mounted = false;
+      window.clearTimeout(loadingTimer);
+    };
+  }, [authenticated, activeTab]);
+
   const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     invalidatePendingRefresh();
@@ -244,18 +301,35 @@ export default function Home() {
     setCustomerPhone("");
   };
 
-  const addService = () => {
+  const addService = async () => {
     if (!serviceName.trim()) return;
-
-    const record = createServiceRecord({
-      tenantId: "tenant-xnail",
-      name: serviceName,
-      durationMinutes: 45,
-      priceCents: Number(servicePrice) || 1500,
-      isActive: true,
+    setServiceError(null);
+    const result = await fetch("/api/services", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: serviceName,
+        durationMinutes: 45,
+        priceCents: Number(servicePrice) || 1500,
+      }),
     });
-
-    setServices((current) => [{ ...record }, ...current]);
+    if (result.status === 401) {
+      setServices([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setServices([]);
+      setServiceError("You are not authorized to create services.");
+      return;
+    }
+    if (!result.ok) {
+      setServiceError("Service could not be saved.");
+      return;
+    }
+    const body = await result.json() as { service: ServiceRecord };
+    setServices((current) => [body.service, ...current]);
     setServiceName("");
     setServicePrice("1500");
   };
@@ -481,8 +555,11 @@ export default function Home() {
             <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
               <h2 className="text-xl font-semibold">Service menu</h2>
               <div className="mt-4 space-y-3">
-                {services.map((service, index) => (
-                  <div key={`${service.name}-${index}`} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                {isLoadingServices ? <div className="text-sm text-[#736067]">Loading services...</div> : null}
+                {!isLoadingServices && serviceError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{serviceError}</div> : null}
+                {!isLoadingServices && !serviceError && services.length === 0 ? <div className="text-sm text-[#736067]">No services yet.</div> : null}
+                {services.map((service) => (
+                  <div key={service.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
                     <div>
                       <div className="font-medium">{service.name}</div>
                       <div className="text-sm text-[#736067]">{service.durationMinutes} min</div>
@@ -599,8 +676,8 @@ export default function Home() {
                   onChange={(event) => setAppointmentService(event.target.value)}
                   className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
                 >
-                  {services.map((service, index) => (
-                    <option key={`${service.name}-${index}`} value={`svc-${index + 1}`}>
+                  {services.map((service) => (
+                    <option key={service.id} value={service.id}>
                       {service.name}
                     </option>
                   ))}
