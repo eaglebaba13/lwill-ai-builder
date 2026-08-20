@@ -1101,3 +1101,77 @@ Phase 1D remains focused on concrete authentication/session integration and asso
 - **Remaining Services gaps:** authenticated server/API route integration, approved authorization wiring, branch/business-unit scope, staff/service metadata, and production verification remain incomplete.
 - **Remaining Appointment gaps:** authenticated server/API workflow, approved authorization wiring, staff and branch linkage, server-side status transition policy, overlap/availability validation, and production verification remain incomplete.
 - **Exact next X Nail task:** define and implement the smallest approved authenticated Services API slice through the existing server-context and authorization boundaries, without introducing Customer RBAC or changing schema/migrations.
+
+---
+
+## X Nail Customer RBAC Implementation — 2026-08-20
+
+### Status: **Implemented and verified locally; not executed against production**
+
+### Implemented Slice
+
+- [`customer-runtime.ts`](apps/web/src/lib/crm/customer-runtime.ts) is now wired to the real authorization pipeline via [`authorizeFromContext()`](apps/web/src/lib/auth/authorization-boundary.ts:27), [`createAuthorizationService()`](packages/authorization-service/src/authorization-service.ts:23), and [`loadPermissionGrants()`](packages/authorization-prisma/src/load-permission-grants.ts:6).
+- [`authorize(permissionCode)`](apps/web/src/lib/crm/customer-runtime.ts:19) accepts a permission code parameter and returns `"authorized"` with `tenantId` when a matching grant exists, `"forbidden"` when denied, and `"unauthenticated"` when no session exists.
+- [`customer-route-handlers.ts`](apps/web/src/lib/crm/customer-route-handlers.ts) now passes `"customer.read"` for list/get and `"customer.write"` for create/update operations through the `authorize` call.
+- A new idempotent CLI bootstrap creates `customer.read` and `customer.write` Permission records and assigns both to the existing `tenant-admin` role via [`bootstrapCustomerPermissions()`](packages/authentication-context-prisma/src/initial-customer-permissions-bootstrap.ts:59).
+- CLI entry: [`initial-customer-permissions-bootstrap-cli.ts`](packages/authentication-context-prisma/src/initial-customer-permissions-bootstrap-cli.ts).
+- Package script: `bootstrap:initial-customer-permissions`.
+- Deny-by-default and tenant isolation are preserved. The authorization boundary fails closed on any error, missing context, unauthenticated state, or missing tenant context.
+
+### New Files
+
+| File | Purpose |
+|------|---------|
+| `packages/authentication-context-prisma/src/initial-customer-permissions-bootstrap.ts` | Idempotent bootstrap creating `customer.read` and `customer.write` permissions, assigned to `tenant-admin` |
+| `packages/authentication-context-prisma/src/initial-customer-permissions-bootstrap-cli.ts` | CLI entry for the customer permissions bootstrap |
+| `packages/authentication-context-prisma/src/initial-customer-permissions-bootstrap.test.ts` | 8 deterministic tests covering first creation, idempotency, missing/inactive tenant, missing/conflicting/ambiguous role |
+
+### Modified Files
+
+| File | Change |
+|------|--------|
+| `apps/web/src/lib/crm/customer-runtime.ts` | Wired to authorization pipeline; imports `authorizeFromContext`, `createAuthorizationService`, `loadPermissionGrants`; `authorize()` accepts `permissionCode` and uses real authorization service |
+| `apps/web/src/lib/crm/customer-route-handlers.ts` | `CustomerRouteServices.authorize` signature accepts `permissionCode: string`; route handlers pass `"customer.read"` or `"customer.write"` |
+| `apps/web/src/test/customer-route-handlers.test.ts` | Updated mock signatures for new `authorize(permissionCode)` contract; added tests for permission code forwarding, authorized access with grants, wrong permission code denial, cross-tenant grant denial, and grant loader failure |
+| `packages/authentication-context-prisma/package.json` | Added `bootstrap:initial-customer-permissions` script |
+
+### Tests Added
+
+| Package / Location | Test File | Count |
+|-------------------|-----------|-------|
+| `@lwill/authentication-context-prisma` | `src/initial-customer-permissions-bootstrap.test.ts` | 8 |
+| `apps/web` | `src/test/customer-route-handlers.test.ts` (new tests) | 9 (added) |
+| **Total new tests** | | **17** |
+
+**Test coverage by requirement:**
+
+- ✅ `customer.read` permission created and assigned to `tenant-admin`
+- ✅ `customer.write` permission created and assigned to `tenant-admin`
+- ✅ Bootstrap idempotency (skip if already exists)
+- ✅ Bootstrap fail-closed on missing/inactive tenant
+- ✅ Bootstrap fail-closed on missing/conflicting/ambiguous role
+- ✅ Route handlers pass `"customer.read"` for list/get
+- ✅ Route handlers pass `"customer.write"` for create/update
+- ✅ Authorized access with matching grant returns `"authorized"` with `tenantId`
+- ✅ Wrong permission code returns `"forbidden"`
+- ✅ Cross-tenant grant returns `"forbidden"`
+- ✅ Grant loader failure fails closed
+
+### Verification Results
+
+- `pnpm test` — Passed: 6 successful workspace tasks; web 14 files / 136 tests; authentication-context-prisma 17 files / 137 tests.
+- `pnpm --filter web test` — Passed: 14 files, 136 tests.
+- `pnpm --filter @lwill/authentication-context-prisma test` — Passed: 17 files, 137 tests.
+- `pnpm --filter web lint` — Passed.
+- `pnpm --filter web build` — Passed: Next.js production build and TypeScript compilation.
+- `git diff --check` — Passed; only normal CRLF line-ending notices.
+
+### Important Boundary
+
+- No Prisma schema or migration was changed.
+- No authentication code was modified.
+- No UI was modified.
+- No production database connection or mutation was performed.
+- The bootstrap has not been executed against production.
+- No `customer.delete` permission exists (no delete API exists).
+- No new roles were introduced; permissions are assigned to the existing `tenant-admin` role.

@@ -13,7 +13,7 @@ export interface CustomerWriteInput {
 }
 
 export interface CustomerRouteServices {
-  readonly authorize: () => Promise<CustomerAuthorization>;
+  readonly authorize: (permissionCode: string) => Promise<CustomerAuthorization>;
   readonly listCustomers: (tenantId: string) => Promise<readonly unknown[]>;
   readonly getCustomer: (tenantId: string, customerId: string) => Promise<unknown | null>;
   readonly createCustomer: (tenantId: string, input: CustomerWriteInput) => Promise<unknown>;
@@ -91,7 +91,7 @@ export async function handleListCustomers(
   _request: Request,
   services: CustomerRouteServices,
 ): Promise<Response> {
-  const authorization = await services.authorize();
+  const authorization = await services.authorize("customer.read");
   const authResult = authorizationOutcome(authorization);
   if (!authResult.ok) {
     return authResult.response;
@@ -104,7 +104,7 @@ export async function handleCreateCustomer(
   request: Request,
   services: CustomerRouteServices,
 ): Promise<Response> {
-  const authorization = await services.authorize();
+  const authorization = await services.authorize("customer.write");
   const authResult = authorizationOutcome(authorization);
   if (!authResult.ok) {
     return authResult.response;
@@ -126,7 +126,7 @@ export async function handleGetCustomer(
   services: CustomerRouteServices,
   customerId: string,
 ): Promise<Response> {
-  const authorization = await services.authorize();
+  const authorization = await services.authorize("customer.read");
   const authResult = authorizationOutcome(authorization);
   if (!authResult.ok) {
     return authResult.response;
@@ -143,7 +143,7 @@ export async function handleUpdateCustomer(
   services: CustomerRouteServices,
   customerId: string,
 ): Promise<Response> {
-  const authorization = await services.authorize();
+  const authorization = await services.authorize("customer.write");
   const authResult = authorizationOutcome(authorization);
   if (!authResult.ok) {
     return authResult.response;

@@ -11,6 +11,12 @@ import {
   setAuthenticationProvider,
 } from "../lib/auth/server-context";
 
+vi.mock("@lwill/authorization-prisma/src/load-permission-grants", () => ({
+  loadPermissionGrants: vi.fn().mockResolvedValue([]),
+}));
+
+import { loadPermissionGrants } from "@lwill/authorization-prisma/src/load-permission-grants";
+
 function request(body?: unknown): Request {
   return new Request("https://builder.lwill.in/api/customers", {
     method: "POST",
@@ -47,9 +53,30 @@ describe("customer route handlers: authentication/authorization gating", () => {
   });
 });
 
+describe("customer route handlers: permission code forwarding", () => {
+  it("passes 'customer.read' to authorize for list and get operations", async () => {
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1" });
+    await handleListCustomers(request(), services);
+    expect(services.authorize).toHaveBeenCalledWith("customer.read");
+
+    await handleGetCustomer(request(), services, "c1");
+    expect(services.authorize).toHaveBeenCalledWith("customer.read");
+  });
+
+  it("passes 'customer.write' to authorize for create and update operations", async () => {
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1" });
+    await handleCreateCustomer(request({ name: "Jane" }), services);
+    expect(services.authorize).toHaveBeenCalledWith("customer.write");
+
+    await handleUpdateCustomer(request({ name: "Jane" }), services, "c1");
+    expect(services.authorize).toHaveBeenCalledWith("customer.write");
+  });
+});
+
 describe("customer-runtime authorize(): authentication vs authorization outcome", () => {
   beforeEach(() => {
     setAuthenticationProvider(null);
+    vi.mocked(loadPermissionGrants).mockResolvedValue([]);
   });
 
   it("returns 'unauthenticated' when the session is not authenticated", async () => {
@@ -60,7 +87,7 @@ describe("customer-runtime authorize(): authentication vs authorization outcome"
     });
     const { createCustomerRouteServices } = await import("../lib/crm/customer-runtime");
     const services = createCustomerRouteServices();
-    expect(await services.authorize()).toEqual({ outcome: "unauthenticated" });
+    expect(await services.authorize("customer.read")).toEqual({ outcome: "unauthenticated" });
   });
 
   it("returns 'forbidden' when the session is authenticated but tenant context is null", async () => {
@@ -77,10 +104,10 @@ describe("customer-runtime authorize(): authentication vs authorization outcome"
     });
     const { createCustomerRouteServices } = await import("../lib/crm/customer-runtime");
     const services = createCustomerRouteServices();
-    expect(await services.authorize()).toEqual({ outcome: "forbidden" });
+    expect(await services.authorize("customer.read")).toEqual({ outcome: "forbidden" });
   });
 
-  it("returns 'forbidden' when the session is authenticated with a valid tenant context (fail-closed until permission catalog exists)", async () => {
+  it("returns 'forbidden' when the session is authenticated with a valid tenant context but no grants", async () => {
     setAuthenticationProvider({
       async getAuthenticationContext() {
         return {
@@ -94,7 +121,88 @@ describe("customer-runtime authorize(): authentication vs authorization outcome"
     });
     const { createCustomerRouteServices } = await import("../lib/crm/customer-runtime");
     const services = createCustomerRouteServices();
-    expect(await services.authorize()).toEqual({ outcome: "forbidden" });
+    expect(await services.authorize("customer.read")).toEqual({ outcome: "forbidden" });
+  });
+
+  it("returns 'authorized' with tenantId when the session has a matching grant", async () => {
+    vi.mocked(loadPermissionGrants).mockResolvedValue([
+      { permissionCode: "customer.read", scope: { kind: "tenant", tenantId: "tenant-1" } },
+    ]);
+    setAuthenticationProvider({
+      async getAuthenticationContext() {
+        return {
+          authenticated: true,
+          user: { userId: "user-1", externalAuthId: "ext-1", displayName: "Admin", email: "admin@test.com" },
+          tenantContext: { tenantId: "tenant-1", businessUnitId: "bu-1", branchId: "branch-1" },
+          expiresAt: new Date(Date.now() + 3_600_000),
+          sessionId: "sess-1",
+        } as never;
+      },
+    });
+    const { createCustomerRouteServices } = await import("../lib/crm/customer-runtime");
+    const services = createCustomerRouteServices();
+    expect(await services.authorize("customer.read")).toEqual({
+      outcome: "authorized",
+      tenantId: "tenant-1",
+    });
+  });
+
+  it("returns 'forbidden' when the grant exists for a different permission code", async () => {
+    vi.mocked(loadPermissionGrants).mockResolvedValue([
+      { permissionCode: "customer.write", scope: { kind: "tenant", tenantId: "tenant-1" } },
+    ]);
+    setAuthenticationProvider({
+      async getAuthenticationContext() {
+        return {
+          authenticated: true,
+          user: { userId: "user-1", externalAuthId: "ext-1", displayName: "Admin", email: "admin@test.com" },
+          tenantContext: { tenantId: "tenant-1", businessUnitId: "bu-1", branchId: "branch-1" },
+          expiresAt: new Date(Date.now() + 3_600_000),
+          sessionId: "sess-1",
+        } as never;
+      },
+    });
+    const { createCustomerRouteServices } = await import("../lib/crm/customer-runtime");
+    const services = createCustomerRouteServices();
+    expect(await services.authorize("customer.read")).toEqual({ outcome: "forbidden" });
+  });
+
+  it("returns 'forbidden' when the grant exists for a different tenant", async () => {
+    vi.mocked(loadPermissionGrants).mockResolvedValue([
+      { permissionCode: "customer.read", scope: { kind: "tenant", tenantId: "tenant-2" } },
+    ]);
+    setAuthenticationProvider({
+      async getAuthenticationContext() {
+        return {
+          authenticated: true,
+          user: { userId: "user-1", externalAuthId: "ext-1", displayName: "Admin", email: "admin@test.com" },
+          tenantContext: { tenantId: "tenant-1", businessUnitId: "bu-1", branchId: "branch-1" },
+          expiresAt: new Date(Date.now() + 3_600_000),
+          sessionId: "sess-1",
+        } as never;
+      },
+    });
+    const { createCustomerRouteServices } = await import("../lib/crm/customer-runtime");
+    const services = createCustomerRouteServices();
+    expect(await services.authorize("customer.read")).toEqual({ outcome: "forbidden" });
+  });
+
+  it("fails closed when the grant loader throws", async () => {
+    vi.mocked(loadPermissionGrants).mockRejectedValue(new Error("database unavailable"));
+    setAuthenticationProvider({
+      async getAuthenticationContext() {
+        return {
+          authenticated: true,
+          user: { userId: "user-1", externalAuthId: "ext-1", displayName: "Admin", email: "admin@test.com" },
+          tenantContext: { tenantId: "tenant-1", businessUnitId: "bu-1", branchId: "branch-1" },
+          expiresAt: new Date(Date.now() + 3_600_000),
+          sessionId: "sess-1",
+        } as never;
+      },
+    });
+    const { createCustomerRouteServices } = await import("../lib/crm/customer-runtime");
+    const services = createCustomerRouteServices();
+    expect(await services.authorize("customer.read")).toEqual({ outcome: "forbidden" });
   });
 });
 
@@ -104,13 +212,13 @@ describe("customer route handlers: authorized operations", () => {
   it("authorizes every operation before accessing customer data", async () => {
     const services = createServices(authorized);
     await handleListCustomers(request(), services);
-    expect(services.authorize).toHaveBeenCalled();
+    expect(services.authorize).toHaveBeenCalledWith("customer.read");
     await handleGetCustomer(request(), services, "c1");
-    expect(services.authorize).toHaveBeenCalled();
+    expect(services.authorize).toHaveBeenCalledWith("customer.read");
     await handleCreateCustomer(request({ name: "Jane" }), services);
-    expect(services.authorize).toHaveBeenCalled();
+    expect(services.authorize).toHaveBeenCalledWith("customer.write");
     await handleUpdateCustomer(request({ name: "Jane" }), services, "c1");
-    expect(services.authorize).toHaveBeenCalled();
+    expect(services.authorize).toHaveBeenCalledWith("customer.write");
   });
 
   it("lists customers scoped to the authorized tenant", async () => {
