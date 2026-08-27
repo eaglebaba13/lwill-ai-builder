@@ -623,4 +623,120 @@ describe("X Nail native authentication integration", () => {
       expect.objectContaining({ credentials: "same-origin" }),
     );
   });
+
+  it("fetches packages when the Packages tab is activated", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ customers: [] }))
+      .mockResolvedValueOnce(Response.json({ packages: [] }));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<Home />);
+    await user.type(await screen.findByLabelText("Email"), "operator@example.test");
+    await user.type(await screen.findByLabelText("Password"), "test-password");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(await screen.findByText("Operations dashboard")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Packages" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/api/packages",
+      expect.objectContaining({ credentials: "same-origin" }),
+    ));
+  });
+
+  it("populates the package list from the API response", async () => {
+    const mockPackages = [
+      {
+        id: "pkg-1",
+        name: "Glow Facial",
+        serviceIds: ["svc-1"],
+        priceCents: 12000,
+        durationDays: 30,
+        isActive: true,
+      },
+    ];
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ customers: [] }))
+      .mockResolvedValueOnce(Response.json({ packages: mockPackages }));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<Home />);
+    await user.type(await screen.findByLabelText("Email"), "operator@example.test");
+    await user.type(await screen.findByLabelText("Password"), "test-password");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(await screen.findByText("Operations dashboard")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Packages" }));
+
+    await waitFor(() => expect(screen.getByText("Glow Facial")).toBeInTheDocument());
+    expect(screen.getByText("₹120")).toBeInTheDocument();
+    expect(screen.getByText("1 service(s)")).toBeInTheDocument();
+  });
+
+  it("shows error and stays on dashboard when packages fetch returns 403", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ customers: [] }))
+      .mockResolvedValueOnce(new Response(null, { status: 403 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<Home />);
+    await user.type(await screen.findByLabelText("Email"), "operator@example.test");
+    await user.type(await screen.findByLabelText("Password"), "test-password");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(await screen.findByText("Operations dashboard")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Packages" }));
+
+    await waitFor(() => expect(screen.getByText("You are not authorized to view packages.")).toBeInTheDocument());
+    expect(screen.queryByText("Operations login")).not.toBeInTheDocument();
+  });
+
+  it("creates a package after packages tab is activated", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ customers: [] }))
+      .mockResolvedValueOnce(Response.json({ packages: [] }))
+      .mockResolvedValueOnce(Response.json({
+        package: {
+          id: "pkg-new",
+          name: "Mani Pedi Combo",
+          serviceIds: [],
+          priceCents: 8000,
+          durationDays: 14,
+          isActive: true,
+        },
+      }));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<Home />);
+    await user.type(await screen.findByLabelText("Email"), "operator@example.test");
+    await user.type(await screen.findByLabelText("Password"), "test-password");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(await screen.findByText("Operations dashboard")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Packages" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/packages", expect.anything()));
+
+    await user.type(screen.getByPlaceholderText("Package name"), "Mani Pedi Combo");
+    await user.click(screen.getByRole("button", { name: "Save package" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/api/packages",
+      expect.objectContaining({ method: "POST", credentials: "same-origin" }),
+    ));
+
+    expect(await screen.findByText("Mani Pedi Combo")).toBeInTheDocument();
+    expect(screen.getByText("₹80")).toBeInTheDocument();
+  });
 });

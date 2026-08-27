@@ -45,6 +45,15 @@ type AppointmentRecord = {
   status: AppointmentStatus;
 };
 
+type PackageRecord = {
+  id: string;
+  name: string;
+  serviceIds: string[];
+  priceCents: number | null;
+  durationDays: number | null;
+  isActive: boolean;
+};
+
 function toLocalAppointment(apiRecord: {
   tenantId: string;
   customerId: string;
@@ -69,7 +78,7 @@ const initialStaff = [
   { tenantId: "tenant-xnail", displayName: "Aisha Khan", branchId: "branch-main" },
 ];
 
-const tabs = ["Overview", "Customers", "Services", "Staff", "Appointments", "Billing"] as const;
+const tabs = ["Overview", "Customers", "Services", "Packages", "Staff", "Appointments", "Billing"] as const;
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<(typeof tabs)[number]>("Overview");
@@ -86,6 +95,10 @@ export default function Home() {
   const [services, setServices] = useState<ServiceRecord[]>([]);
   const [isLoadingServices, setIsLoadingServices] = useState(false);
   const [serviceError, setServiceError] = useState<string | null>(null);
+  const [packages, setPackages] = useState<PackageRecord[]>([]);
+  const [isLoadingPackages, setIsLoadingPackages] = useState(false);
+  const [packageError, setPackageError] = useState<string | null>(null);
+  const [packageName, setPackageName] = useState("");
   const [staff, setStaff] = useState(initialStaff);
   const [appointments, setAppointments] = useState<AppointmentRecord[]>([]);
   const [isLoadingAppointments, setIsLoadingAppointments] = useState(false);
@@ -153,8 +166,9 @@ export default function Home() {
     }
 
     let mounted = true;
+    let completed = false;
     const loadingTimer = window.setTimeout(() => {
-      if (mounted) {
+      if (mounted && !completed) {
         setIsLoadingCustomers(true);
         setCustomerError(null);
       }
@@ -162,6 +176,7 @@ export default function Home() {
     void fetch("/api/customers", { credentials: "same-origin" })
       .then(async (result) => {
         if (!mounted) return;
+        completed = true;
         if (result.status === 401) {
           setCustomers([]);
           setAuthenticated(false);
@@ -184,13 +199,17 @@ export default function Home() {
         }
       })
       .catch(() => {
+        completed = true;
         if (mounted) {
           setCustomers([]);
           setCustomerError("Customers could not be loaded.");
         }
       })
       .finally(() => {
-        if (mounted) setIsLoadingCustomers(false);
+        if (mounted) {
+          window.clearTimeout(loadingTimer);
+          setIsLoadingCustomers(false);
+        }
       });
 
     return () => {
@@ -205,8 +224,9 @@ export default function Home() {
     }
 
     let mounted = true;
+    let completed = false;
     const loadingTimer = window.setTimeout(() => {
-      if (mounted) {
+      if (mounted && !completed) {
         setIsLoadingServices(true);
         setServiceError(null);
       }
@@ -214,6 +234,7 @@ export default function Home() {
     void fetch("/api/services", { credentials: "same-origin" })
       .then(async (result) => {
         if (!mounted) return;
+        completed = true;
         if (result.status === 401) {
           setServices([]);
           setAuthenticated(false);
@@ -235,13 +256,17 @@ export default function Home() {
         }
       })
       .catch(() => {
+        completed = true;
         if (mounted) {
           setServices([]);
           setServiceError("Services could not be loaded.");
         }
       })
       .finally(() => {
-        if (mounted) setIsLoadingServices(false);
+        if (mounted) {
+          window.clearTimeout(loadingTimer);
+          setIsLoadingServices(false);
+        }
       });
 
     return () => {
@@ -256,8 +281,9 @@ export default function Home() {
     }
 
     let mounted = true;
+    let completed = false;
     const loadingTimer = window.setTimeout(() => {
-      if (mounted) {
+      if (mounted && !completed) {
         setIsLoadingAppointments(true);
         setAppointmentError(null);
       }
@@ -265,6 +291,7 @@ export default function Home() {
     void fetch("/api/appointments", { credentials: "same-origin" })
       .then(async (result) => {
         if (!mounted) return;
+        completed = true;
         if (result.status === 401) {
           setAppointments([]);
           setAuthenticated(false);
@@ -294,13 +321,86 @@ export default function Home() {
         setAppointments(loadedAppointments);
       })
       .catch(() => {
+        completed = true;
         if (mounted) {
           setAppointments([]);
           setAppointmentError("Appointments could not be loaded.");
         }
       })
       .finally(() => {
-        if (mounted) setIsLoadingAppointments(false);
+        if (mounted) {
+          window.clearTimeout(loadingTimer);
+          setIsLoadingAppointments(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+      window.clearTimeout(loadingTimer);
+    };
+  }, [authenticated, activeTab]);
+
+  useEffect(() => {
+    if (authenticated !== true || activeTab !== "Packages") {
+      return;
+    }
+
+    let mounted = true;
+    let completed = false;
+    const loadingTimer = window.setTimeout(() => {
+      if (mounted && !completed) {
+        setIsLoadingPackages(true);
+        setPackageError(null);
+      }
+    }, 0);
+    void fetch("/api/packages", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        completed = true;
+        if (result.status === 401) {
+          setPackages([]);
+          setAuthenticated(false);
+          return;
+        }
+        if (result.status === 403) {
+          setPackages([]);
+          setPackageError("You are not authorized to view packages.");
+          return;
+        }
+        if (!result.ok) {
+          throw new Error("Package list request failed");
+        }
+        const body = await result.json() as {
+          packages?: Array<{
+            id: string;
+            name: string;
+            serviceIds: string[];
+            priceCents: number | null;
+            durationDays: number | null;
+            isActive: boolean;
+          }>;
+        };
+        const loadedPackages = Array.isArray(body.packages)
+          ? body.packages.map((pkg) => ({
+              ...pkg,
+              priceCents: pkg.priceCents,
+              durationDays: pkg.durationDays,
+            }))
+          : [];
+        setPackages(loadedPackages);
+      })
+      .catch(() => {
+        completed = true;
+        if (mounted) {
+          setPackages([]);
+          setPackageError("Packages could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          window.clearTimeout(loadingTimer);
+          setIsLoadingPackages(false);
+        }
       });
 
     return () => {
@@ -411,6 +511,37 @@ export default function Home() {
     setServices((current) => [body.service, ...current]);
     setServiceName("");
     setServicePrice("1500");
+  };
+
+  const addPackage = async () => {
+    if (!packageName.trim()) return;
+    setPackageError(null);
+    const result = await fetch("/api/packages", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: packageName,
+        serviceIds: [],
+      }),
+    });
+    if (result.status === 401) {
+      setPackages([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setPackages([]);
+      setPackageError("You are not authorized to create packages.");
+      return;
+    }
+    if (!result.ok) {
+      setPackageError("Package could not be saved.");
+      return;
+    }
+    const body = await result.json() as { package: PackageRecord };
+    setPackages((current) => [body.package, ...current]);
+    setPackageName("");
   };
 
   const addStaff = () => {
@@ -698,6 +829,46 @@ export default function Home() {
                   className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
                 >
                   Save service
+                </button>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {activeTab === "Packages" ? (
+          <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <h2 className="text-xl font-semibold">Packages</h2>
+              <div className="mt-4 space-y-3">
+                {isLoadingPackages ? <div className="text-sm text-[#736067]">Loading packages...</div> : null}
+                {!isLoadingPackages && packageError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{packageError}</div> : null}
+                {!isLoadingPackages && !packageError && packages.length === 0 ? <div className="text-sm text-[#736067]">No packages yet.</div> : null}
+                {packages.map((pkg) => (
+                  <div key={pkg.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    <div>
+                      <div className="font-medium">{pkg.name}</div>
+                      <div className="text-sm text-[#736067]">{pkg.serviceIds.length} service(s)</div>
+                    </div>
+                    <div className="font-semibold text-[#6a2f4a]">{pkg.priceCents === null ? "—" : `₹${pkg.priceCents / 100}`}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <h2 className="text-xl font-semibold">Add package</h2>
+              <div className="mt-4 space-y-3">
+                <input
+                  value={packageName}
+                  onChange={(event) => setPackageName(event.target.value)}
+                  placeholder="Package name"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <button
+                  onClick={addPackage}
+                  className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                >
+                  Save package
                 </button>
               </div>
             </div>
