@@ -53,6 +53,15 @@ type PackageRecord = {
   isActive: boolean;
 };
 
+type MembershipRecord = {
+  id: string;
+  customerId: string;
+  packageId: string;
+  startedAt: string;
+  endsAt: string | null;
+  status: string | null;
+};
+
 type StaffRecord = {
   id: string;
   tenantId: string;
@@ -82,7 +91,7 @@ function toLocalAppointment(apiRecord: {
   };
 }
 
-const tabs = ["Overview", "Customers", "Services", "Packages", "Staff", "Appointments", "Billing"] as const;
+const tabs = ["Overview", "Customers", "Services", "Packages", "Memberships", "Staff", "Appointments", "Billing"] as const;
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<(typeof tabs)[number]>("Overview");
@@ -103,6 +112,16 @@ export default function Home() {
   const [isLoadingPackages, setIsLoadingPackages] = useState(false);
   const [packageError, setPackageError] = useState<string | null>(null);
   const [packageName, setPackageName] = useState("");
+  const [memberships, setMemberships] = useState<MembershipRecord[]>([]);
+  const [isLoadingMemberships, setIsLoadingMemberships] = useState(false);
+  const [membershipError, setMembershipError] = useState<string | null>(null);
+  const [membershipCustomerId, setMembershipCustomerId] = useState("");
+  const [membershipPackageId, setMembershipPackageId] = useState("");
+  const [membershipStartedAt, setMembershipStartedAt] = useState(
+    new Date().toISOString(),
+  );
+  const [membershipEndsAt, setMembershipEndsAt] = useState("");
+  const [membershipStatus, setMembershipStatus] = useState("");
   const [staff, setStaff] = useState<StaffRecord[]>([]);
   const [isLoadingStaff, setIsLoadingStaff] = useState(false);
   const [staffError, setStaffError] = useState<string | null>(null);
@@ -416,6 +435,71 @@ export default function Home() {
   }, [authenticated, activeTab]);
 
   useEffect(() => {
+    if (authenticated !== true || activeTab !== "Memberships") {
+      return;
+    }
+
+    let mounted = true;
+    let completed = false;
+    const loadingTimer = window.setTimeout(() => {
+      if (mounted && !completed) {
+        setIsLoadingMemberships(true);
+        setMembershipError(null);
+      }
+    }, 0);
+    void fetch("/api/memberships", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        completed = true;
+        if (result.status === 401) {
+          setMemberships([]);
+          setAuthenticated(false);
+          return;
+        }
+        if (result.status === 403) {
+          setMemberships([]);
+          setMembershipError("You are not authorized to view memberships.");
+          return;
+        }
+        if (!result.ok) {
+          throw new Error("Membership list request failed");
+        }
+        const body = await result.json() as {
+          memberships?: Array<{
+            id: string;
+            customerId: string;
+            packageId: string;
+            startedAt: string;
+            endsAt: string | null;
+            status: string | null;
+          }>;
+        };
+        const loadedMemberships = Array.isArray(body.memberships)
+          ? body.memberships
+          : [];
+        setMemberships(loadedMemberships);
+      })
+      .catch(() => {
+        completed = true;
+        if (mounted) {
+          setMemberships([]);
+          setMembershipError("Memberships could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          window.clearTimeout(loadingTimer);
+          setIsLoadingMemberships(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+      window.clearTimeout(loadingTimer);
+    };
+  }, [authenticated, activeTab]);
+
+  useEffect(() => {
     if (authenticated !== true || activeTab !== "Staff") {
       return;
     }
@@ -602,6 +686,44 @@ export default function Home() {
     const body = await result.json() as { package: PackageRecord };
     setPackages((current) => [body.package, ...current]);
     setPackageName("");
+  };
+
+  const addMembership = async () => {
+    if (!membershipCustomerId.trim() || !membershipPackageId.trim()) return;
+    setMembershipError(null);
+    const result = await fetch("/api/memberships", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        customerId: membershipCustomerId,
+        packageId: membershipPackageId,
+        startedAt: membershipStartedAt,
+        endsAt: membershipEndsAt || null,
+        status: membershipStatus || null,
+      }),
+    });
+    if (result.status === 401) {
+      setMemberships([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setMemberships([]);
+      setMembershipError("You are not authorized to create memberships.");
+      return;
+    }
+    if (!result.ok) {
+      setMembershipError("Membership could not be saved.");
+      return;
+    }
+    const body = await result.json() as { membership: MembershipRecord };
+    setMemberships((current) => [body.membership, ...current]);
+    setMembershipCustomerId("");
+    setMembershipPackageId("");
+    setMembershipStartedAt(new Date().toISOString());
+    setMembershipEndsAt("");
+    setMembershipStatus("");
   };
 
   const addStaff = async () => {
@@ -948,6 +1070,73 @@ export default function Home() {
                   className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
                 >
                   Save package
+                </button>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {activeTab === "Memberships" ? (
+          <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <h2 className="text-xl font-semibold">Memberships</h2>
+              <div className="mt-4 space-y-3">
+                {isLoadingMemberships ? <div className="text-sm text-[#736067]">Loading memberships...</div> : null}
+                {!isLoadingMemberships && membershipError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{membershipError}</div> : null}
+                {!isLoadingMemberships && !membershipError && memberships.length === 0 ? <div className="text-sm text-[#736067]">No memberships yet.</div> : null}
+                {memberships.map((membership) => (
+                  <div key={membership.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    <div>
+                      <div className="font-medium">Customer {membership.customerId}</div>
+                      <div className="text-sm text-[#736067]">Package {membership.packageId}</div>
+                    </div>
+                    <div className="text-right text-sm text-[#736067]">
+                      <div>{membership.startedAt}</div>
+                      <div>{membership.endsAt ?? "—"}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <h2 className="text-xl font-semibold">Add membership</h2>
+              <div className="mt-4 space-y-3">
+                <input
+                  value={membershipCustomerId}
+                  onChange={(event) => setMembershipCustomerId(event.target.value)}
+                  placeholder="Customer ID"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <input
+                  value={membershipPackageId}
+                  onChange={(event) => setMembershipPackageId(event.target.value)}
+                  placeholder="Package ID"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <input
+                  value={membershipStartedAt}
+                  onChange={(event) => setMembershipStartedAt(event.target.value)}
+                  placeholder="Started at (ISO date)"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <input
+                  value={membershipEndsAt}
+                  onChange={(event) => setMembershipEndsAt(event.target.value)}
+                  placeholder="Ends at (optional)"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <input
+                  value={membershipStatus}
+                  onChange={(event) => setMembershipStatus(event.target.value)}
+                  placeholder="Status (optional)"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <button
+                  onClick={addMembership}
+                  className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                >
+                  Save membership
                 </button>
               </div>
             </div>
