@@ -1258,3 +1258,86 @@ Phase 1D remains focused on concrete authentication/session integration and asso
 - The bootstrap has not been executed against production.
 - No `service.delete` permission exists (no delete API exists).
 - No new roles were introduced; permissions are assigned to the existing `tenant-admin` role.
+
+---
+
+## X Nail Appointments API Vertical Slice — 2026-08-27
+
+### Status: **Implemented and verified locally; not executed against production**
+
+### Implemented Slice
+
+- [`appointment-runtime.ts`](apps/web/src/lib/crm/appointment-runtime.ts) mirrors [`service-runtime.ts`](apps/web/src/lib/crm/service-runtime.ts): wires to the real authorization pipeline via [`authorizeFromContext()`](apps/web/src/lib/auth/authorization-boundary.ts:27), [`createAuthorizationService()`](packages/authorization-service/src/authorization-service.ts:23), and [`loadPermissionGrants()`](packages/authorization-prisma/src/load-permission-grants.ts:6), reusing the existing [`createAppointmentService()`](packages/authentication-context-prisma/src/appointment-service.ts:53) data layer (no data-layer changes).
+- [`authorize(permissionCode)`](apps/web/src/lib/crm/appointment-runtime.ts:19) returns `"authorized"` with the server-derived `tenantId` when a matching grant exists, `"forbidden"` when denied, and `"unauthenticated"` when no session exists. `tenantId` is taken from `context.tenantContext.tenantId`, never from the client.
+- [`appointment-route-handlers.ts`](apps/web/src/lib/crm/appointment-route-handlers.ts) passes `"appointment.read"` for list/get and `"appointment.write"` for create/update through the `authorize` call.
+- Input validation enforces non-empty `customerId`/`serviceId`, valid ISO-8601 `startsAt`/`endsAt` with `endsAt` strictly after `startsAt`, non-blank `status` (string only; no enum/status-transition rules are invented), and `notes` as `string | null`. Unexpected keys (including a client-supplied `tenantId`) are rejected with `400`, preventing authorization-boundary manipulation.
+- API routes: [`GET/POST /api/appointments`](apps/web/src/app/api/appointments/route.ts) and [`GET/PATCH /api/appointments/[id]`](apps/web/src/app/api/appointments/[id]/route.ts).
+- A new idempotent CLI bootstrap creates `appointment.read` and `appointment.write` Permission records and assigns both to the existing `tenant-admin` role via [`bootstrapAppointmentPermissions()`](packages/authentication-context-prisma/src/initial-appointment-permissions-bootstrap.ts:79).
+- CLI entry: [`initial-appointment-permissions-bootstrap-cli.ts`](packages/authentication-context-prisma/src/initial-appointment-permissions-bootstrap-cli.ts). Package script: `bootstrap:initial-appointment-permissions`.
+- [`page.tsx`](apps/web/src/app/page.tsx) Appointments "Book appointment" form now creates via `POST /api/appointments` (mirroring `addService()`), reading `customerId`/`serviceId` from the real `/api/services` and `/api/customers` dropdowns; the mock `createAppointmentRecord` creation path is no longer used for persistence. `advanceAppointment` (client-side status demo), the staff dropdown, and the form structure are preserved unchanged.
+- Deny-by-default and tenant isolation are preserved. The authorization boundary fails closed on any error, missing context, unauthenticated state, or missing tenant context. Cross-tenant get/list/update return `null` → `404` at the route layer; `createAppointment` validates that the referenced customer and service belong to the same tenant as the request.
+
+### New Files
+
+| File | Purpose |
+|------|---------|
+| `apps/web/src/lib/crm/appointment-runtime.ts` | Authorization wiring for appointment routes |
+| `apps/web/src/lib/crm/appointment-route-handlers.ts` | Route handlers: list, get, create, update with input validation |
+| `apps/web/src/app/api/appointments/route.ts` | `GET` (list) and `POST` (create) API route |
+| `apps/web/src/app/api/appointments/[id]/route.ts` | `GET` (get by id) and `PATCH` (update) API route |
+| `packages/authentication-context-prisma/src/initial-appointment-permissions-bootstrap.ts` | Idempotent bootstrap creating `appointment.read` and `appointment.write` permissions, assigned to `tenant-admin` |
+| `packages/authentication-context-prisma/src/initial-appointment-permissions-bootstrap-cli.ts` | CLI entry for the appointment permissions bootstrap |
+| `packages/authentication-context-prisma/src/initial-appointment-permissions-bootstrap.test.ts` | 8 deterministic tests covering first creation, idempotency, missing/inactive tenant, missing/conflicting/ambiguous role |
+| `apps/web/src/test/appointment-route-handlers.test.ts` | 23 tests covering auth gating, permission forwarding, runtime authorize outcomes, input validation, and authorized operations |
+
+### Modified Files
+
+| File | Change |
+|------|--------|
+| `packages/authentication-context-prisma/package.json` | Added `bootstrap:initial-appointment-permissions` script |
+| `apps/web/src/app/page.tsx` | Replaced mock `createAppointmentRecord` in `addAppointment` with `POST /api/appointments`; added `appointmentError` state + display; removed unused `createAppointmentRecord` import; preserved `advanceAppointment`, staff dropdown, and form structure |
+
+### Tests Added
+
+| Package / Location | Test File | Count |
+|-------------------|-----------|-------|
+| `@lwill/authentication-context-prisma` | `src/initial-appointment-permissions-bootstrap.test.ts` | 8 |
+| `apps/web` | `src/test/appointment-route-handlers.test.ts` | 23 |
+| **Total new tests** | | **31** |
+
+**Test coverage by requirement:**
+
+- ✅ `appointment.read` permission created and assigned to `tenant-admin`
+- ✅ `appointment.write` permission created and assigned to `tenant-admin`
+- ✅ Bootstrap idempotency (skip if already exists)
+- ✅ Bootstrap fail-closed on missing/inactive tenant
+- ✅ Bootstrap fail-closed on missing/conflicting/ambiguous role
+- ✅ Route handlers pass `"appointment.read"` for list/get
+- ✅ Route handlers pass `"appointment.write"` for create/update
+- ✅ Authorized access with matching grant returns `"authorized"` with `tenantId`
+- ✅ Wrong permission code returns `"forbidden"`
+- ✅ Cross-tenant grant returns `"forbidden"`
+- ✅ Grant loader failure fails closed
+- ✅ Input validation: non-empty customerId/serviceId, valid ISO dates with endsAt > startsAt, non-blank status, notes optional
+- ✅ Unknown keys rejected (tenantId injection prevention)
+- ✅ 404 for non-existent/cross-tenant appointment
+- ✅ notes accepted as null and omitted
+
+### Verification Results
+
+- `pnpm test` — Passed: `authentication-context-prisma` 19 files / 153 tests; `web` 16 files / 180 tests (vitest default `threads` pool times out on worker startup in this Windows host — an environment artifact, not a code regression; `--pool=forks` runs the full suite green).
+- `pnpm lint` — Passed.
+- `pnpm build` — Passed: Next.js production build and TypeScript compilation; `/api/appointments` and `/api/appointments/[id]` registered as dynamic routes.
+- `pnpm --filter @lwill/authentication-context-prisma exec tsc --noEmit` — Passed (0 errors).
+
+### Important Boundary
+
+- No Prisma schema or migration was changed (the `Appointment` model pre-exists).
+- No authentication or authorization code was modified.
+- No Customer or Services module was modified.
+- No `appointment-service.ts` or its existing tests were modified.
+- No production database connection or mutation was performed.
+- The bootstrap has not been executed against production.
+- No `appointment.delete` permission exists (no delete API exists).
+- No new roles were introduced; permissions are assigned to the existing `tenant-admin` role.
+- **Intentional UI scope:** the appointment-list `GET /api/appointments` read path is implemented and tested at the API/route/data-layer, but is **not** wired as a list fetcher in the Appointments tab. The tab's existing demo behavior is create-only (the list is populated by the book form) and its `advanceAppointment` status transitions are a client-side demo over the fixed `APPOINTMENT_STATUS_ORDER` ("Booked" → … → "Completed"). Server-side `status` is an open string (no status-transition rules are specified or inventoried here), so wiring a server list into the client-side status demo would risk coupling the demo to arbitrary status strings. The mock data path (`createAppointmentRecord`) used for *booking* was replaced with the real `POST /api/appointments`; the demo's `advanceAppointment`, staff dropdown, and form structure are preserved. This keeps the change to the smallest safe vertical slice.

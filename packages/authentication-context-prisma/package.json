@@ -12,6 +12,7 @@
     "bootstrap:initial-admin": "tsx src/initial-admin-bootstrap-cli.ts",
     "bootstrap:initial-customer-permissions": "tsx src/initial-customer-permissions-bootstrap-cli.ts",
     "bootstrap:initial-service-permissions": "tsx src/initial-service-permissions-bootstrap-cli.ts",
+    "bootstrap:initial-appointment-permissions": "tsx src/initial-appointment-permissions-bootstrap-cli.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

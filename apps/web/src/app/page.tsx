@@ -9,7 +9,6 @@ import {
 } from "@/lib/auth/native-auth-client";
 import {
   APPOINTMENT_STATUS_ORDER,
-  createAppointmentRecord,
   createInvoiceRecord,
   createStaffRecord,
   transitionAppointmentStatus,
@@ -46,6 +45,25 @@ type AppointmentRecord = {
   status: AppointmentStatus;
 };
 
+function toLocalAppointment(apiRecord: {
+  tenantId: string;
+  customerId: string;
+  serviceId: string;
+  startsAt: string;
+  endsAt: string;
+  status: string;
+}): AppointmentRecord {
+  return {
+    tenantId: apiRecord.tenantId,
+    customerId: apiRecord.customerId,
+    serviceId: apiRecord.serviceId,
+    staffId: "",
+    startsAt: apiRecord.startsAt,
+    endsAt: apiRecord.endsAt,
+    status: apiRecord.status as AppointmentStatus,
+  };
+}
+
 const initialStaff = [
   { tenantId: "tenant-xnail", displayName: "Mina Patel", branchId: "branch-main" },
   { tenantId: "tenant-xnail", displayName: "Aisha Khan", branchId: "branch-main" },
@@ -78,6 +96,7 @@ export default function Home() {
   const [appointmentCustomer, setAppointmentCustomer] = useState("");
   const [appointmentService, setAppointmentService] = useState("");
   const [appointmentStaff, setAppointmentStaff] = useState("staff-1");
+  const [appointmentError, setAppointmentError] = useState<string | null>(null);
   const [selectedInvoice, setSelectedInvoice] = useState({
     tenantId: "tenant-xnail",
     customerId: "",
@@ -348,18 +367,47 @@ export default function Home() {
     setStaffName("");
   };
 
-  const addAppointment = () => {
-    const record = createAppointmentRecord({
-      tenantId: "tenant-xnail",
-      customerId: appointmentCustomer,
-      serviceId: appointmentService,
-      staffId: appointmentStaff,
-      startsAt: "2026-08-12T10:30:00.000Z",
-      endsAt: "2026-08-12T11:15:00.000Z",
-      status: "Booked",
+  const addAppointment = async () => {
+    if (!appointmentCustomer || !appointmentService) return;
+    setAppointmentError(null);
+    const result = await fetch("/api/appointments", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        customerId: appointmentCustomer,
+        serviceId: appointmentService,
+        startsAt: "2026-08-12T10:30:00.000Z",
+        endsAt: "2026-08-12T11:15:00.000Z",
+        status: "Booked",
+        notes: null,
+      }),
     });
-
-    setAppointments((current) => [record, ...current]);
+    if (result.status === 401) {
+      setAppointments([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setAppointments([]);
+      setAppointmentError("You are not authorized to create appointments.");
+      return;
+    }
+    if (!result.ok) {
+      setAppointmentError("Appointment could not be saved.");
+      return;
+    }
+    const body = (await result.json()) as {
+      appointment: {
+        tenantId: string;
+        customerId: string;
+        serviceId: string;
+        startsAt: string;
+        endsAt: string;
+        status: string;
+      };
+    };
+    setAppointments((current) => [toLocalAppointment(body.appointment), ...current]);
   };
 
   const advanceAppointment = (index: number) => {
@@ -637,6 +685,11 @@ export default function Home() {
           <section className="mt-6 grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
             <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
               <h2 className="text-xl font-semibold">Appointments</h2>
+              {!appointmentError ? null : (
+                <div className="mt-2 rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">
+                  {appointmentError}
+                </div>
+              )}
               <div className="mt-4 space-y-3">
                 {appointments.map((appointment, index) => (
                   <div key={`${appointment.customerId}-${index}`} className="rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
