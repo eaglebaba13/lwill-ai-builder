@@ -5,8 +5,8 @@
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
 - **Current Branch**: `phase-1d-native-auth`
-- **Current HEAD Commit**: `298ceab` (stale-refresh null-token cookie-clear race fix)
-- **Git State**: `phase-1d-native-auth` at `298ceab`; the working tree contains the uncommitted authentication-redirect fix (`customer-runtime.ts` and `instrumentation.ts`), focused tests, and documentation updates. Unrelated customer/CRM/RBAC/bootstrap changes remain unstaged.
+- **Current HEAD Commit**: `fc55e99` (`feat(x-nail): implement Services API vertical slice with RBAC`)
+- **Git State**: `phase-1d-native-auth` at `fc55e99`, clean working tree; the native-auth navigation, customer-auth-redirect, Customer RBAC, and Services API vertical slices are committed. No uncommitted customer/CRM/RBAC/bootstrap or Prisma schema/migration changes remain staged or unstaged.
 
 ## State Breakdown
 
