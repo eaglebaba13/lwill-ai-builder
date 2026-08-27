@@ -9,7 +9,6 @@ import {
 } from "@/lib/auth/native-auth-client";
 import {
   APPOINTMENT_STATUS_ORDER,
-  createInvoiceRecord,
   transitionAppointmentStatus,
   type AppointmentStatus,
 } from "@/lib/x-nail/operational-workflow";
@@ -122,6 +121,28 @@ export default function Home() {
   );
   const [membershipEndsAt, setMembershipEndsAt] = useState("");
   const [membershipStatus, setMembershipStatus] = useState("");
+  const [invoices, setInvoices] = useState<Array<{
+    id: string;
+    customerId: string;
+    issuedAt: string;
+    subtotalCents: number;
+    discountCents: number;
+    gstCents: number;
+    totalCents: number;
+    notes: string | null;
+  }>>([]);
+  const [isLoadingInvoices, setIsLoadingInvoices] = useState(false);
+  const [invoiceError, setInvoiceError] = useState<string | null>(null);
+  const [invoiceCustomerId, setInvoiceCustomerId] = useState("");
+  const [invoiceIssuedAt, setInvoiceIssuedAt] = useState(
+    new Date().toISOString(),
+  );
+  const [invoiceDescription, setInvoiceDescription] = useState("");
+  const [invoiceQuantity, setInvoiceQuantity] = useState("1");
+  const [invoiceUnitPrice, setInvoiceUnitPrice] = useState("1500");
+  const [invoiceDiscount, setInvoiceDiscount] = useState("0");
+  const [invoiceGst, setInvoiceGst] = useState("0");
+  const [invoiceNotes, setInvoiceNotes] = useState("");
   const [staff, setStaff] = useState<StaffRecord[]>([]);
   const [isLoadingStaff, setIsLoadingStaff] = useState(false);
   const [staffError, setStaffError] = useState<string | null>(null);
@@ -136,16 +157,6 @@ export default function Home() {
   const [appointmentService, setAppointmentService] = useState("");
   const [appointmentStaff, setAppointmentStaff] = useState("staff-1");
   const [appointmentError, setAppointmentError] = useState<string | null>(null);
-  const [selectedInvoice, setSelectedInvoice] = useState({
-    tenantId: "tenant-xnail",
-    customerId: "",
-    items: [
-      { description: "Classic Manicure", quantity: 1, unitPriceCents: 1500 },
-      { description: "Gel Polish", quantity: 1, unitPriceCents: 2200 },
-    ],
-    discountCents: 200,
-    gstCents: 180,
-  });
 
   useEffect(() => {
     let mounted = true;
@@ -220,7 +231,6 @@ export default function Home() {
         setCustomers(loadedCustomers);
         if (loadedCustomers[0]) {
           setAppointmentCustomer((current) => current || loadedCustomers[0].id);
-          setSelectedInvoice((current) => ({ ...current, customerId: current.customerId || loadedCustomers[0].id }));
         }
       })
       .catch(() => {
@@ -500,6 +510,71 @@ export default function Home() {
   }, [authenticated, activeTab]);
 
   useEffect(() => {
+    if (authenticated !== true || activeTab !== "Billing") {
+      return;
+    }
+
+    let mounted = true;
+    let completed = false;
+    const loadingTimer = window.setTimeout(() => {
+      if (mounted && !completed) {
+        setIsLoadingInvoices(true);
+        setInvoiceError(null);
+      }
+    }, 0);
+    void fetch("/api/invoices", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        completed = true;
+        if (result.status === 401) {
+          setInvoices([]);
+          setAuthenticated(false);
+          return;
+        }
+        if (result.status === 403) {
+          setInvoices([]);
+          setInvoiceError("You are not authorized to view invoices.");
+          return;
+        }
+        if (!result.ok) {
+          throw new Error("Invoice list request failed");
+        }
+        const body = await result.json() as {
+          invoices?: Array<{
+            id: string;
+            customerId: string;
+            issuedAt: string;
+            subtotalCents: number;
+            discountCents: number;
+            gstCents: number;
+            totalCents: number;
+            notes: string | null;
+          }>;
+        };
+        const loadedInvoices = Array.isArray(body.invoices) ? body.invoices : [];
+        setInvoices(loadedInvoices);
+      })
+      .catch(() => {
+        completed = true;
+        if (mounted) {
+          setInvoices([]);
+          setInvoiceError("Invoices could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          window.clearTimeout(loadingTimer);
+          setIsLoadingInvoices(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+      window.clearTimeout(loadingTimer);
+    };
+  }, [authenticated, activeTab]);
+
+  useEffect(() => {
     if (authenticated !== true || activeTab !== "Staff") {
       return;
     }
@@ -726,6 +801,58 @@ export default function Home() {
     setMembershipStatus("");
   };
 
+  const addInvoice = async () => {
+    if (!invoiceCustomerId.trim() || !invoiceDescription.trim()) return;
+    setInvoiceError(null);
+    const quantity = Number(invoiceQuantity) || 1;
+    const unitPriceCents = Number(invoiceUnitPrice) || 0;
+    const discountCents = Number(invoiceDiscount) || 0;
+    const gstCents = Number(invoiceGst) || 0;
+    const result = await fetch("/api/invoices", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        customerId: invoiceCustomerId,
+        issuedAt: invoiceIssuedAt,
+        items: [
+          {
+            description: invoiceDescription,
+            quantity,
+            unitPriceCents,
+          },
+        ],
+        discountCents,
+        gstCents,
+        notes: invoiceNotes || null,
+      }),
+    });
+    if (result.status === 401) {
+      setInvoices([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setInvoices([]);
+      setInvoiceError("You are not authorized to create invoices.");
+      return;
+    }
+    if (!result.ok) {
+      setInvoiceError("Invoice could not be saved.");
+      return;
+    }
+    const body = await result.json() as { invoice: { id: string; customerId: string; issuedAt: string; subtotalCents: number; discountCents: number; gstCents: number; totalCents: number; notes: string | null } };
+    setInvoices((current) => [body.invoice, ...current]);
+    setInvoiceCustomerId("");
+    setInvoiceDescription("");
+    setInvoiceQuantity("1");
+    setInvoiceUnitPrice("1500");
+    setInvoiceDiscount("0");
+    setInvoiceGst("0");
+    setInvoiceNotes("");
+    setInvoiceIssuedAt(new Date().toISOString());
+  };
+
   const addStaff = async () => {
     if (!staffName.trim()) return;
     setStaffError(null);
@@ -817,10 +944,6 @@ export default function Home() {
       );
     });
   };
-
-  const invoicePreview = selectedInvoice.customerId
-    ? createInvoiceRecord(selectedInvoice)
-    : { subtotalCents: 0, discountCents: 0, gstCents: 0, totalCents: 0 };
 
   if (authenticated === null) {
     return null;
@@ -1264,73 +1387,89 @@ export default function Home() {
         ) : null}
 
         {activeTab === "Billing" ? (
-          <section className="mt-6 rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
-            <h2 className="text-xl font-semibold">Invoice / POS</h2>
-            <div className="mt-5 grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
-              <div className="rounded-2xl bg-[#fffafc] p-4 ring-1 ring-[#f3e6eb]">
-                <div className="space-y-3">
-                  {selectedInvoice.items.map((item, index) => (
-                    <div key={`${item.description}-${index}`} className="flex items-center justify-between text-sm">
-                      <span>{item.description}</span>
-                      <span>₹{(item.quantity * item.unitPriceCents) / 100}</span>
+          <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <h2 className="text-xl font-semibold">Invoices</h2>
+              <div className="mt-4 space-y-3">
+                {isLoadingInvoices ? <div className="text-sm text-[#736067]">Loading invoices...</div> : null}
+                {!isLoadingInvoices && invoiceError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{invoiceError}</div> : null}
+                {!isLoadingInvoices && !invoiceError && invoices.length === 0 ? <div className="text-sm text-[#736067]">No invoices yet.</div> : null}
+                {invoices.map((invoice) => (
+                  <div key={invoice.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    <div>
+                      <div className="font-medium">Customer {invoice.customerId}</div>
+                      <div className="text-sm text-[#736067]">{invoice.issuedAt}</div>
                     </div>
-                  ))}
-                </div>
-                <div className="mt-4 border-t border-[#f0dfe6] pt-4 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span>Subtotal</span>
-                    <span>₹{invoicePreview.subtotalCents / 100}</span>
+                    <div className="text-right text-sm text-[#736067]">
+                      <div>Total ₹{invoice.totalCents / 100}</div>
+                      <div>{invoice.notes ?? "—"}</div>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span>Discount</span>
-                    <span>-₹{invoicePreview.discountCents / 100}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>GST</span>
-                    <span>₹{invoicePreview.gstCents / 100}</span>
-                  </div>
-                  <div className="mt-3 flex items-center justify-between text-lg font-semibold">
-                    <span>Total</span>
-                    <span>₹{invoicePreview.totalCents / 100}</span>
-                  </div>
-                </div>
+                ))}
               </div>
+            </div>
 
-              <div className="rounded-2xl bg-[#fffafc] p-4 ring-1 ring-[#f3e6eb]">
-                <div className="text-sm font-medium text-[#5a3b48]">Quick POS</div>
-                <div className="mt-4 space-y-3">
-                  <button
-                    onClick={() =>
-                      setSelectedInvoice({
-                        tenantId: "tenant-xnail",
-                        customerId: "cust-1",
-                        items: [
-                          { description: "Classic Manicure", quantity: 1, unitPriceCents: 1500 },
-                          { description: "Nail Art Add-on", quantity: 2, unitPriceCents: 800 },
-                        ],
-                        discountCents: 200,
-                        gstCents: 180,
-                      })
-                    }
-                    className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
-                  >
-                    Generate invoice
-                  </button>
-                  <button
-                    onClick={() =>
-                      setSelectedInvoice({
-                        tenantId: "tenant-xnail",
-                        customerId: "cust-2",
-                        items: [{ description: "Gel Polish", quantity: 1, unitPriceCents: 2200 }],
-                        discountCents: 0,
-                        gstCents: 120,
-                      })
-                    }
-                    className="w-full rounded-xl border border-[#ead0d9] px-4 py-2.5 text-sm font-semibold"
-                  >
-                    Quick checkout
-                  </button>
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <h2 className="text-xl font-semibold">Create invoice</h2>
+              <div className="mt-4 space-y-3">
+                <input
+                  value={invoiceCustomerId}
+                  onChange={(event) => setInvoiceCustomerId(event.target.value)}
+                  placeholder="Customer ID"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <input
+                  value={invoiceIssuedAt}
+                  onChange={(event) => setInvoiceIssuedAt(event.target.value)}
+                  placeholder="Issued at (ISO date)"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <input
+                  value={invoiceDescription}
+                  onChange={(event) => setInvoiceDescription(event.target.value)}
+                  placeholder="Item description"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <div className="grid grid-cols-2 gap-3">
+                  <input
+                    value={invoiceQuantity}
+                    onChange={(event) => setInvoiceQuantity(event.target.value)}
+                    placeholder="Qty"
+                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  />
+                  <input
+                    value={invoiceUnitPrice}
+                    onChange={(event) => setInvoiceUnitPrice(event.target.value)}
+                    placeholder="Unit price (cents)"
+                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  />
                 </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <input
+                    value={invoiceDiscount}
+                    onChange={(event) => setInvoiceDiscount(event.target.value)}
+                    placeholder="Discount (cents)"
+                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  />
+                  <input
+                    value={invoiceGst}
+                    onChange={(event) => setInvoiceGst(event.target.value)}
+                    placeholder="GST (cents)"
+                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  />
+                </div>
+                <input
+                  value={invoiceNotes}
+                  onChange={(event) => setInvoiceNotes(event.target.value)}
+                  placeholder="Notes (optional)"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <button
+                  onClick={addInvoice}
+                  className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                >
+                  Save invoice
+                </button>
               </div>
             </div>
           </section>
