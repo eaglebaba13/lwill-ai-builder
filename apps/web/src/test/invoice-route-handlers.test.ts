@@ -52,7 +52,7 @@ describe("invoice route handlers: authentication/authorization gating", () => {
 
 describe("invoice route handlers: permission code forwarding", () => {
   it("passes 'invoice.read' to authorize for list and get operations", async () => {
-    const services = createServices({ outcome: "authorized", tenantId: "tenant-1" });
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1", branchId: "branch-1" });
     await handleListInvoices(request(), services);
     expect(services.authorize).toHaveBeenCalledWith("invoice.read");
 
@@ -61,7 +61,7 @@ describe("invoice route handlers: permission code forwarding", () => {
   });
 
   it("passes 'invoice.write' to authorize for create operations", async () => {
-    const services = createServices({ outcome: "authorized", tenantId: "tenant-1" });
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1", branchId: "branch-1" });
     await handleCreateInvoice(request({ customerId: "cust-1", issuedAt: "2026-08-12T10:00:00.000Z", items: [{ description: "X", quantity: 1, unitPriceCents: 1000 }] }), services);
     expect(services.authorize).toHaveBeenCalledWith("invoice.write");
   });
@@ -138,6 +138,7 @@ describe("invoice-runtime authorize(): authentication vs authorization outcome",
     expect(await services.authorize("invoice.read")).toEqual({
       outcome: "authorized",
       tenantId: "tenant-1",
+      branchId: "branch-1",
     });
   });
 
@@ -201,7 +202,7 @@ describe("invoice-runtime authorize(): authentication vs authorization outcome",
 });
 
 describe("invoice route handlers: authorized operations", () => {
-  const authorized: InvoiceAuthorization = { outcome: "authorized", tenantId: "tenant-1" };
+  const authorized: InvoiceAuthorization = { outcome: "authorized", tenantId: "tenant-1", branchId: "branch-1" };
 
   it("authorizes every operation before accessing invoice data", async () => {
     const services = createServices(authorized);
@@ -236,6 +237,7 @@ describe("invoice route handlers: authorized operations", () => {
     expect(validResult.status).toBe(201);
     expect(services.createInvoice).toHaveBeenCalledWith(
       "tenant-1",
+      "branch-1",
       expect.objectContaining({ customerId: "cust-1" }),
     );
   });
@@ -280,6 +282,7 @@ describe("invoice route handlers: authorized operations", () => {
     expect(result.status).toBe(201);
     expect(services.createInvoice).toHaveBeenCalledWith(
       "tenant-1",
+      "branch-1",
       expect.objectContaining({
         customerId: "cust-1",
         items: expect.arrayContaining([

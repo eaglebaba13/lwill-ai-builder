@@ -90,7 +90,7 @@ function toLocalAppointment(apiRecord: {
   };
 }
 
-const tabs = ["Overview", "Customers", "Services", "Packages", "Memberships", "Staff", "Appointments", "Billing"] as const;
+const tabs = ["Overview", "Customers", "Services", "Packages", "Memberships", "Inventory", "Staff", "Appointments", "Billing"] as const;
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<(typeof tabs)[number]>("Overview");
@@ -143,6 +143,13 @@ export default function Home() {
   const [invoiceDiscount, setInvoiceDiscount] = useState("0");
   const [invoiceGst, setInvoiceGst] = useState("0");
   const [invoiceNotes, setInvoiceNotes] = useState("");
+  const [products, setProducts] = useState<Array<{ id: string; name: string; sku: string; priceCents: number; isActive: boolean }>>([]);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
+  const [productError, setProductError] = useState<string | null>(null);
+  const [productName, setProductName] = useState("");
+  const [productSku, setProductSku] = useState("");
+  const [productPrice, setProductPrice] = useState("1500");
+  const [productCategoryId, setProductCategoryId] = useState("");
   const [staff, setStaff] = useState<StaffRecord[]>([]);
   const [isLoadingStaff, setIsLoadingStaff] = useState(false);
   const [staffError, setStaffError] = useState<string | null>(null);
@@ -575,6 +582,68 @@ export default function Home() {
   }, [authenticated, activeTab]);
 
   useEffect(() => {
+    if (authenticated !== true || activeTab !== "Inventory") {
+      return;
+    }
+
+    let mounted = true;
+    let completed = false;
+    const loadingTimer = window.setTimeout(() => {
+      if (mounted && !completed) {
+        setIsLoadingProducts(true);
+        setProductError(null);
+      }
+    }, 0);
+    void fetch("/api/products", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        completed = true;
+        if (result.status === 401) {
+          setProducts([]);
+          setAuthenticated(false);
+          return;
+        }
+        if (result.status === 403) {
+          setProducts([]);
+          setProductError("You are not authorized to view products.");
+          return;
+        }
+        if (!result.ok) {
+          throw new Error("Product list request failed");
+        }
+        const body = await result.json() as {
+          products?: Array<{
+            id: string;
+            name: string;
+            sku: string;
+            priceCents: number;
+            isActive: boolean;
+          }>;
+        };
+        const loadedProducts = Array.isArray(body.products) ? body.products : [];
+        setProducts(loadedProducts);
+      })
+      .catch(() => {
+        completed = true;
+        if (mounted) {
+          setProducts([]);
+          setProductError("Products could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          window.clearTimeout(loadingTimer);
+          setIsLoadingProducts(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+      window.clearTimeout(loadingTimer);
+    };
+  }, [authenticated, activeTab]);
+
+  useEffect(() => {
     if (authenticated !== true || activeTab !== "Staff") {
       return;
     }
@@ -851,6 +920,44 @@ export default function Home() {
     setInvoiceGst("0");
     setInvoiceNotes("");
     setInvoiceIssuedAt(new Date().toISOString());
+  };
+
+  const addProduct = async () => {
+    if (!productName.trim() || !productSku.trim() || !productCategoryId.trim()) return;
+    setProductError(null);
+    const result = await fetch("/api/products", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        categoryId: productCategoryId,
+        name: productName,
+        sku: productSku,
+        unit: "pcs",
+        priceCents: Number(productPrice) || 0,
+        isActive: true,
+      }),
+    });
+    if (result.status === 401) {
+      setProducts([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setProducts([]);
+      setProductError("You are not authorized to create products.");
+      return;
+    }
+    if (!result.ok) {
+      setProductError("Product could not be saved.");
+      return;
+    }
+    const body = await result.json() as { product: { id: string; name: string; sku: string; priceCents: number; isActive: boolean } };
+    setProducts((current) => [body.product, ...current]);
+    setProductName("");
+    setProductSku("");
+    setProductPrice("1500");
+    setProductCategoryId("");
   };
 
   const addStaff = async () => {
@@ -1380,6 +1487,67 @@ export default function Home() {
                   className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
                 >
                   Save appointment
+                </button>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {activeTab === "Inventory" ? (
+          <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <h2 className="text-xl font-semibold">Products</h2>
+              <div className="mt-4 space-y-3">
+                {isLoadingProducts ? <div className="text-sm text-[#736067]">Loading products...</div> : null}
+                {!isLoadingProducts && productError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{productError}</div> : null}
+                {!isLoadingProducts && !productError && products.length === 0 ? <div className="text-sm text-[#736067]">No products yet.</div> : null}
+                {products.map((product) => (
+                  <div key={product.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    <div>
+                      <div className="font-medium">{product.name}</div>
+                      <div className="text-sm text-[#736067]">SKU: {product.sku}</div>
+                    </div>
+                    <div className="text-right text-sm text-[#736067]">
+                      <div>₹{product.priceCents / 100}</div>
+                      <div>{product.isActive ? "Active" : "Inactive"}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <h2 className="text-xl font-semibold">Add product</h2>
+              <div className="mt-4 space-y-3">
+                <input
+                  value={productCategoryId}
+                  onChange={(event) => setProductCategoryId(event.target.value)}
+                  placeholder="Category ID"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <input
+                  value={productName}
+                  onChange={(event) => setProductName(event.target.value)}
+                  placeholder="Product name"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <input
+                  value={productSku}
+                  onChange={(event) => setProductSku(event.target.value)}
+                  placeholder="SKU"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <input
+                  value={productPrice}
+                  onChange={(event) => setProductPrice(event.target.value)}
+                  placeholder="Price (cents)"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <button
+                  onClick={addProduct}
+                  className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                >
+                  Save product
                 </button>
               </div>
             </div>

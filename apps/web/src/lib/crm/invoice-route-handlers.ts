@@ -3,7 +3,7 @@ import "server-only";
 export type InvoiceAuthorization =
   | { readonly outcome: "unauthenticated" }
   | { readonly outcome: "forbidden" }
-  | { readonly outcome: "authorized"; readonly tenantId: string };
+  | { readonly outcome: "authorized"; readonly tenantId: string; readonly branchId: string | null };
 
 export interface InvoiceLineItemWriteInput {
   readonly description: string;
@@ -26,7 +26,7 @@ export interface InvoiceRouteServices {
   readonly authorize: (permissionCode: string) => Promise<InvoiceAuthorization>;
   readonly listInvoices: (tenantId: string) => Promise<readonly unknown[]>;
   readonly getInvoice: (tenantId: string, invoiceId: string) => Promise<unknown | null>;
-  readonly createInvoice: (tenantId: string, input: InvoiceWriteInput) => Promise<unknown>;
+  readonly createInvoice: (tenantId: string, branchId: string | null, input: InvoiceWriteInput) => Promise<unknown>;
 }
 
 const RESPONSE_HEADERS = { "cache-control": "no-store" };
@@ -40,14 +40,14 @@ function response(status: number, body?: unknown): Response {
 
 function authorizationOutcome(
   authorization: InvoiceAuthorization,
-): { readonly ok: true; readonly tenantId: string } | { readonly ok: false; readonly response: Response } {
+): { readonly ok: true; readonly tenantId: string; readonly branchId: string | null } | { readonly ok: false; readonly response: Response } {
   if (authorization.outcome === "unauthenticated") {
     return { ok: false, response: response(401) };
   }
   if (authorization.outcome === "forbidden") {
     return { ok: false, response: response(403) };
   }
-  return { ok: true, tenantId: authorization.tenantId };
+  return { ok: true, tenantId: authorization.tenantId, branchId: authorization.branchId ?? null };
 }
 
 function isNonEmptyString(value: unknown): value is string {
@@ -188,7 +188,7 @@ export async function handleCreateInvoice(
   if (input === null) {
     return response(400);
   }
-  const invoice = await services.createInvoice(authResult.tenantId, input);
+  const invoice = await services.createInvoice(authResult.tenantId, authResult.branchId, input);
   return response(201, { invoice });
 }
 

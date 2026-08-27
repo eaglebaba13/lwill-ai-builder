@@ -5,6 +5,7 @@ export interface InvoiceLineItemRecord {
   readonly description: string;
   readonly serviceId: string | null;
   readonly packageId: string | null;
+  readonly productId: string | null;
   readonly quantity: number;
   readonly unitPriceCents: number;
   readonly lineTotalCents: number;
@@ -16,6 +17,7 @@ export interface InvoiceLineItemInput {
   readonly description: string;
   readonly serviceId?: string | null;
   readonly packageId?: string | null;
+  readonly productId?: string | null;
   readonly quantity: number;
   readonly unitPriceCents: number;
 }
@@ -41,6 +43,7 @@ export interface InvoiceCreateInput {
   readonly discountCents?: number;
   readonly gstCents?: number;
   readonly notes?: string | null;
+  readonly branchId?: string | null;
   readonly items: readonly InvoiceLineItemInput[];
 }
 
@@ -67,6 +70,20 @@ interface InvoicePrismaClient {
     findUnique: (args: { where: { id: string } }) => Promise<{ id: string; tenantId: string } | null>;
   };
   readonly package: {
+    findUnique: (args: { where: { id: string } }) => Promise<{ id: string; tenantId: string } | null>;
+  };
+  readonly product: {
+    findUnique: (args: { where: { id: string } }) => Promise<{ id: string; tenantId: string } | null>;
+  };
+  readonly stockItem: {
+    findFirst: (args: { where: Record<string, unknown> }) => Promise<{ id: string } | null>;
+    create: (args: { data: Record<string, unknown> }) => Promise<{ id: string }>;
+    update: (args: { data: Record<string, unknown>; where: { id: string } }) => Promise<{ id: string }>;
+  };
+  readonly stockMovement: {
+    create: (args: { data: Record<string, unknown> }) => Promise<unknown>;
+  };
+  readonly branch: {
     findUnique: (args: { where: { id: string } }) => Promise<{ id: string; tenantId: string } | null>;
   };
 }
@@ -111,6 +128,13 @@ export function createBillingInvoiceService(prisma: InvoicePrismaClient): Invoic
             throw new Error("package must belong to the same tenant");
           }
         }
+
+        if (item.productId) {
+          const product = await prisma.product.findUnique({ where: { id: item.productId } });
+          if (product === null || product.tenantId !== input.tenantId) {
+            throw new Error("product must belong to the same tenant");
+          }
+        }
       }
 
       const discountCents = input.discountCents ?? 0;
@@ -139,11 +163,54 @@ export function createBillingInvoiceService(prisma: InvoicePrismaClient): Invoic
             description: item.description,
             serviceId: item.serviceId ?? null,
             packageId: item.packageId ?? null,
+            productId: item.productId ?? null,
             quantity: item.quantity,
             unitPriceCents: item.unitPriceCents,
             lineTotalCents,
           },
         });
+      }
+
+      if (input.branchId) {
+        const branch = await prisma.branch.findUnique({ where: { id: input.branchId } });
+        if (branch === null || branch.tenantId !== input.tenantId) {
+          throw new Error("branch must belong to the same tenant");
+        }
+
+        for (const item of normalizedItems) {
+          if (!item.productId) {
+            continue;
+          }
+          let stockItem = await prisma.stockItem.findFirst({
+            where: { tenantId: input.tenantId, productId: item.productId, branchId: input.branchId },
+          });
+          if (stockItem === null) {
+            stockItem = await prisma.stockItem.create({
+              data: {
+                tenantId: input.tenantId,
+                productId: item.productId,
+                branchId: input.branchId,
+                quantity: 0,
+              },
+            });
+          }
+          await prisma.stockItem.update({
+            where: { id: stockItem.id },
+            data: { quantity: { decrement: item.quantity } },
+          });
+          await prisma.stockMovement.create({
+            data: {
+              tenantId: input.tenantId,
+              productId: item.productId,
+              branchId: input.branchId,
+              movementType: "SALE",
+              quantity: -item.quantity,
+              referenceType: "INVOICE",
+              referenceId: invoice.id,
+              notes: `Stock deducted for invoice ${invoice.id}`,
+            },
+          });
+        }
       }
 
       return invoice;

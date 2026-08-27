@@ -4,19 +4,19 @@ import { authorizeFromContext } from "../auth/authorization-boundary";
 import { createAuthorizationService } from "@lwill/authorization-service/src/authorization-service";
 import { loadPermissionGrants } from "@lwill/authorization-prisma/src/load-permission-grants";
 import { prisma } from "../../../../../packages/database/src/client";
-import { createBillingInvoiceService } from "../../../../../packages/authentication-context-prisma/src/invoice-service";
+import { createProductService } from "../../../../../packages/authentication-context-prisma/src/product-service";
 import type {
-  InvoiceAuthorization,
-  InvoiceRouteServices,
-} from "./invoice-route-handlers";
+  ProductAuthorization,
+  ProductRouteServices,
+} from "./product-route-handlers";
 
-const invoiceService = createBillingInvoiceService(prisma as never);
+const productService = createProductService(prisma as never);
 
 const authService = createAuthorizationService({
   loadPermissionGrants,
 });
 
-async function authorize(permissionCode: string): Promise<InvoiceAuthorization> {
+async function authorize(permissionCode: string): Promise<ProductAuthorization> {
   const context = await getAuthenticationContext();
   if (!context.authenticated) {
     return { outcome: "unauthenticated" };
@@ -35,14 +35,15 @@ async function authorize(permissionCode: string): Promise<InvoiceAuthorization> 
   if (!decision.allowed) {
     return { outcome: "forbidden" };
   }
-  return { outcome: "authorized", tenantId: context.tenantContext.tenantId, branchId: context.tenantContext.branchId };
+  return { outcome: "authorized", tenantId: context.tenantContext.tenantId };
 }
 
-export function createInvoiceRouteServices(): InvoiceRouteServices {
+export function createProductRouteServices(): ProductRouteServices {
   return {
     authorize,
-    listInvoices: (tenantId) => invoiceService.listInvoices({ tenantId }),
-    getInvoice: (tenantId, invoiceId) => invoiceService.getInvoice({ tenantId, invoiceId }),
-    createInvoice: (tenantId, branchId, input) => invoiceService.createInvoice({ tenantId, branchId, ...input }),
+    listProducts: (tenantId) => productService.listProducts({ tenantId }),
+    getProduct: (tenantId, productId) => productService.getProduct({ tenantId, productId }),
+    createProduct: (tenantId, input) => productService.createProduct({ tenantId, ...input }),
+    updateProduct: (tenantId, productId, input) => productService.updateProduct({ tenantId, productId, input }),
   };
 }
