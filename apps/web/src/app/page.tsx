@@ -88,6 +88,7 @@ export default function Home() {
   const [serviceError, setServiceError] = useState<string | null>(null);
   const [staff, setStaff] = useState(initialStaff);
   const [appointments, setAppointments] = useState<AppointmentRecord[]>([]);
+  const [isLoadingAppointments, setIsLoadingAppointments] = useState(false);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [serviceName, setServiceName] = useState("");
@@ -241,6 +242,65 @@ export default function Home() {
       })
       .finally(() => {
         if (mounted) setIsLoadingServices(false);
+      });
+
+    return () => {
+      mounted = false;
+      window.clearTimeout(loadingTimer);
+    };
+  }, [authenticated, activeTab]);
+
+  useEffect(() => {
+    if (authenticated !== true || activeTab !== "Appointments") {
+      return;
+    }
+
+    let mounted = true;
+    const loadingTimer = window.setTimeout(() => {
+      if (mounted) {
+        setIsLoadingAppointments(true);
+        setAppointmentError(null);
+      }
+    }, 0);
+    void fetch("/api/appointments", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        if (result.status === 401) {
+          setAppointments([]);
+          setAuthenticated(false);
+          return;
+        }
+        if (result.status === 403) {
+          setAppointments([]);
+          setAppointmentError("You are not authorized to view appointments.");
+          return;
+        }
+        if (!result.ok) {
+          throw new Error("Appointment list request failed");
+        }
+        const body = await result.json() as {
+          appointments?: Array<{
+            tenantId: string;
+            customerId: string;
+            serviceId: string;
+            startsAt: string;
+            endsAt: string;
+            status: string;
+          }>;
+        };
+        const loadedAppointments = Array.isArray(body.appointments)
+          ? body.appointments.map(toLocalAppointment)
+          : [];
+        setAppointments(loadedAppointments);
+      })
+      .catch(() => {
+        if (mounted) {
+          setAppointments([]);
+          setAppointmentError("Appointments could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) setIsLoadingAppointments(false);
       });
 
     return () => {
@@ -690,6 +750,10 @@ export default function Home() {
                   {appointmentError}
                 </div>
               )}
+              {isLoadingAppointments ? <div className="text-sm text-[#736067]">Loading appointments...</div> : null}
+              {!isLoadingAppointments && !appointmentError && appointments.length === 0 ? (
+                <div className="text-sm text-[#736067]">No appointments yet.</div>
+              ) : null}
               <div className="mt-4 space-y-3">
                 {appointments.map((appointment, index) => (
                   <div key={`${appointment.customerId}-${index}`} className="rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">

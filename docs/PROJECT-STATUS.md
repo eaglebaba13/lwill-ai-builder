@@ -1329,6 +1329,12 @@ Phase 1D remains focused on concrete authentication/session integration and asso
 - `pnpm lint` — Passed.
 - `pnpm build` — Passed: Next.js production build and TypeScript compilation; `/api/appointments` and `/api/appointments/[id]` registered as dynamic routes.
 - `pnpm --filter @lwill/authentication-context-prisma exec tsc --noEmit` — Passed (0 errors).
+- `git diff --check` — Passed (working tree clean at 5187273).
+- **Production deployment**: Coolify auto-deployed from GitHub push at HEAD `5187273`; container healthy; healthcheck passing; `builder.lwill.in` reachable (HTTP 200).
+- **Production authentication**: `POST /api/auth/login` returns 204 with HttpOnly Secure SameSite=Lax access/refresh cookies; tenant context established (`builder.lwill.in` → `HDK Beauty I Pvt. Ltd.`, verified+active in `TenantDomain`); unauthenticated API requests return 401 (fail-closed).
+- **Production Services API**: `GET /api/services` 200; `POST /api/services` 201; `GET /api/services/[id]` 200; `PATCH /api/services/[id]` 200; input validation 400 for invalid inputs; unauthorized 401.
+- **Production Appointments API**: `GET /api/appointments` 200; `POST /api/appointments` 201; `GET /api/appointments/[id]` 200; `PATCH /api/appointments/[id]` 200; input validation 400 for invalid inputs (empty customerId, endsAt <= startsAt, tenantId injection); unauthorized 401.
+- **Production permission bootstrap**: `appointment.read` and `appointment.write` created and assigned to `tenant-admin` via `pnpm --filter @lwill/authentication-context-prisma run bootstrap:initial-appointment-permissions`; test data created during verification was cleaned up.
 
 ### Important Boundary
 
@@ -1336,8 +1342,9 @@ Phase 1D remains focused on concrete authentication/session integration and asso
 - No authentication or authorization code was modified.
 - No Customer or Services module was modified.
 - No `appointment-service.ts` or its existing tests were modified.
-- No production database connection or mutation was performed.
-- The bootstrap has not been executed against production.
+- No production database schema was modified.
+- The appointment permission bootstrap (`appointment.read`, `appointment.write`) was the only data operation performed in production; it was idempotent, transactional, and fail-closed per the existing repository mechanism.
+- Test records created during verification (one Service, one Appointment) were deleted from the production database immediately after verification.
 - No `appointment.delete` permission exists (no delete API exists).
 - No new roles were introduced; permissions are assigned to the existing `tenant-admin` role.
-- **Intentional UI scope:** the appointment-list `GET /api/appointments` read path is implemented and tested at the API/route/data-layer, but is **not** wired as a list fetcher in the Appointments tab. The tab's existing demo behavior is create-only (the list is populated by the book form) and its `advanceAppointment` status transitions are a client-side demo over the fixed `APPOINTMENT_STATUS_ORDER` ("Booked" → … → "Completed"). Server-side `status` is an open string (no status-transition rules are specified or inventoried here), so wiring a server list into the client-side status demo would risk coupling the demo to arbitrary status strings. The mock data path (`createAppointmentRecord`) used for *booking* was replaced with the real `POST /api/appointments`; the demo's `advanceAppointment`, staff dropdown, and form structure are preserved. This keeps the change to the smallest safe vertical slice.
+ - **Intentional UI scope:** the appointment-list `GET /api/appointments` read path is now wired as a list fetcher in the Appointments tab (mirroring the Services tab fetch pattern, with loading/error/401/403 states). The `advanceAppointment` client-side status demo, staff dropdown, and form structure are preserved unchanged. Server-side `status` remains an open string (no status-transition rules are specified or inventoried here), so the demo's `advanceAppointment` transitions remain over the fixed `APPOINTMENT_STATUS_ORDER` ("Booked" → … → "Completed"). The mock data path (`createAppointmentRecord`) used for *booking* was replaced with the real `POST /api/appointments`; it is not referenced in the page component. This keeps the change to the smallest safe vertical slice.

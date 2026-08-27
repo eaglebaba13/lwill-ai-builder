@@ -417,4 +417,210 @@ describe("X Nail native authentication integration", () => {
       expect.objectContaining({ credentials: "same-origin" }),
     );
   });
+
+  it("fetches appointments when the Appointments tab is activated", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ customers: [] }))
+      .mockResolvedValueOnce(Response.json({ appointments: [] }));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<Home />);
+    await user.type(await screen.findByLabelText("Email"), "operator@example.test");
+    await user.type(await screen.findByLabelText("Password"), "test-password");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(await screen.findByText("Operations dashboard")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Appointments" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/api/appointments",
+      expect.objectContaining({ credentials: "same-origin" }),
+    ));
+  });
+
+  it("populates the appointment list from the API response", async () => {
+    const mockAppointments = [
+      {
+        id: "apt-1",
+        tenantId: "tenant-xnail",
+        customerId: "cust-1",
+        serviceId: "svc-1",
+        startsAt: "2026-08-30T10:00:00.000Z",
+        endsAt: "2026-08-30T10:45:00.000Z",
+        status: "Booked",
+        notes: null,
+      },
+    ];
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ customers: [] }))
+      .mockResolvedValueOnce(Response.json({ appointments: mockAppointments }));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<Home />);
+    await user.type(await screen.findByLabelText("Email"), "operator@example.test");
+    await user.type(await screen.findByLabelText("Password"), "test-password");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(await screen.findByText("Operations dashboard")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Appointments" }));
+
+    await waitFor(() => expect(screen.getByText("Customer cust-1")).toBeInTheDocument());
+    expect(screen.getByText("2026-08-30T10:00:00.000Z")).toBeInTheDocument();
+    expect(screen.getByText("Booked")).toBeInTheDocument();
+  });
+
+  it("shows loading state while appointments request is pending", async () => {
+    let resolveAppointments: ((response: Response) => void) | undefined;
+    const appointmentsRequest = new Promise<Response>((resolve) => {
+      resolveAppointments = resolve;
+    });
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ customers: [] }))
+      .mockReturnValueOnce(appointmentsRequest);
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<Home />);
+    await user.type(await screen.findByLabelText("Email"), "operator@example.test");
+    await user.type(await screen.findByLabelText("Password"), "test-password");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(await screen.findByText("Operations dashboard")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Appointments" }));
+
+    await waitFor(() => expect(screen.getByText("Loading appointments...")).toBeInTheDocument());
+
+    await act(async () => {
+      resolveAppointments?.(Response.json({ appointments: [] }));
+    });
+
+    expect(screen.queryByText("Loading appointments...")).not.toBeInTheDocument();
+  });
+
+  it("shows error and stays on dashboard when appointments fetch returns 403", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ customers: [] }))
+      .mockImplementationOnce(() => new Promise((resolve) => setTimeout(() => resolve(new Response(null, { status: 403 })), 50)));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<Home />);
+    await user.type(await screen.findByLabelText("Email"), "operator@example.test");
+    await user.type(await screen.findByLabelText("Password"), "test-password");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(await screen.findByText("Operations dashboard")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Appointments" }));
+
+    expect(await screen.findByText("You are not authorized to view appointments.")).toBeInTheDocument();
+    expect(screen.queryByText("Operations login")).not.toBeInTheDocument();
+  });
+
+  it("shows error on unexpected API failure for appointments", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ customers: [] }))
+      .mockImplementationOnce(() => new Promise((resolve) => setTimeout(() => resolve(new Response(null, { status: 500 })), 50)));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<Home />);
+    await user.type(await screen.findByLabelText("Email"), "operator@example.test");
+    await user.type(await screen.findByLabelText("Password"), "test-password");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(await screen.findByText("Operations dashboard")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Appointments" }));
+
+    expect(await screen.findByText("Appointments could not be loaded.")).toBeInTheDocument();
+    expect(screen.queryByText("Operations login")).not.toBeInTheDocument();
+  });
+
+  it("creates an appointment after appointments tab is activated", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({
+        customers: [{ id: "cust-1", name: "Test Customer", tenantId: "tenant-xnail", phone: "555-0100", email: null, notes: null, isActive: true }],
+      }))
+      .mockResolvedValueOnce(Response.json({
+        services: [{ id: "svc-1", name: "Test Service", tenantId: "tenant-xnail", durationMinutes: 30, priceCents: 1500, description: null, isActive: true }],
+      }))
+      .mockResolvedValueOnce(Response.json({ appointments: [] }))
+      .mockResolvedValueOnce(Response.json({
+        appointment: {
+          id: "apt-new",
+          tenantId: "tenant-xnail",
+          customerId: "cust-1",
+          serviceId: "svc-1",
+          startsAt: "2026-08-12T10:30:00.000Z",
+          endsAt: "2026-08-12T11:15:00.000Z",
+          status: "Booked",
+          notes: null,
+        },
+      }));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<Home />);
+    await user.type(await screen.findByLabelText("Email"), "operator@example.test");
+    await user.type(await screen.findByLabelText("Password"), "test-password");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(await screen.findByText("Operations dashboard")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Services" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/services", expect.anything()));
+
+    await user.click(screen.getByRole("button", { name: "Appointments" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/appointments", expect.anything()));
+
+    await user.click(screen.getByRole("button", { name: "Save appointment" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/api/appointments",
+      expect.objectContaining({ method: "POST", credentials: "same-origin" }),
+    ));
+
+    expect(await screen.findByText("Customer cust-1")).toBeInTheDocument();
+    expect(screen.getByText("2026-08-12T10:30:00.000Z")).toBeInTheDocument();
+    expect(screen.getByText("Booked")).toBeInTheDocument();
+  });
+
+  it("Services tab fetch remains unaffected by the appointments tab fetch", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ customers: [] }))
+      .mockResolvedValueOnce(Response.json({ services: [] }));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<Home />);
+    await user.type(await screen.findByLabelText("Email"), "operator@example.test");
+    await user.type(await screen.findByLabelText("Password"), "test-password");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(await screen.findByText("Operations dashboard")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Services" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/api/services",
+      expect.objectContaining({ credentials: "same-origin" }),
+    ));
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      "/api/appointments",
+      expect.objectContaining({ credentials: "same-origin" }),
+    );
+  });
 });
