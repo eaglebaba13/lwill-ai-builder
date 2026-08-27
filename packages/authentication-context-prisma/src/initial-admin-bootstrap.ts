@@ -195,117 +195,194 @@ export async function bootstrapInitialAdmin(
     }
     const tenantId = tenants[0].id;
 
-    const role = await transaction.role.findFirst({
-      where: {
-        tenantId,
-        code: INITIAL_ADMIN_ROLE_CODE,
-        isActive: true,
-      },
-      select: {
-        id: true,
-        code: true,
-        permissions: {
-          select: { permission: { select: { code: true } } },
+    let user = await transaction.user.findUnique({ where: { email: input.email } });
+    const userCreated = user === null;
+
+    if (userCreated && input.updatePassword) {
+      throw new InitialAdminBootstrapError(
+        "Existing bootstrap administrator user is missing",
+      );
+    }
+
+    if (!input.updatePassword || userCreated) {
+      const role = await transaction.role.findFirst({
+        where: {
+          tenantId,
+          code: INITIAL_ADMIN_ROLE_CODE,
+          isActive: true,
         },
-      },
+        select: {
+          id: true,
+          code: true,
+          permissions: {
+            select: { permission: { select: { code: true } } },
+          },
+        },
+      });
+      if (role === null) {
+        throw new InitialAdminBootstrapError(
+          `Missing approved active tenant administrative role: ${INITIAL_ADMIN_ROLE_CODE}`,
+        );
+      }
+      const actualPermissionCodes = role.permissions
+        .map(({ permission }) => permission.code)
+        .sort();
+      const approvedPermissionCodes = [...INITIAL_TENANT_ADMIN_PERMISSION_CODES].sort();
+      if (
+        actualPermissionCodes.length !== approvedPermissionCodes.length
+        || actualPermissionCodes.some((code, index) => code !== approvedPermissionCodes[index])
+      ) {
+        throw new InitialAdminBootstrapError(
+          `Tenant administrative role does not have the approved permission set: ${INITIAL_ADMIN_ROLE_CODE}`,
+        );
+      }
+
+      if (userCreated) {
+        user = await transaction.user.create({
+          data: {
+            email: input.email,
+            displayName: input.displayName,
+            isActive: true,
+          },
+        });
+      } else {
+        if (!user.isActive) {
+          throw new InitialAdminBootstrapError("Existing bootstrap administrator user is inactive");
+        }
+        if (user.displayName !== input.displayName) {
+          await transaction.user.update({
+            where: { id: user.id },
+            data: { displayName: input.displayName },
+          });
+        }
+      }
+
+      const credential = await transaction.passwordCredential.findUnique({
+        where: { userId: user.id },
+      });
+      let passwordCreated = false;
+      let passwordUpdated = false;
+      if (credential === null) {
+        const passwordHash = await hashPassword(input.password);
+        await transaction.passwordCredential.create({
+          data: { userId: user.id, passwordHash },
+        });
+        passwordCreated = true;
+      } else if (input.updatePassword) {
+        const passwordHash = await hashPassword(input.password);
+        await transaction.passwordCredential.update({
+          where: { userId: user.id },
+          data: {
+            passwordHash,
+            passwordUpdatedAt: new Date(),
+            passwordVersion: credential.passwordVersion + 1,
+          },
+        });
+        passwordUpdated = true;
+      }
+
+      let membership = await transaction.tenantMembership.findUnique({
+        where: { tenantId_userId: { tenantId, userId: user.id } },
+      });
+      const membershipCreated = membership === null;
+      if (membership === null) {
+        membership = await transaction.tenantMembership.create({
+          data: { tenantId, userId: user.id, isActive: true },
+        });
+      } else if (!membership.isActive) {
+        throw new InitialAdminBootstrapError(
+          "Existing bootstrap administrator tenant membership is inactive",
+        );
+      }
+
+      const existingAssignment = await transaction.membershipRole.findFirst({
+        where: { tenantId, membershipId: membership.id, roleId: role.id },
+      });
+      const roleAssignmentCreated = existingAssignment === null;
+      if (existingAssignment === null) {
+        await transaction.membershipRole.create({
+          data: { tenantId, membershipId: membership.id, roleId: role.id },
+        });
+      }
+
+      return {
+        tenantName: INITIAL_ADMIN_TENANT_NAME,
+        businessUnitName: INITIAL_ADMIN_BUSINESS_UNIT_NAME,
+        roleCode: role.code,
+        userCreated,
+        membershipCreated,
+        roleAssignmentCreated,
+        passwordCreated,
+        passwordUpdated,
+      };
+    }
+
+    const adminRole = await transaction.role.findFirst({
+      where: { tenantId, code: INITIAL_ADMIN_ROLE_CODE, isActive: true },
+      select: { id: true },
     });
-    if (role === null) {
+    if (adminRole === null) {
       throw new InitialAdminBootstrapError(
         `Missing approved active tenant administrative role: ${INITIAL_ADMIN_ROLE_CODE}`,
       );
     }
-    const actualPermissionCodes = role.permissions
-      .map(({ permission }) => permission.code)
-      .sort();
-    const approvedPermissionCodes = [...INITIAL_TENANT_ADMIN_PERMISSION_CODES].sort();
-    if (
-      actualPermissionCodes.length !== approvedPermissionCodes.length
-      || actualPermissionCodes.some((code, index) => code !== approvedPermissionCodes[index])
-    ) {
+
+    if (!user.isActive) {
+      throw new InitialAdminBootstrapError("Existing bootstrap administrator user is inactive");
+    }
+    if (user.displayName !== input.displayName) {
+      await transaction.user.update({
+        where: { id: user.id },
+        data: { displayName: input.displayName },
+      });
+    }
+
+    const membership = await transaction.tenantMembership.findUnique({
+      where: { tenantId_userId: { tenantId, userId: user.id } },
+    });
+    if (membership === null || !membership.isActive) {
       throw new InitialAdminBootstrapError(
-        `Tenant administrative role does not have the approved permission set: ${INITIAL_ADMIN_ROLE_CODE}`,
+        "Existing bootstrap administrator tenant membership is missing or inactive",
       );
     }
 
-    let user = await transaction.user.findUnique({ where: { email: input.email } });
-    const userCreated = user === null;
-    if (user === null) {
-      user = await transaction.user.create({
-        data: {
-          email: input.email,
-          displayName: input.displayName,
-          isActive: true,
-        },
-      });
-    } else {
-      if (!user.isActive) {
-        throw new InitialAdminBootstrapError("Existing bootstrap administrator user is inactive");
-      }
-      if (user.displayName !== input.displayName) {
-        await transaction.user.update({
-          where: { id: user.id },
-          data: { displayName: input.displayName },
-        });
-      }
+    const existingAssignment = await transaction.membershipRole.findFirst({
+      where: { tenantId, membershipId: membership.id, roleId: adminRole.id },
+    });
+    if (existingAssignment === null) {
+      throw new InitialAdminBootstrapError(
+        "Existing bootstrap administrator tenant membership is missing the expected tenant-admin role assignment",
+      );
     }
 
     const credential = await transaction.passwordCredential.findUnique({
       where: { userId: user.id },
     });
-    let passwordCreated = false;
-    let passwordUpdated = false;
     if (credential === null) {
-      const passwordHash = await hashPassword(input.password);
-      await transaction.passwordCredential.create({
-        data: { userId: user.id, passwordHash },
-      });
-      passwordCreated = true;
-    } else if (input.updatePassword) {
-      const passwordHash = await hashPassword(input.password);
-      await transaction.passwordCredential.update({
-        where: { userId: user.id },
-        data: {
-          passwordHash,
-          passwordUpdatedAt: new Date(),
-          passwordVersion: credential.passwordVersion + 1,
-        },
-      });
-      passwordUpdated = true;
-    }
-
-    let membership = await transaction.tenantMembership.findUnique({
-      where: { tenantId_userId: { tenantId, userId: user.id } },
-    });
-    const membershipCreated = membership === null;
-    if (membership === null) {
-      membership = await transaction.tenantMembership.create({
-        data: { tenantId, userId: user.id, isActive: true },
-      });
-    } else if (!membership.isActive) {
       throw new InitialAdminBootstrapError(
-        "Existing bootstrap administrator tenant membership is inactive",
+        "Existing bootstrap administrator password credential is missing",
       );
     }
 
-    const existingAssignment = await transaction.membershipRole.findFirst({
-      where: { tenantId, membershipId: membership.id, roleId: role.id },
+    const passwordHash = await hashPassword(input.password);
+    await transaction.passwordCredential.update({
+      where: { userId: user.id },
+      data: {
+        passwordHash,
+        passwordUpdatedAt: new Date(),
+        passwordVersion: credential.passwordVersion + 1,
+      },
     });
-    const roleAssignmentCreated = existingAssignment === null;
-    if (existingAssignment === null) {
-      await transaction.membershipRole.create({
-        data: { tenantId, membershipId: membership.id, roleId: role.id },
-      });
-    }
 
     return {
       tenantName: INITIAL_ADMIN_TENANT_NAME,
       businessUnitName: INITIAL_ADMIN_BUSINESS_UNIT_NAME,
-      roleCode: role.code,
-      userCreated,
-      membershipCreated,
-      roleAssignmentCreated,
-      passwordCreated,
-      passwordUpdated,
+      roleCode: INITIAL_ADMIN_ROLE_CODE,
+      userCreated: false,
+      membershipCreated: false,
+      roleAssignmentCreated: false,
+      passwordCreated: false,
+      passwordUpdated: true,
     };
   });
 }

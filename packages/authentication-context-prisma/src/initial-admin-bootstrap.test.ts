@@ -12,6 +12,13 @@ function createFixture(overrides: {
   missingTenant?: boolean;
   missingRole?: boolean;
   emptyRole?: boolean;
+  expandedRolePermissions?: boolean;
+  missingUser?: boolean;
+  inactiveUser?: boolean;
+  missingMembership?: boolean;
+  inactiveMembership?: boolean;
+  missingRoleAssignment?: boolean;
+  missingCredential?: boolean;
 } = {}) {
   const state = {
     user: null as null | { id: string; displayName: string | null; isActive: boolean },
@@ -36,12 +43,18 @@ function createFixture(overrides: {
               code: "tenant-admin",
               permissions: overrides.emptyRole
                 ? []
-                : [{ permission: { code: "tenant.manage" } }],
+                : overrides.expandedRolePermissions
+                  ? [
+                      { permission: { code: "tenant.manage" } },
+                      { permission: { code: "package.read" } },
+                      { permission: { code: "package.write" } },
+                    ]
+                  : [{ permission: { code: "tenant.manage" } }],
             },
       ),
     },
     user: {
-      findUnique: vi.fn(async () => state.user),
+      findUnique: vi.fn(async () => (overrides.missingUser ? null : state.user)),
       create: vi.fn(async ({ data }) => {
         state.user = { id: "user-1", displayName: data.displayName, isActive: true };
         return state.user;
@@ -51,7 +64,7 @@ function createFixture(overrides: {
       }),
     },
     passwordCredential: {
-      findUnique: vi.fn(async () => state.credential),
+      findUnique: vi.fn(async () => (overrides.missingCredential ? null : state.credential)),
       create: vi.fn(async ({ data }) => {
         state.credential = { passwordHash: data.passwordHash, passwordVersion: 1 };
       }),
@@ -63,14 +76,14 @@ function createFixture(overrides: {
       }),
     },
     tenantMembership: {
-      findUnique: vi.fn(async () => state.membership),
+      findUnique: vi.fn(async () => (overrides.missingMembership ? null : state.membership)),
       create: vi.fn(async () => {
         state.membership = { id: "membership-1", isActive: true };
         return state.membership;
       }),
     },
     membershipRole: {
-      findFirst: vi.fn(async () => state.roleAssignment),
+      findFirst: vi.fn(async () => (overrides.missingRoleAssignment ? null : state.roleAssignment)),
       create: vi.fn(async () => {
         state.roleAssignment = { id: "assignment-1" };
       }),
@@ -200,5 +213,134 @@ describe("initial administrative bootstrap", () => {
     expect(consoleError).not.toHaveBeenCalled();
     consoleLog.mockRestore();
     consoleError.mockRestore();
+  });
+
+  it("allows password update when tenant-admin has expanded approved module permissions", async () => {
+    const fixture = createFixture({ expandedRolePermissions: true });
+    fixture.state.user = { id: "user-1", displayName: "Initial Admin", isActive: true };
+    fixture.state.credential = { passwordHash: "old-hash", passwordVersion: 1 };
+    fixture.state.membership = { id: "membership-1", isActive: true };
+    fixture.state.roleAssignment = { id: "assignment-1" };
+    const result = await bootstrapInitialAdmin(fixture.prisma, {
+      ...input,
+      password: "replacement-secret-value",
+      updatePassword: true,
+    });
+
+    expect(result).toMatchObject({
+      userCreated: false,
+      membershipCreated: false,
+      roleAssignmentCreated: false,
+      passwordCreated: false,
+      passwordUpdated: true,
+    });
+    expect(fixture.state.credential?.passwordHash).not.toBe("old-hash");
+    expect(fixture.state.credential?.passwordVersion).toBe(2);
+  });
+
+  it("fails password update when the target user does not exist", async () => {
+    const fixture = createFixture({ missingUser: true, expandedRolePermissions: true });
+    await expect(
+      bootstrapInitialAdmin(fixture.prisma, {
+        ...input,
+        updatePassword: true,
+      }),
+    ).rejects.toThrow("Existing bootstrap administrator user is missing");
+  });
+
+  it("fails password update when the target user is inactive", async () => {
+    const fixture = createFixture({ inactiveUser: true, expandedRolePermissions: true });
+    fixture.state.user = { id: "user-1", displayName: "Admin", isActive: false };
+    await expect(
+      bootstrapInitialAdmin(fixture.prisma, {
+        ...input,
+        updatePassword: true,
+      }),
+    ).rejects.toThrow("Existing bootstrap administrator user is inactive");
+  });
+
+  it("fails password update when tenant membership is missing", async () => {
+    const fixture = createFixture({ missingMembership: true, expandedRolePermissions: true });
+    fixture.state.user = { id: "user-1", displayName: "Admin", isActive: true };
+    await expect(
+      bootstrapInitialAdmin(fixture.prisma, {
+        ...input,
+        updatePassword: true,
+      }),
+    ).rejects.toThrow(
+      "Existing bootstrap administrator tenant membership is missing or inactive",
+    );
+  });
+
+  it("fails password update when tenant membership is inactive", async () => {
+    const fixture = createFixture({ inactiveMembership: true, expandedRolePermissions: true });
+    fixture.state.user = { id: "user-1", displayName: "Admin", isActive: true };
+    fixture.state.membership = { id: "membership-1", isActive: false };
+    await expect(
+      bootstrapInitialAdmin(fixture.prisma, {
+        ...input,
+        updatePassword: true,
+      }),
+    ).rejects.toThrow(
+      "Existing bootstrap administrator tenant membership is missing or inactive",
+    );
+  });
+
+  it("fails password update when tenant-admin role assignment is missing", async () => {
+    const fixture = createFixture({
+      missingRoleAssignment: true,
+      expandedRolePermissions: true,
+    });
+    fixture.state.user = { id: "user-1", displayName: "Admin", isActive: true };
+    fixture.state.membership = { id: "membership-1", isActive: true };
+    await expect(
+      bootstrapInitialAdmin(fixture.prisma, {
+        ...input,
+        updatePassword: true,
+      }),
+    ).rejects.toThrow(
+      "Existing bootstrap administrator tenant membership is missing the expected tenant-admin role assignment",
+    );
+  });
+
+  it("fails password update when password credential is missing", async () => {
+    const fixture = createFixture({ missingCredential: true, expandedRolePermissions: true });
+    fixture.state.user = { id: "user-1", displayName: "Admin", isActive: true };
+    fixture.state.membership = { id: "membership-1", isActive: true };
+    fixture.state.roleAssignment = { id: "assignment-1" };
+    await expect(
+      bootstrapInitialAdmin(fixture.prisma, {
+        ...input,
+        updatePassword: true,
+      }),
+    ).rejects.toThrow("Existing bootstrap administrator password credential is missing");
+  });
+
+  it("does not modify role or permission records during password update", async () => {
+    const fixture = createFixture({ expandedRolePermissions: true });
+    fixture.state.user = { id: "user-1", displayName: "Initial Admin", isActive: true };
+    fixture.state.credential = { passwordHash: "old-hash", passwordVersion: 1 };
+    fixture.state.membership = { id: "membership-1", isActive: true };
+    fixture.state.roleAssignment = { id: "assignment-1" };
+    await bootstrapInitialAdmin(fixture.prisma, {
+      ...input,
+      password: "new-secret-value",
+      updatePassword: true,
+    });
+
+    expect(fixture.transaction.role.findFirst).toHaveBeenCalledTimes(1);
+    expect(fixture.transaction.membershipRole.create).not.toHaveBeenCalled();
+  });
+
+  it("does not change password when --update-password is not supplied", async () => {
+    const fixture = createFixture();
+    await bootstrapInitialAdmin(fixture.prisma, input);
+    const existingHash = fixture.state.credential?.passwordHash;
+    await bootstrapInitialAdmin(fixture.prisma, {
+      ...input,
+      password: "ignored-secret-value",
+    });
+
+    expect(fixture.state.credential?.passwordHash).toBe(existingHash);
   });
 });
