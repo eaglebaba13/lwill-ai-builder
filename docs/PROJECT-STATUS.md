@@ -5,8 +5,8 @@
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
 - **Current Branch**: `phase-1d-native-auth`
-- **Current HEAD Commit**: `fc55e99` (`feat(x-nail): implement Services API vertical slice with RBAC`)
-- **Git State**: `phase-1d-native-auth` at `fc55e99`, clean working tree; the native-auth navigation, customer-auth-redirect, Customer RBAC, and Services API vertical slices are committed. No uncommitted customer/CRM/RBAC/bootstrap or Prisma schema/migration changes remain staged or unstaged.
+- **Current HEAD Commit**: `4eba4d3` (`feat(xnail): implement appointments api vertical slice`)
+- **Git State**: `phase-1d-native-auth` at `4eba4d3`, clean working tree; the Services API vertical slice (`fc55e99`) and the Appointments API vertical slice (`4eba4d3`) are committed locally. `4eba4d3` is ahead of `origin/phase-1d-native-auth`; the prior Services status-header sync (`93dd736`) is already pushed to origin. No uncommitted customer/CRM/RBAC/bootstrap or Prisma schema/migration changes remain staged or unstaged.
 
 ## State Breakdown
 
