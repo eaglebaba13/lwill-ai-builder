@@ -1345,6 +1345,54 @@ Phase 1D remains focused on concrete authentication/session integration and asso
 - No production database schema was modified.
 - The appointment permission bootstrap (`appointment.read`, `appointment.write`) was the only data operation performed in production; it was idempotent, transactional, and fail-closed per the existing repository mechanism.
 - Test records created during verification (one Service, one Appointment) were deleted from the production database immediately after verification.
-- No `appointment.delete` permission exists (no delete API exists).
-- No new roles were introduced; permissions are assigned to the existing `tenant-admin` role.
- - **Intentional UI scope:** the appointment-list `GET /api/appointments` read path is now wired as a list fetcher in the Appointments tab (mirroring the Services tab fetch pattern, with loading/error/401/403 states). The `advanceAppointment` client-side status demo, staff dropdown, and form structure are preserved unchanged. Server-side `status` remains an open string (no status-transition rules are specified or inventoried here), so the demo's `advanceAppointment` transitions remain over the fixed `APPOINTMENT_STATUS_ORDER` ("Booked" → … → "Completed"). The mock data path (`createAppointmentRecord`) used for *booking* was replaced with the real `POST /api/appointments`; it is not referenced in the page component. This keeps the change to the smallest safe vertical slice.
+ - No `appointment.delete` permission exists (no delete API exists).
+ - No new roles were introduced; permissions are assigned to the existing `tenant-admin` role.
+  - **Intentional UI scope:** the appointment-list `GET /api/appointments` read path is now wired as a list fetcher in the Appointments tab (mirroring the Services tab fetch pattern, with loading/error/401/403 states). The `advanceAppointment` client-side status demo, staff dropdown, and form structure are preserved unchanged. Server-side `status` remains an open string (no status-transition rules are specified or inventoried here), so the demo's `advanceAppointment` transitions remain over the fixed `APPOINTMENT_STATUS_ORDER` ("Booked" → … → "Completed"). The mock data path (`createAppointmentRecord`) used for *booking* was replaced with the real `POST /api/appointments`; it is not referenced in the page component. This keeps the change to the smallest safe vertical slice.
+
+## Phase 1I X Nail Packages Production Verification
+
+### Production Bootstrap
+
+- `bootstrap:initial-package-permissions` executed successfully in the production Coolify container.
+- `package.read` and `package.write` created and assigned to the existing `tenant-admin` role.
+- Bootstrap is idempotent.
+
+### Admin Password Update
+
+- The existing `bootstrap:initial-admin -- --update-password` command was blocked because `tenant-admin` had expanded module permissions from prior vertical slices.
+- Implemented smallest safe separation: initial provisioning retains exact permission-set validation; `--update-password` for an existing administrator now validates user/membership/role existence without requiring the original exact permission set.
+- Password update executed successfully in production; login confirmed with HTTP 204.
+
+### Production API Verification
+
+- **Login**: `POST /api/auth/login` returns 204 with HttpOnly Secure SameSite=Lax cookies; tenant context established.
+- **GET /api/packages**: 200 with empty list initially.
+- **POST /api/packages**: 201; creates package with server-assigned tenantId.
+- **GET /api/packages/[id]**: 200; returns created package.
+- **PATCH /api/packages/[id]**: 200; updates package successfully.
+- **Unauthenticated**: `GET /api/packages` returns 401 (fail-closed).
+- **Client tenantId injection**: `PATCH /api/packages/[id]` with client-supplied `tenantId` returns 400 (rejected).
+- **RBAC**: `package.read` for list/get, `package.write` for create/update enforced via existing authorization pipeline.
+- **Tenant isolation**: Server derives `tenantId` from authenticated context only; cross-tenant access denied.
+
+### Regression
+
+- **Services**: `GET /api/services` 200; no regression.
+- **Appointments**: `GET /api/appointments` 200; no regression.
+
+### Test Data
+
+- One temporary package was created for verification.
+- Package DELETE is not implemented (`405 Method Not Allowed`); cleanup via API is not available in this scope.
+- Test package remains in production; no manual database deletion was performed.
+
+### Browser Verification
+
+- Not performed: no browser automation tooling is available in this environment.
+
+### Implementation Notes
+
+- No Prisma schema or migration was changed.
+- No authentication or authorization architecture was modified.
+- The admin bootstrap fix is limited to `packages/authentication-context-prisma/src/initial-admin-bootstrap.ts` and its tests.
+- The `bootstrap:initial-admin` exact permission validation remains unchanged for initial provisioning; only the explicit `--update-password` path for existing administrators was adjusted.
