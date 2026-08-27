@@ -14,6 +14,7 @@
     "bootstrap:initial-service-permissions": "tsx src/initial-service-permissions-bootstrap-cli.ts",
     "bootstrap:initial-appointment-permissions": "tsx src/initial-appointment-permissions-bootstrap-cli.ts",
     "bootstrap:initial-package-permissions": "tsx src/initial-package-permissions-bootstrap-cli.ts",
+    "bootstrap:initial-staff-permissions": "tsx src/initial-staff-permissions-bootstrap-cli.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

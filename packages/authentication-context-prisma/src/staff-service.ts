@@ -23,6 +23,15 @@ export interface StaffService {
   createStaff(input: StaffCreateInput): Promise<StaffRecord>;
   getStaff(args: { tenantId: string; staffId: string }): Promise<StaffRecord | null>;
   listStaff(args: { tenantId: string }): Promise<StaffRecord[]>;
+  updateStaff(args: { tenantId: string; staffId: string; input: StaffUpdateInput }): Promise<StaffRecord | null>;
+}
+
+export interface StaffUpdateInput {
+  readonly displayName?: string;
+  readonly email?: string | null;
+  readonly phone?: string | null;
+  readonly branchId?: string | null;
+  readonly isActive?: boolean;
 }
 
 interface StaffPrismaClient {
@@ -30,6 +39,7 @@ interface StaffPrismaClient {
     create: (args: { data: Record<string, unknown> }) => Promise<StaffRecord>;
     findUnique: (args: { where: { id: string } }) => Promise<StaffRecord | null>;
     findMany: (args: { where?: Record<string, unknown> }) => Promise<StaffRecord[]>;
+    update: (args: { data: Record<string, unknown>; where: { id: string } }) => Promise<StaffRecord>;
   };
   readonly branch: {
     findUnique: (args: { where: { id: string } }) => Promise<{ id: string; tenantId: string } | null>;
@@ -66,6 +76,35 @@ export function createStaffService(prisma: StaffPrismaClient): StaffService {
     },
     async listStaff({ tenantId }) {
       return prisma.staff.findMany({ where: { tenantId } });
+    },
+    async updateStaff({ tenantId, staffId, input }) {
+      const existing = await prisma.staff.findUnique({ where: { id: staffId } });
+      if (existing === null || existing.tenantId !== tenantId) {
+        return null;
+      }
+      const data: Record<string, unknown> = {};
+      if (input.displayName !== undefined) {
+        data.displayName = input.displayName;
+      }
+      if (input.email !== undefined) {
+        data.email = input.email;
+      }
+      if (input.phone !== undefined) {
+        data.phone = input.phone;
+      }
+      if (input.branchId !== undefined) {
+        if (input.branchId !== null) {
+          const branch = await prisma.branch.findUnique({ where: { id: input.branchId } });
+          if (branch === null || branch.tenantId !== tenantId) {
+            throw new Error("branch must belong to the same tenant");
+          }
+        }
+        data.branchId = input.branchId;
+      }
+      if (input.isActive !== undefined) {
+        data.isActive = input.isActive;
+      }
+      return prisma.staff.update({ where: { id: staffId }, data });
     },
   };
 }

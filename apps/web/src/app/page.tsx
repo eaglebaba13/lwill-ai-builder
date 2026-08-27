@@ -10,7 +10,6 @@ import {
 import {
   APPOINTMENT_STATUS_ORDER,
   createInvoiceRecord,
-  createStaffRecord,
   transitionAppointmentStatus,
   type AppointmentStatus,
 } from "@/lib/x-nail/operational-workflow";
@@ -54,6 +53,16 @@ type PackageRecord = {
   isActive: boolean;
 };
 
+type StaffRecord = {
+  id: string;
+  tenantId: string;
+  displayName: string;
+  email: string | null;
+  phone: string | null;
+  branchId: string | null;
+  isActive: boolean;
+};
+
 function toLocalAppointment(apiRecord: {
   tenantId: string;
   customerId: string;
@@ -72,11 +81,6 @@ function toLocalAppointment(apiRecord: {
     status: apiRecord.status as AppointmentStatus,
   };
 }
-
-const initialStaff = [
-  { tenantId: "tenant-xnail", displayName: "Mina Patel", branchId: "branch-main" },
-  { tenantId: "tenant-xnail", displayName: "Aisha Khan", branchId: "branch-main" },
-];
 
 const tabs = ["Overview", "Customers", "Services", "Packages", "Staff", "Appointments", "Billing"] as const;
 
@@ -99,14 +103,16 @@ export default function Home() {
   const [isLoadingPackages, setIsLoadingPackages] = useState(false);
   const [packageError, setPackageError] = useState<string | null>(null);
   const [packageName, setPackageName] = useState("");
-  const [staff, setStaff] = useState(initialStaff);
+  const [staff, setStaff] = useState<StaffRecord[]>([]);
+  const [isLoadingStaff, setIsLoadingStaff] = useState(false);
+  const [staffError, setStaffError] = useState<string | null>(null);
+  const [staffName, setStaffName] = useState("");
   const [appointments, setAppointments] = useState<AppointmentRecord[]>([]);
   const [isLoadingAppointments, setIsLoadingAppointments] = useState(false);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [serviceName, setServiceName] = useState("");
   const [servicePrice, setServicePrice] = useState("1500");
-  const [staffName, setStaffName] = useState("");
   const [appointmentCustomer, setAppointmentCustomer] = useState("");
   const [appointmentService, setAppointmentService] = useState("");
   const [appointmentStaff, setAppointmentStaff] = useState("staff-1");
@@ -409,6 +415,60 @@ export default function Home() {
     };
   }, [authenticated, activeTab]);
 
+  useEffect(() => {
+    if (authenticated !== true || activeTab !== "Staff") {
+      return;
+    }
+
+    let mounted = true;
+    let completed = false;
+    const loadingTimer = window.setTimeout(() => {
+      if (mounted && !completed) {
+        setIsLoadingStaff(true);
+        setStaffError(null);
+      }
+    }, 0);
+    void fetch("/api/staff", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        completed = true;
+        if (result.status === 401) {
+          setStaff([]);
+          setAuthenticated(false);
+          return;
+        }
+        if (result.status === 403) {
+          setStaff([]);
+          setStaffError("You are not authorized to view staff.");
+          return;
+        }
+        if (!result.ok) {
+          throw new Error("Staff list request failed");
+        }
+        const body = await result.json() as { staff?: StaffRecord[] };
+        const loadedStaff = Array.isArray(body.staff) ? body.staff : [];
+        setStaff(loadedStaff);
+      })
+      .catch(() => {
+        completed = true;
+        if (mounted) {
+          setStaff([]);
+          setStaffError("Staff could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          window.clearTimeout(loadingTimer);
+          setIsLoadingStaff(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+      window.clearTimeout(loadingTimer);
+    };
+  }, [authenticated, activeTab]);
+
   const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     invalidatePendingRefresh();
@@ -544,17 +604,36 @@ export default function Home() {
     setPackageName("");
   };
 
-  const addStaff = () => {
+  const addStaff = async () => {
     if (!staffName.trim()) return;
-
-    const record = createStaffRecord({
-      tenantId: "tenant-xnail",
-      displayName: staffName,
-      branchId: "branch-main",
-      isActive: true,
+    setStaffError(null);
+    const result = await fetch("/api/staff", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        displayName: staffName,
+        email: null,
+        phone: null,
+        branchId: null,
+        isActive: true,
+      }),
     });
-
-    setStaff((current) => [{ ...record }, ...current]);
+    if (result.status === 401) {
+      setStaff([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setStaffError("You are not authorized to manage staff.");
+      return;
+    }
+    if (!result.ok) {
+      setStaffError("Staff member could not be saved.");
+      return;
+    }
+    const body = await result.json() as { staff: StaffRecord };
+    setStaff((current) => [body.staff, ...current]);
     setStaffName("");
   };
 
@@ -880,11 +959,14 @@ export default function Home() {
             <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
               <h2 className="text-xl font-semibold">Staff roster</h2>
               <div className="mt-4 space-y-3">
-                {staff.map((member, index) => (
-                  <div key={`${member.displayName}-${index}`} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                {isLoadingStaff ? <div className="text-sm text-[#736067]">Loading staff...</div> : null}
+                {!isLoadingStaff && staffError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{staffError}</div> : null}
+                {!isLoadingStaff && !staffError && staff.length === 0 ? <div className="text-sm text-[#736067]">No staff yet.</div> : null}
+                {staff.map((member) => (
+                  <div key={member.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
                     <div>
                       <div className="font-medium">{member.displayName}</div>
-                      <div className="text-sm text-[#736067]">{member.branchId}</div>
+                      <div className="text-sm text-[#736067]">{member.branchId ?? "No branch"}</div>
                     </div>
                     <span className="rounded-full bg-[#edf8f3] px-2.5 py-1 text-xs text-[#2f6d47]">On duty</span>
                   </div>
