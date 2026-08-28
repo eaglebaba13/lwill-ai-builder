@@ -268,7 +268,7 @@ model Product {
   updatedAt   DateTime @updatedAt
 
   tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  category     Category     @relation(fields: [categoryId], references: [tenantId, id], onDelete: Restrict)
+  category     Category     @relation(fields: [tenantId, categoryId], references: [tenantId, id], onDelete: Restrict)
   stockItems   StockItem[]
   movements    StockMovement[]
   invoiceLineItems InvoiceLineItem[]
@@ -290,7 +290,7 @@ model StockItem {
   tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   product    Product  @relation(fields: [tenantId, productId], references: [tenantId, id], onDelete: Restrict)
   branch     Branch   @relation(fields: [tenantId, branchId], references: [tenantId, id], onDelete: Restrict)
-  movements  StockMovement[]
+  movements  StockMovement[] @relation("StockItemMovements")
 
   @@unique([tenantId, productId, branchId])
   @@index([tenantId, branchId])
@@ -312,6 +312,7 @@ model StockMovement {
   tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   product    Product  @relation(fields: [tenantId, productId], references: [tenantId, id], onDelete: Restrict)
   branch     Branch   @relation(fields: [tenantId, branchId], references: [tenantId, id], onDelete: Restrict)
+  stockItem  StockItem @relation("StockItemMovements", fields: [tenantId, productId, branchId], references: [tenantId, productId, branchId])
 
   @@index([tenantId, productId, branchId])
   @@index([tenantId, referenceId])
