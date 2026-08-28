@@ -90,7 +90,7 @@ function toLocalAppointment(apiRecord: {
   };
 }
 
-const tabs = ["Overview", "Customers", "Services", "Packages", "Memberships", "Inventory", "Staff", "Appointments", "Billing"] as const;
+const tabs = ["Overview", "Customers", "Services", "Packages", "Memberships", "Inventory", "Staff", "Attendance", "Appointments", "Billing"] as const;
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<(typeof tabs)[number]>("Overview");
@@ -154,6 +154,14 @@ export default function Home() {
   const [isLoadingStaff, setIsLoadingStaff] = useState(false);
   const [staffError, setStaffError] = useState<string | null>(null);
   const [staffName, setStaffName] = useState("");
+  const [attendance, setAttendance] = useState<Array<{ id: string; staffId: string; checkInAt: string; checkOutAt: string | null; status: string | null }>>([]);
+  const [isLoadingAttendance, setIsLoadingAttendance] = useState(false);
+  const [attendanceError, setAttendanceError] = useState<string | null>(null);
+  const [attendanceStaffId, setAttendanceStaffId] = useState("");
+  const [attendanceCheckIn, setAttendanceCheckIn] = useState(new Date().toISOString());
+  const [attendanceCheckOut, setAttendanceCheckOut] = useState("");
+  const [attendanceStatus, setAttendanceStatus] = useState("");
+  const [attendanceNotes, setAttendanceNotes] = useState("");
   const [appointments, setAppointments] = useState<AppointmentRecord[]>([]);
   const [isLoadingAppointments, setIsLoadingAppointments] = useState(false);
   const [customerName, setCustomerName] = useState("");
@@ -697,6 +705,68 @@ export default function Home() {
     };
   }, [authenticated, activeTab]);
 
+  useEffect(() => {
+    if (authenticated !== true || activeTab !== "Attendance") {
+      return;
+    }
+
+    let mounted = true;
+    let completed = false;
+    const loadingTimer = window.setTimeout(() => {
+      if (mounted && !completed) {
+        setIsLoadingAttendance(true);
+        setAttendanceError(null);
+      }
+    }, 0);
+    void fetch("/api/attendance", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        completed = true;
+        if (result.status === 401) {
+          setAttendance([]);
+          setAuthenticated(false);
+          return;
+        }
+        if (result.status === 403) {
+          setAttendance([]);
+          setAttendanceError("You are not authorized to view attendance.");
+          return;
+        }
+        if (!result.ok) {
+          throw new Error("Attendance list request failed");
+        }
+        const body = await result.json() as {
+          attendance?: Array<{
+            id: string;
+            staffId: string;
+            checkInAt: string;
+            checkOutAt: string | null;
+            status: string | null;
+          }>;
+        };
+        const loadedAttendance = Array.isArray(body.attendance) ? body.attendance : [];
+        setAttendance(loadedAttendance);
+      })
+      .catch(() => {
+        completed = true;
+        if (mounted) {
+          setAttendance([]);
+          setAttendanceError("Attendance could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          window.clearTimeout(loadingTimer);
+          setIsLoadingAttendance(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+      window.clearTimeout(loadingTimer);
+    };
+  }, [authenticated, activeTab]);
+
   const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     invalidatePendingRefresh();
@@ -991,6 +1061,43 @@ export default function Home() {
     const body = await result.json() as { staff: StaffRecord };
     setStaff((current) => [body.staff, ...current]);
     setStaffName("");
+  };
+
+  const addAttendance = async () => {
+    if (!attendanceStaffId.trim() || !attendanceCheckIn.trim()) return;
+    setAttendanceError(null);
+    const result = await fetch("/api/attendance", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        staffId: attendanceStaffId,
+        checkInAt: attendanceCheckIn,
+        checkOutAt: attendanceCheckOut || null,
+        status: attendanceStatus || null,
+        notes: attendanceNotes || null,
+      }),
+    });
+    if (result.status === 401) {
+      setAttendance([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setAttendanceError("You are not authorized to record attendance.");
+      return;
+    }
+    if (!result.ok) {
+      setAttendanceError("Attendance could not be saved.");
+      return;
+    }
+    const body = await result.json() as { attendance: { id: string; staffId: string; checkInAt: string; checkOutAt: string | null; status: string | null; notes: string | null } };
+    setAttendance((current) => [body.attendance, ...current]);
+    setAttendanceStaffId("");
+    setAttendanceCheckIn(new Date().toISOString());
+    setAttendanceCheckOut("");
+    setAttendanceStatus("");
+    setAttendanceNotes("");
   };
 
   const addAppointment = async () => {
@@ -1407,6 +1514,79 @@ export default function Home() {
                   className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
                 >
                   Save staff
+                </button>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {activeTab === "Attendance" ? (
+          <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <h2 className="text-xl font-semibold">Attendance</h2>
+              <div className="mt-4 space-y-3">
+                {isLoadingAttendance ? <div className="text-sm text-[#736067]">Loading attendance...</div> : null}
+                {!isLoadingAttendance && attendanceError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{attendanceError}</div> : null}
+                {!isLoadingAttendance && !attendanceError && attendance.length === 0 ? <div className="text-sm text-[#736067]">No attendance records yet.</div> : null}
+                {attendance.map((record) => (
+                  <div key={record.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    <div>
+                      <div className="font-medium">Staff {record.staffId}</div>
+                      <div className="text-sm text-[#736067]">{record.checkInAt}</div>
+                    </div>
+                    <div className="text-right text-sm text-[#736067]">
+                      <div>{record.status ?? "—"}</div>
+                      <div>{record.checkOutAt ?? "—"}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <h2 className="text-xl font-semibold">Record attendance</h2>
+              <div className="mt-4 space-y-3">
+                <select
+                  value={attendanceStaffId}
+                  onChange={(event) => setAttendanceStaffId(event.target.value)}
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                >
+                  <option value="">Select staff</option>
+                  {staff.map((member, index) => (
+                    <option key={`${member.displayName}-${index}`} value={`staff-${index + 1}`}>
+                      {member.displayName}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  value={attendanceCheckIn}
+                  onChange={(event) => setAttendanceCheckIn(event.target.value)}
+                  placeholder="Check-in (ISO date)"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <input
+                  value={attendanceCheckOut}
+                  onChange={(event) => setAttendanceCheckOut(event.target.value)}
+                  placeholder="Check-out (optional, ISO date)"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <input
+                  value={attendanceStatus}
+                  onChange={(event) => setAttendanceStatus(event.target.value)}
+                  placeholder="Status (optional)"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <input
+                  value={attendanceNotes}
+                  onChange={(event) => setAttendanceNotes(event.target.value)}
+                  placeholder="Notes (optional)"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <button
+                  onClick={addAttendance}
+                  className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                >
+                  Save attendance
                 </button>
               </div>
             </div>
