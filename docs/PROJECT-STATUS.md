@@ -5,8 +5,8 @@
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
 - **Current Branch**: `phase-1d-native-auth`
-- **Current HEAD Commit**: `4eba4d3` (`feat(xnail): implement appointments api vertical slice`)
-- **Git State**: `phase-1d-native-auth` at `4eba4d3`, clean working tree; the Services API vertical slice (`fc55e99`) and the Appointments API vertical slice (`4eba4d3`) are committed locally. `4eba4d3` is ahead of `origin/phase-1d-native-auth`; the prior Services status-header sync (`93dd736`) is already pushed to origin. No uncommitted customer/CRM/RBAC/bootstrap or Prisma schema/migration changes remain staged or unstaged.
+- **Current HEAD Commit**: `e20ffc1` (`feat(auth): add tenant user and role administration`)
+- **Git State**: `phase-1d-native-auth` at `e20ffc1` (`feat(auth): add tenant user and role administration`), clean working tree; all vertical slices (Services `fc55e99`, Appointments `4eba4d3`, Staff `2125f15`, Memberships `0281c36`, Invoices `4a03b7d`, Inventory/Product `1dfa71c`, Attendance `cfc87dc`, User/Role Admin `e20ffc1`) are committed locally and pushed to `origin/phase-1d-native-auth`. No uncommitted source code, schema, migration, or RBAC data changes remain staged or unstaged.
 
 ## State Breakdown
 
@@ -22,29 +22,36 @@
 
 ### Not Implemented State
 
-- Database / Prisma ORM / PostgreSQL schema and migrations.
-- Authentication and RBAC.
-- Tenant -> Business Unit -> Branch hierarchy implementation.
-- ERP modules including POS, inventory, appointments, CRM, and accounting.
-- HDK Beauty / X Nail operational workflows.
-- NestJS backend/API application.
-- Docker deployment configuration.
-- AI Builder generation engine and production AI provider integrations.
+- Purchases / procurement workflows.
+- Commission calculations and settlement.
+- Franchise partner, territory, and agreement management.
+- Reports and business intelligence.
+- Settings / platform configuration management UI.
+- AI Assistant / generation engine and production AI provider integrations.
+- Notification / WhatsApp automation.
+- Platform administration (control-plane super-user management).
+- Full POS / accounting workflows (invoice APIs exist; POS checkout, payments, and general ledger remain incomplete).
+- Full inventory stock management (Category, StockItem, and StockMovement models exist; web API/UI layers for inventory management remain incomplete).
+- NestJS backend/API application (platform uses Next.js App Router, not NestJS).
+- Password reset via verified email (deferred per ADR 013).
+- MFA (deferred per ADR 013).
+- API-key authentication (deferred per ADR 013).
+- Full automated browser-level production UI verification.
 
 ## Application & Workspace Architecture Status
 
 - **Current Applications**: `apps/web` only.
 - **Current Packages / Modules / Services**: Shared authentication, authorization, database, Prisma-backed service, and web API modules are implemented in scoped slices; the broader backend/services target remains incomplete.
-- **Database Status**: Prisma database foundation and migration baseline are present in the repository; no live production database connection has been verified.
-- **Migration Status**: Initial migration baseline exists under `packages/database/prisma/migrations/0_init`; no production database has been applied or verified.
-- **Authentication Status**: Provider-neutral authentication contracts, native email/password login, Prisma-backed session verification, cookie-based refresh, browser refresh/session restoration, server-session revocation, cookie clearing, and generation-safe client revalidation on initial mount, `pageshow`, and history `popstate` are implemented and locally verified. Production verification covers login, hard refresh, and logout; this un-deployed navigation correction still requires controlled production browser verification.
-- **Authorization Status**: Provider-neutral authorization contracts are implemented; no production-backed authorization adapter has been connected.
-- **Test Status**: Automated Vitest coverage is implemented. The focused X Nail native-auth verification passed `pnpm --filter web test -- x-nail-native-auth.test.tsx` with 13 files and 100 tests, including 7 navigation regression tests. `pnpm test` passed with 6 successful workspace tasks.
+- **Database Status**: Prisma database foundation and migration baseline are present in the repository. Production PostgreSQL database (`lwill` schema, `public`) is deployed and verified on the KVM4 VPS; migration `0_init` applied via `prisma migrate deploy`; 13 tables and 19 foreign-key constraints verified.
+- **Migration Status**: Initial migration baseline `0_init` exists under `packages/database/prisma/migrations/0_init`; production database applied and up-to-date.
+- **Authentication Status**: Provider-neutral authentication contracts, native email/password login, Prisma-backed session verification, cookie-based refresh, browser refresh/session restoration, server-session revocation, cookie clearing, and generation-safe client revalidation on initial mount, `pageshow`, and history `popstate` are implemented and locally verified. Native JWT issue/verify adapter, RS256 signing, and the four auth routes (`POST /api/auth/login`, `/api/auth/refresh`, `/api/auth/logout`, `/api/auth/logout-all`) are production-verified. Login returns 204 with `HttpOnly`, `Secure`, `SameSite=Lax` cookies; the un-deployed navigation correction requires controlled production browser verification.
+- **Authorization Status**: Provider-neutral authorization contracts are implemented and connected to the production Prisma grant loader. Authorization derives `userId`/`tenantId` exclusively from the verified session; fail-closed on any error. Tenant RBAC with `tenant-admin` role is production-verified for all module permission grants.
+- **Test Status**: Automated Vitest coverage is implemented. `pnpm test` passed with 6 successful workspace tasks.
 - **TypeScript Status**: Verified passing through the Next.js production build.
 - **Lint Status**: Verified passing with `pnpm lint`.
 - **Build Status**: Verified passing with `pnpm build`.
-- **Docker Status**: Not implemented.
-- **VPS / Deployment Status**: Repository cloned and verified at `/root/lwill-ai-builder` on the KVM4 VPS. No LWILL production deployment has been verified or configured.
+- **Docker Status**: Next.js production build with Prisma Client generation integrated into the Docker build; deployed via Coolify.
+- **VPS / Deployment Status**: Repository deployed at `/root/lwill-ai-builder` on the KVM4 VPS (IP 200.234.35.116) via Coolify. Production `builder.lwill.in` is healthy with PostgreSQL container `dq93e4bcrpisalu826spzk5t` (PostgreSQL 18) operational.
 
 ## Environment & Dependency Requirements
 
@@ -78,9 +85,10 @@
 
 ## Exact Next Task
 
-1. Finish Phase 0A documentation verification.
-2. Establish automated baseline tests before core business implementation.
-3. Design Phase 1 authentication, tenant hierarchy, permissions, and database foundation from verified requirements.
+1. Update documentation to reflect the verified production RBAC and API state for all nine module bootstraps (customer, service, staff, attendance, membership, invoice, product, appointment, package).
+2. Implement full inventory stock-management web API/UI for Category, StockItem, and StockMovement models (models exist; API/UI layers incomplete).
+3. Await approved commercial rules for Commission before any Franchise or settlement implementation (per ADR 014).
+4. Implement Commission, Reports, Settings, AI Assistant, Notification/WhatsApp automation, and Platform administration as separate approved phases.
 
 ## X Nail MVP Native-Auth Navigation Nail — 2026-08-17
 
@@ -1019,9 +1027,9 @@ Phase 1D remains focused on concrete authentication/session integration and asso
 
 ### Progress Snapshot (planning estimates, not a formal completion metric)
 
-- **LWILL AI BUILDER overall:** 35% — shared monorepo, database foundation, authentication/session slice, authorization foundation, tenant-domain controls, and initial X Nail operational slices are verified; the platform UI, complete SRS coverage, production hardening, and most target modules remain incomplete.
-- **X Nail MVP:** 55% — authenticated operational shell plus verified customer, service, staff, attendance, appointment, package/membership, and POS/billing foundations exist; production-grade ERP workflows, inventory, scheduling depth, payments, reporting, and tenant-specific repository separation remain incomplete.
-- **Phase 1D:** 90% for the implemented native-auth/session slice — login, JWT/refresh integration, revocation, cookie contract, tenant resolution, browser refresh restoration, and logout navigation restoration are locally verified; production re-verification and broader SRS items such as MFA, password reset, lockout/rate limiting, API keys, and full audit coverage remain blockers.
+- **LWILL AI BUILDER overall:** ~50% — monorepo, database foundation with production migrations applied, native authentication, tenant context, RBAC, tenant user/role administration, and all nine X Nail module APIs (customer, service, staff, attendance, membership, invoice, product, appointment, package) are production-verified; platform UI, complete SRS coverage, production browser UI automation, full inventory stock management, commission, franchise, reports, settings, AI assistant, notifications, and platform administration remain incomplete.
+- **X Nail MVP:** ~70% — authenticated operational shell plus production-verified customer, service, staff, attendance, appointment, package/membership, invoice, and POS/billing foundations exist; inventory stock management, payments, reporting, and tenant-specific repository separation remain incomplete.
+- **Phase 1D:** ~90% for the native auth/session/RBAC slice — login, JWT/refresh integration, revocation, cookie contract, tenant resolution, browser refresh restoration, logout navigation restoration, and full RBAC permission bootstrapping are production-verified; production browser UI automation, MFA, password reset, lockout/rate limiting, API keys, and full audit-event coverage remain blocked.
 
 ### Remaining Blockers and Next Smallest Production-Safe Task
 
@@ -1396,3 +1404,121 @@ Phase 1D remains focused on concrete authentication/session integration and asso
 - No authentication or authorization architecture was modified.
 - The admin bootstrap fix is limited to `packages/authentication-context-prisma/src/initial-admin-bootstrap.ts` and its tests.
 - The `bootstrap:initial-admin` exact permission validation remains unchanged for initial provisioning; only the explicit `--update-password` path for existing administrators was adjusted.
+
+---
+
+## Phase 1D Production RBAC Permission Bootstrap Verification — 2026-08-28
+
+### Status: **Complete — all nine module permission bootstraps and production APIs verified**
+
+### Production Environment
+
+- **Application container**: Coolify container `64fda2ce0353` (image tagged `e20ffc1752d5905906c47b736a6873654583f80a`, matching current HEAD).
+- **Database**: PostgreSQL 18 container `dq93e4bcrpisalu826spzk5t` on the KVM4 VPS (IP 200.234.35.116). `DATABASE_URL` is set by Coolify (not printed, not exposed).
+- **Tenant**: `HDK Beauty I Pvt. Ltd.` (id: `ae70e866-aa44-4cef-86f8-90fe253eb5ce`, slug: `hdk-beauty-i-pvt-ltd`, active).
+- **Role**: `tenant-admin` / `Tenant Admin` (id: `a73b9ea0-5a89-4d12-b063-8452f577b447`, active).
+- **Execution method**: Each bootstrap was run inside the production app container using the exact existing package scripts — `pnpm --filter @lwill/authentication-context-prisma run bootstrap:initial-*-permissions`. No source code, schema, migration, or RBAC data was modified; no new application version was deployed; no manual SQL was executed.
+
+### Bootstrap Verification Table
+
+All nine permission bootstraps are idempotent (each wraps its work in a Prisma `$transaction`, checks for existing `Permission` records via `findUnique` before `create`, and checks existing `RolePermission` grants before inserting).
+
+| Module | Permission codes | Bootstrap script | permissionsCreated | rolePermissionsCreated | Target role | Result |
+|--------|-----------------|------------------|-------------------|----------------------|-------------|--------|
+| customer | `customer.read`, `customer.write` | `bootstrap:initial-customer-permissions` | 0 | 0 | tenant-admin | SUCCESS |
+| service | `service.read`, `service.write` | `bootstrap:initial-service-permissions` | 0 | 0 | tenant-admin | SUCCESS |
+| staff | `staff.read`, `staff.write` | `bootstrap:initial-staff-permissions` | 0 | 0 | tenant-admin | SUCCESS |
+| attendance | `attendance.read`, `attendance.write` | `bootstrap:initial-attendance-permissions` | 0 | 0 | tenant-admin | SUCCESS |
+| membership | `membership.read`, `membership.write` | `bootstrap:initial-membership-permissions` | 0 | 0 | tenant-admin | SUCCESS |
+| invoice | `invoice.read`, `invoice.write` | `bootstrap:initial-invoice-permissions` | 0 | 0 | tenant-admin | SUCCESS |
+| product | `product.read`, `product.write` | `bootstrap:initial-product-permissions` | 0 | 0 | tenant-admin | SUCCESS |
+| appointment | `appointment.read`, `appointment.write` | `bootstrap:initial-appointment-permissions` | 0 | 0 | tenant-admin | SUCCESS |
+| package | `package.read`, `package.write` | `bootstrap:initial-package-permissions` | 0 | 0 | tenant-admin | SUCCESS |
+
+**Interpretation**: All nine permission codes already existed in production and were already granted to the `tenant-admin` role at verification time. `permissionsCreated: 0` and `rolePermissionsCreated: 0` for every module confirms the RBAC data gap is closed.
+
+### Independent Database Verification
+
+A direct query of the production database confirmed:
+
+- **19 Permission records** exist: `tenant.manage` plus all 18 read/write pairs across customer, service, staff, attendance, membership, invoice, product, appointment, and package modules.
+- **19 RolePermission grants** exist for the `tenant-admin` role, each with `tenantId = ae70e866-...` and `roleId = a73b9ea0-...`.
+- The `tenant-admin` role is active and belongs to the active HDK tenant.
+
+### Production API Verification
+
+Authenticated as the existing tenant-admin test account via `POST /api/auth/login` (HTTP 204, `HttpOnly` + `Secure` + `SameSite=Lax` cookies captured in a cookie jar — cookie values never printed). Admin credentials were read only from the existing `LWILL_BOOTSTRAP_ADMIN_EMAIL` / `LWILL_BOOTSTRAP_ADMIN_PASSWORD` environment variables in the production container — never printed or exposed.
+
+| Endpoint | Method | HTTP Status | Response summary |
+|----------|--------|-------------|------------------|
+| `/api/auth/login` | POST | 204 | Cookies set (not displayed) |
+| `/api/customers` | GET | 200 | 266 bytes; data present |
+| `/api/services` | GET | 200 | 538 bytes; data present |
+| `/api/staff` | GET | 200 | Empty list `{"staff":[]}` |
+| `/api/attendance` | GET | 200 | Empty list `{"attendance":[]}` |
+| `/api/memberships` | GET | 200 | Empty list `{"memberships":[]}` |
+| `/api/invoices` | GET | 200 | Empty list `{"invoices":[]}` |
+| `/api/products` | GET | 200 | 965 bytes; data present |
+| `/api/appointments` | GET | 200 | 400 bytes; data present |
+| `/api/packages` | GET | 200 | 799 bytes; data present |
+| `/api/customers` (no auth) | GET | 401 | Fail-closed confirmed |
+
+**Note**: Staff, attendance, memberships, and invoices returned HTTP 200 with empty lists. This reflects the absence of production business records, not an API failure. No test records were created.
+
+### Security Verification
+
+- **tenantId derivation**: The authorization boundary (`apps/web/src/lib/auth/authorization-boundary.ts:27-48`) injects `tenantId` exclusively from `context.tenantContext.tenantId` (the validated server session). The `AuthorizationServiceRequest` type explicitly omits `userId` and `tenantId` from client input.
+- **Client-supplied tenantId rejection**: Route handlers reject unexpected keys (including a client-supplied `tenantId`) with HTTP 400, as verified by existing route-handler tests.
+- **Fail-closed authorization**: The authorization boundary returns `DENIED` on unauthenticated sessions, null tenant context, or any service error.
+- **Unauthenticated access**: `GET /api/customers` without authentication returns 401.
+- **Tenant-scoped responses**: All API response data carries `tenantId = ae70e866-aa44-4cef-86f8-90fe253eb5ce`, matching the HDK tenant record exclusively.
+- **No credential exposure**: No passwords, tokens, cookies, or `DATABASE_URL` values were printed during verification.
+
+### Implementation Status — Current as of 2026-08-28
+
+**IMPLEMENTED / VERIFIED in production:**
+- Native authentication (email/password login, JWT/refresh cookies, logout, logout-all)
+- Tenant context (Tenant → Business Unit → Branch hierarchy)
+- Tenant RBAC (permissions, roles, role-permission grants)
+- Tenant user administration (`GET/POST /api/users`, `GET/PATCH /api/users/[id]`)
+- Tenant role administration (`GET/POST /api/roles`, `GET/PATCH /api/roles/[id]`)
+- Membership-role assignment (`POST /api/membership-roles`)
+- Customer API (`GET/POST /api/customers`, `GET/PATCH /api/customers/[id]`)
+- Service API (`GET/POST /api/services`, `GET/PATCH /api/services/[id]`)
+- Staff API (`GET/POST /api/staff`, `GET/PATCH /api/staff/[id]`)
+- Attendance API (`GET/POST /api/attendance`, `GET/PATCH /api/attendance/[id]`)
+- Membership API (`GET/POST /api/memberships`, `GET/PATCH /api/memberships/[id]`)
+- Appointment API (`GET/POST /api/appointments`, `GET/PATCH /api/appointments/[id]`)
+- Package API (`GET/POST /api/packages`, `GET/PATCH /api/packages/[id]`)
+- Invoice API (`GET/POST /api/invoices`, `GET/PATCH /api/invoices/[id]`)
+- Product API (`GET/POST /api/products`, `GET/PATCH /api/products/[id]`)
+
+**PARTIAL / NOT IMPLEMENTED:**
+- Full inventory stock management (Category, StockItem, and StockMovement models exist in Prisma schema; web API/UI layers not implemented)
+- Commission calculations and settlement (blocked per ADR 014 pending approved commercial rules)
+- Franchise partner, territory, and agreement management (not approved)
+- Reports and business intelligence
+- Settings / platform configuration management UI
+- AI Assistant / generation engine and production AI provider integrations
+- Notification / WhatsApp automation
+- Platform administration (control-plane super-user management)
+- Full POS / accounting workflows (invoice APIs exist; checkout, payments, general ledger incomplete)
+- Purchases / procurement workflows
+- Password reset via verified email (deferred per ADR 013)
+- MFA (deferred per ADR 013)
+- API-key authentication (deferred per ADR 013)
+- Browser-level production UI automation (tooling unavailable)
+
+### Limitations
+
+- **Browser automation**: Browser-level production UI automation was not performed because browser automation tooling is unavailable in this environment (consistent with all prior verification sections). The local Vitest regression suite covers client navigation behavior.
+- **Empty production records**: Staff, attendance, memberships, and invoices currently have no production business records; their APIs return HTTP 200 with empty lists. This is correct fail-closed behavior for authorized-but-empty resources.
+- **Platform administration**: Remains outside the tenant-scoped implementation. No platform super-user management exists in this repository.
+- **Commission**: Remains blocked pending explicitly approved commercial rules per ADR 014. No schema, migration, or RBAC changes are authorized until those rules are documented and approved.
+- **Inventory**: Category, StockItem, and StockMovement Prisma models exist (`packages/database/prisma/schema.prisma`), but no web API or UI routes are implemented for them. The `stock-service.ts` module exists but is not wired to any API route.
+- **Production tenant-domain**: `builder.lwill.in` has an active `TenantDomain` record mapping to the HDK tenant, enabling login tenancy resolution.
+- **No secrets introduced**: This verification did not create, modify, or expose any credentials, tokens, `DATABASE_URL`, or other secrets.
+
+### Historical Context
+
+The prior "Phase 1I X Nail Packages Production Verification" section (above) documented production verification for only appointment and package bootstraps. The verification described in this new section (2026-08-28) supersedes that operational state: all nine module permission bootstraps have now been verified in production, confirming the complete RBAC data gap is closed.
