@@ -19,6 +19,8 @@
     "bootstrap:initial-membership-permissions": "tsx src/initial-membership-permissions-bootstrap-cli.ts",
     "bootstrap:initial-invoice-permissions": "tsx src/initial-invoice-permissions-bootstrap-cli.ts",
     "bootstrap:initial-product-permissions": "tsx src/initial-product-permissions-bootstrap-cli.ts",
+    "bootstrap:initial-business-unit-permissions": "tsx src/initial-business-unit-permissions-bootstrap-cli.ts",
+    "bootstrap:initial-branch-permissions": "tsx src/initial-branch-permissions-bootstrap-cli.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

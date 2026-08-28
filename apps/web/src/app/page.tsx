@@ -90,7 +90,7 @@ function toLocalAppointment(apiRecord: {
   };
 }
 
-const tabs = ["Overview", "Customers", "Services", "Packages", "Memberships", "Inventory", "Staff", "Attendance", "Appointments", "Billing"] as const;
+const tabs = ["Overview", "Customers", "Services", "Packages", "Memberships", "Inventory", "Staff", "Attendance", "Appointments", "Billing", "Branches"] as const;
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<(typeof tabs)[number]>("Overview");
@@ -189,6 +189,17 @@ export default function Home() {
   const [appointmentService, setAppointmentService] = useState("");
   const [appointmentStaff, setAppointmentStaff] = useState("staff-1");
   const [appointmentError, setAppointmentError] = useState<string | null>(null);
+  const [businessUnits, setBusinessUnits] = useState<Array<{ id: string; name: string; slug: string; isActive: boolean }>>([]);
+  const [isLoadingBusinessUnits, setIsLoadingBusinessUnits] = useState(false);
+  const [businessUnitError, setBusinessUnitError] = useState<string | null>(null);
+  const [businessUnitName, setBusinessUnitName] = useState("");
+  const [businessUnitSlug, setBusinessUnitSlug] = useState("");
+  const [branches, setBranches] = useState<Array<{ id: string; businessUnitId: string; name: string; slug: string; isActive: boolean }>>([]);
+  const [isLoadingBranches, setIsLoadingBranches] = useState(false);
+  const [branchError, setBranchError] = useState<string | null>(null);
+  const [branchName, setBranchName] = useState("");
+  const [branchSlug, setBranchSlug] = useState("");
+  const [branchBusinessUnitId, setBranchBusinessUnitId] = useState("");
 
   useEffect(() => {
     let mounted = true;
@@ -900,6 +911,114 @@ export default function Home() {
     };
   }, [authenticated, activeTab]);
 
+  useEffect(() => {
+    if (authenticated !== true || activeTab !== "Branches") {
+      return;
+    }
+
+    let mounted = true;
+    let completed = false;
+    const loadingTimer = window.setTimeout(() => {
+      if (mounted && !completed) {
+        setIsLoadingBusinessUnits(true);
+        setBusinessUnitError(null);
+      }
+    }, 0);
+    void fetch("/api/business-units", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        completed = true;
+        if (result.status === 401) {
+          setBusinessUnits([]);
+          setAuthenticated(false);
+          return;
+        }
+        if (result.status === 403) {
+          setBusinessUnits([]);
+          setBusinessUnitError("You are not authorized to view business units.");
+          return;
+        }
+        if (!result.ok) {
+          throw new Error("Business unit list request failed");
+        }
+        const body = await result.json() as { businessUnits?: Array<{ id: string; name: string; slug: string; isActive: boolean }> };
+        const loaded = Array.isArray(body.businessUnits) ? body.businessUnits : [];
+        setBusinessUnits(loaded);
+      })
+      .catch(() => {
+        completed = true;
+        if (mounted) {
+          setBusinessUnits([]);
+          setBusinessUnitError("Business units could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          window.clearTimeout(loadingTimer);
+          setIsLoadingBusinessUnits(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+      window.clearTimeout(loadingTimer);
+    };
+  }, [authenticated, activeTab]);
+
+  useEffect(() => {
+    if (authenticated !== true || activeTab !== "Branches") {
+      return;
+    }
+
+    let mounted = true;
+    let completed = false;
+    const loadingTimer = window.setTimeout(() => {
+      if (mounted && !completed) {
+        setIsLoadingBranches(true);
+        setBranchError(null);
+      }
+    }, 0);
+    void fetch("/api/branches", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        completed = true;
+        if (result.status === 401) {
+          setBranches([]);
+          setAuthenticated(false);
+          return;
+        }
+        if (result.status === 403) {
+          setBranches([]);
+          setBranchError("You are not authorized to view branches.");
+          return;
+        }
+        if (!result.ok) {
+          throw new Error("Branch list request failed");
+        }
+        const body = await result.json() as { branches?: Array<{ id: string; businessUnitId: string; name: string; slug: string; isActive: boolean }> };
+        const loaded = Array.isArray(body.branches) ? body.branches : [];
+        setBranches(loaded);
+      })
+      .catch(() => {
+        completed = true;
+        if (mounted) {
+          setBranches([]);
+          setBranchError("Branches could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          window.clearTimeout(loadingTimer);
+          setIsLoadingBranches(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+      window.clearTimeout(loadingTimer);
+    };
+  }, [authenticated, activeTab]);
+
   const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     invalidatePendingRefresh();
@@ -1322,6 +1441,72 @@ export default function Home() {
           : appointment,
       );
     });
+  };
+
+  const addBusinessUnit = async () => {
+    if (!businessUnitName.trim() || !businessUnitSlug.trim()) return;
+    setBusinessUnitError(null);
+    const result = await fetch("/api/business-units", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: businessUnitName,
+        slug: businessUnitSlug,
+        isActive: true,
+      }),
+    });
+    if (result.status === 401) {
+      setBusinessUnits([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setBusinessUnitError("You are not authorized to create business units.");
+      return;
+    }
+    if (!result.ok) {
+      setBusinessUnitError("Business unit could not be saved.");
+      return;
+    }
+    const body = (await result.json()) as { businessUnit: { id: string; name: string; slug: string; isActive: boolean } };
+    setBusinessUnits((current) => [body.businessUnit, ...current]);
+    setBusinessUnitName("");
+    setBusinessUnitSlug("");
+  };
+
+  const addBranch = async () => {
+    if (!branchName.trim() || !branchSlug.trim() || !branchBusinessUnitId.trim()) return;
+    setBranchError(null);
+    const result = await fetch("/api/branches", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        businessUnitId: branchBusinessUnitId,
+        name: branchName,
+        slug: branchSlug,
+        isActive: true,
+      }),
+    });
+    if (result.status === 401) {
+      setBranches([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setBranchError("You are not authorized to create branches.");
+      return;
+    }
+    if (!result.ok) {
+      setBranchError("Branch could not be saved.");
+      return;
+    }
+    const body = (await result.json()) as { branch: { id: string; businessUnitId: string; name: string; slug: string; isActive: boolean } };
+    setBranches((current) => [body.branch, ...current]);
+    setBranchName("");
+    setBranchSlug("");
+    setBranchBusinessUnitId("");
   };
 
   if (authenticated === null) {
@@ -2072,6 +2257,100 @@ export default function Home() {
                   className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
                 >
                   Save invoice
+                </button>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {activeTab === "Branches" ? (
+          <section className="mt-6 grid gap-6 lg:grid-cols-2">
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <h2 className="text-xl font-semibold">Business units</h2>
+              <div className="mt-4 space-y-3">
+                {isLoadingBusinessUnits ? <div className="text-sm text-[#736067]">Loading business units...</div> : null}
+                {!isLoadingBusinessUnits && businessUnitError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{businessUnitError}</div> : null}
+                {!isLoadingBusinessUnits && !businessUnitError && businessUnits.length === 0 ? <div className="text-sm text-[#736067]">No business units yet.</div> : null}
+                {businessUnits.map((bu) => (
+                  <div key={bu.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    <div>
+                      <div className="font-medium">{bu.name}</div>
+                      <div className="text-sm text-[#736067]">{bu.slug}</div>
+                    </div>
+                    <span className={`rounded-full px-2.5 py-1 text-xs ${bu.isActive ? "bg-[#e6f4ea] text-[#1e7e34]" : "bg-[#fceff4] text-[#6a2f4a]"}`}>{bu.isActive ? "Active" : "Inactive"}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <h2 className="text-xl font-semibold">Add business unit</h2>
+              <div className="mt-4 space-y-3">
+                <input
+                  value={businessUnitName}
+                  onChange={(event) => setBusinessUnitName(event.target.value)}
+                  placeholder="Business unit name"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <input
+                  value={businessUnitSlug}
+                  onChange={(event) => setBusinessUnitSlug(event.target.value)}
+                  placeholder="Slug"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <button
+                  onClick={addBusinessUnit}
+                  className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                >
+                  Save business unit
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <h2 className="text-xl font-semibold">Branches</h2>
+              <div className="mt-4 space-y-3">
+                {isLoadingBranches ? <div className="text-sm text-[#736067]">Loading branches...</div> : null}
+                {!isLoadingBranches && branchError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{branchError}</div> : null}
+                {!isLoadingBranches && !branchError && branches.length === 0 ? <div className="text-sm text-[#736067]">No branches yet.</div> : null}
+                {branches.map((branch) => (
+                  <div key={branch.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    <div>
+                      <div className="font-medium">{branch.name}</div>
+                      <div className="text-sm text-[#736067]">{branch.slug} · BU {branch.businessUnitId}</div>
+                    </div>
+                    <span className={`rounded-full px-2.5 py-1 text-xs ${branch.isActive ? "bg-[#e6f4ea] text-[#1e7e34]" : "bg-[#fceff4] text-[#6a2f4a]"}`}>{branch.isActive ? "Active" : "Inactive"}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <h2 className="text-xl font-semibold">Add branch</h2>
+              <div className="mt-4 space-y-3">
+                <input
+                  value={branchName}
+                  onChange={(event) => setBranchName(event.target.value)}
+                  placeholder="Branch name"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <input
+                  value={branchSlug}
+                  onChange={(event) => setBranchSlug(event.target.value)}
+                  placeholder="Slug"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <input
+                  value={branchBusinessUnitId}
+                  onChange={(event) => setBranchBusinessUnitId(event.target.value)}
+                  placeholder="Business unit ID"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <button
+                  onClick={addBranch}
+                  className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                >
+                  Save branch
                 </button>
               </div>
             </div>
