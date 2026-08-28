@@ -150,6 +150,23 @@ export default function Home() {
   const [productSku, setProductSku] = useState("");
   const [productPrice, setProductPrice] = useState("1500");
   const [productCategoryId, setProductCategoryId] = useState("");
+  const [categories, setCategories] = useState<
+    Array<{ id: string; name: string; description: string | null; isActive: boolean }>
+  >([]);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(false);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
+  const [categoryName, setCategoryName] = useState("");
+  const [categoryDescription, setCategoryDescription] = useState("");
+  const [stockItems, setStockItems] = useState<
+    Array<{ id: string; productId: string; branchId: string; quantity: number }>
+  >([]);
+  const [isLoadingStockItems, setIsLoadingStockItems] = useState(false);
+  const [stockItemError, setStockItemError] = useState<string | null>(null);
+  const [stockMovements, setStockMovements] = useState<
+    Array<{ id: string; productId: string; movementType: string; quantity: number; notes: string | null; createdAt: string }>
+  >([]);
+  const [isLoadingStockMovements, setIsLoadingStockMovements] = useState(false);
+  const [stockMovementError, setStockMovementError] = useState<string | null>(null);
   const [staff, setStaff] = useState<StaffRecord[]>([]);
   const [isLoadingStaff, setIsLoadingStaff] = useState(false);
   const [staffError, setStaffError] = useState<string | null>(null);
@@ -645,6 +662,122 @@ export default function Home() {
         }
       });
 
+    void fetch("/api/categories", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        if (result.status === 401) {
+          setCategories([]);
+          return;
+        }
+        if (result.status === 403) {
+          setCategories([]);
+          setCategoryError("You are not authorized to view categories.");
+          return;
+        }
+        if (!result.ok) {
+          throw new Error("Category list request failed");
+        }
+        const body = await result.json() as {
+          categories?: Array<{
+            id: string;
+            name: string;
+            description: string | null;
+            isActive: boolean;
+          }>;
+        };
+        const loadedCategories = Array.isArray(body.categories) ? body.categories : [];
+        setCategories(loadedCategories);
+      })
+      .catch(() => {
+        if (mounted) {
+          setCategories([]);
+          setCategoryError("Categories could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setIsLoadingCategories(false);
+        }
+      });
+
+    void fetch("/api/stock-items", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        if (result.status === 401) {
+          setStockItems([]);
+          return;
+        }
+        if (result.status === 403) {
+          setStockItems([]);
+          setStockItemError("You are not authorized to view stock items.");
+          return;
+        }
+        if (!result.ok) {
+          throw new Error("Stock item list request failed");
+        }
+        const body = await result.json() as {
+          stockItems?: Array<{
+            id: string;
+            productId: string;
+            branchId: string;
+            quantity: number;
+          }>;
+        };
+        const loadedStockItems = Array.isArray(body.stockItems) ? body.stockItems : [];
+        setStockItems(loadedStockItems);
+      })
+      .catch(() => {
+        if (mounted) {
+          setStockItems([]);
+          setStockItemError("Stock items could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setIsLoadingStockItems(false);
+        }
+      });
+
+    void fetch("/api/stock-movements", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        if (result.status === 401) {
+          setStockMovements([]);
+          return;
+        }
+        if (result.status === 403) {
+          setStockMovements([]);
+          setStockMovementError("You are not authorized to view stock movements.");
+          return;
+        }
+        if (!result.ok) {
+          throw new Error("Stock movement list request failed");
+        }
+        const body = await result.json() as {
+          stockMovements?: Array<{
+            id: string;
+            productId: string;
+            movementType: string;
+            quantity: number;
+            notes: string | null;
+            createdAt: string;
+          }>;
+        };
+        const loadedStockMovements = Array.isArray(body.stockMovements) ? body.stockMovements : [];
+        setStockMovements(loadedStockMovements);
+      })
+      .catch(() => {
+        if (mounted) {
+          setStockMovements([]);
+          setStockMovementError("Stock movements could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setIsLoadingStockMovements(false);
+        }
+      });
+
     return () => {
       mounted = false;
       window.clearTimeout(loadingTimer);
@@ -1028,6 +1161,38 @@ export default function Home() {
     setProductSku("");
     setProductPrice("1500");
     setProductCategoryId("");
+  };
+
+  const addCategory = async () => {
+    if (!categoryName.trim()) return;
+    setCategoryError(null);
+    const result = await fetch("/api/categories", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: categoryName,
+        description: categoryDescription || null,
+        isActive: true,
+      }),
+    });
+    if (result.status === 401) {
+      setCategories([]);
+      return;
+    }
+    if (result.status === 403) {
+      setCategories([]);
+      setCategoryError("You are not authorized to manage categories.");
+      return;
+    }
+    if (!result.ok) {
+      setCategoryError("Category could not be saved.");
+      return;
+    }
+    const body = await result.json() as { category: { id: string; name: string; description: string | null; isActive: boolean } };
+    setCategories((current) => [body.category, ...current]);
+    setCategoryName("");
+    setCategoryDescription("");
   };
 
   const addStaff = async () => {
@@ -1674,22 +1839,126 @@ export default function Home() {
         ) : null}
 
         {activeTab === "Inventory" ? (
-          <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+          <section className="mt-6 space-y-6">
+            <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+              <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+                <h2 className="text-xl font-semibold">Categories</h2>
+                <div className="mt-4 space-y-3">
+                  {isLoadingCategories ? <div className="text-sm text-[#736067]">Loading categories...</div> : null}
+                  {!isLoadingCategories && categoryError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{categoryError}</div> : null}
+                  {!isLoadingCategories && !categoryError && categories.length === 0 ? <div className="text-sm text-[#736067]">No categories yet.</div> : null}
+                  {categories.map((category) => (
+                    <div key={category.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                      <div>
+                        <div className="font-medium">{category.name}</div>
+                        {category.description ? <div className="text-sm text-[#736067]">{category.description}</div> : null}
+                      </div>
+                      <div className="text-right text-sm text-[#736067]">
+                        <div>{category.isActive ? "Active" : "Inactive"}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+                <h2 className="text-xl font-semibold">Add category</h2>
+                <div className="mt-4 space-y-3">
+                  <input
+                    value={categoryName}
+                    onChange={(event) => setCategoryName(event.target.value)}
+                    placeholder="Category name"
+                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  />
+                  <input
+                    value={categoryDescription}
+                    onChange={(event) => setCategoryDescription(event.target.value)}
+                    placeholder="Description (optional)"
+                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  />
+                  <button
+                    onClick={addCategory}
+                    className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                  >
+                    Save category
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+              <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+                <h2 className="text-xl font-semibold">Products</h2>
+                <div className="mt-4 space-y-3">
+                  {isLoadingProducts ? <div className="text-sm text-[#736067]">Loading products...</div> : null}
+                  {!isLoadingProducts && productError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{productError}</div> : null}
+                  {!isLoadingProducts && !productError && products.length === 0 ? <div className="text-sm text-[#736067]">No products yet.</div> : null}
+                  {products.map((product) => (
+                    <div key={product.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                      <div>
+                        <div className="font-medium">{product.name}</div>
+                        <div className="text-sm text-[#736067]">SKU: {product.sku}</div>
+                      </div>
+                      <div className="text-right text-sm text-[#736067]">
+                        <div>₹{product.priceCents / 100}</div>
+                        <div>{product.isActive ? "Active" : "Inactive"}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+                <h2 className="text-xl font-semibold">Add product</h2>
+                <div className="mt-4 space-y-3">
+                  <input
+                    value={productCategoryId}
+                    onChange={(event) => setProductCategoryId(event.target.value)}
+                    placeholder="Category ID"
+                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  />
+                  <input
+                    value={productName}
+                    onChange={(event) => setProductName(event.target.value)}
+                    placeholder="Product name"
+                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  />
+                  <input
+                    value={productSku}
+                    onChange={(event) => setProductSku(event.target.value)}
+                    placeholder="SKU"
+                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  />
+                  <input
+                    value={productPrice}
+                    onChange={(event) => setProductPrice(event.target.value)}
+                    placeholder="Price (cents)"
+                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  />
+                  <button
+                    onClick={addProduct}
+                    className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                  >
+                    Save product
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
-              <h2 className="text-xl font-semibold">Products</h2>
+              <h2 className="text-xl font-semibold">Current Stock</h2>
               <div className="mt-4 space-y-3">
-                {isLoadingProducts ? <div className="text-sm text-[#736067]">Loading products...</div> : null}
-                {!isLoadingProducts && productError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{productError}</div> : null}
-                {!isLoadingProducts && !productError && products.length === 0 ? <div className="text-sm text-[#736067]">No products yet.</div> : null}
-                {products.map((product) => (
-                  <div key={product.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                {isLoadingStockItems ? <div className="text-sm text-[#736067]">Loading stock items...</div> : null}
+                {!isLoadingStockItems && stockItemError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{stockItemError}</div> : null}
+                {!isLoadingStockItems && !stockItemError && stockItems.length === 0 ? <div className="text-sm text-[#736067]">No stock items yet.</div> : null}
+                {stockItems.map((item) => (
+                  <div key={item.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
                     <div>
-                      <div className="font-medium">{product.name}</div>
-                      <div className="text-sm text-[#736067]">SKU: {product.sku}</div>
+                      <div className="font-medium">Product {item.productId}</div>
+                      <div className="text-sm text-[#736067]">Branch {item.branchId}</div>
                     </div>
                     <div className="text-right text-sm text-[#736067]">
-                      <div>₹{product.priceCents / 100}</div>
-                      <div>{product.isActive ? "Active" : "Inactive"}</div>
+                      <div>Qty: {item.quantity}</div>
                     </div>
                   </div>
                 ))}
@@ -1697,38 +1966,24 @@ export default function Home() {
             </div>
 
             <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
-              <h2 className="text-xl font-semibold">Add product</h2>
+              <h2 className="text-xl font-semibold">Movement History</h2>
               <div className="mt-4 space-y-3">
-                <input
-                  value={productCategoryId}
-                  onChange={(event) => setProductCategoryId(event.target.value)}
-                  placeholder="Category ID"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
-                />
-                <input
-                  value={productName}
-                  onChange={(event) => setProductName(event.target.value)}
-                  placeholder="Product name"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
-                />
-                <input
-                  value={productSku}
-                  onChange={(event) => setProductSku(event.target.value)}
-                  placeholder="SKU"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
-                />
-                <input
-                  value={productPrice}
-                  onChange={(event) => setProductPrice(event.target.value)}
-                  placeholder="Price (cents)"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
-                />
-                <button
-                  onClick={addProduct}
-                  className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
-                >
-                  Save product
-                </button>
+                {isLoadingStockMovements ? <div className="text-sm text-[#736067]">Loading stock movements...</div> : null}
+                {!isLoadingStockMovements && stockMovementError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{stockMovementError}</div> : null}
+                {!isLoadingStockMovements && !stockMovementError && stockMovements.length === 0 ? <div className="text-sm text-[#736067]">No stock movements yet.</div> : null}
+                {stockMovements.map((movement) => (
+                  <div key={movement.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    <div>
+                      <div className="font-medium">{movement.movementType}</div>
+                      <div className="text-sm text-[#736067]">Product {movement.productId}</div>
+                      {movement.notes ? <div className="text-sm text-[#736067]">{movement.notes}</div> : null}
+                    </div>
+                    <div className="text-right text-sm text-[#736067]">
+                      <div>{movement.quantity > 0 ? "+" : ""}{movement.quantity}</div>
+                      <div>{new Date(movement.createdAt).toLocaleString()}</div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </section>

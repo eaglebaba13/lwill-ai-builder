@@ -5,8 +5,8 @@
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
 - **Current Branch**: `phase-1d-native-auth`
-- **Current HEAD Commit**: `e20ffc1` (`feat(auth): add tenant user and role administration`)
-- **Git State**: `phase-1d-native-auth` at `e20ffc1` (`feat(auth): add tenant user and role administration`), clean working tree; all vertical slices (Services `fc55e99`, Appointments `4eba4d3`, Staff `2125f15`, Memberships `0281c36`, Invoices `4a03b7d`, Inventory/Product `1dfa71c`, Attendance `cfc87dc`, User/Role Admin `e20ffc1`) are committed locally and pushed to `origin/phase-1d-native-auth`. No uncommitted source code, schema, migration, or RBAC data changes remain staged or unstaged.
+- **Current HEAD Commit**: `a909949` (`docs(status): record production RBAC verification`)
+- **Git State**: `phase-1d-native-auth` at `a909949` (`docs(status): record production RBAC verification`); working tree has uncommitted inventory stock-management web API/UI changes for Category, StockItem, and StockMovement vertical slice.
 
 ## State Breakdown
 
@@ -31,7 +31,7 @@
 - Notification / WhatsApp automation.
 - Platform administration (control-plane super-user management).
 - Full POS / accounting workflows (invoice APIs exist; POS checkout, payments, and general ledger remain incomplete).
-- Full inventory stock management (Category, StockItem, and StockMovement models exist; web API/UI layers for inventory management remain incomplete).
+- Inventory stock-management web API/UI layer implemented for Category (list, get, create, update), StockItem (list, get), and StockMovement (list, get); current stock information and movement history exposed in the X Nail Inventory tab. Category/StockItem/StockMovement create, update of stock quantities, stock transfer, and low-stock alerts remain NOT SPECIFIED — APPROVAL REQUIRED.
 - NestJS backend/API application (platform uses Next.js App Router, not NestJS).
 - Password reset via verified email (deferred per ADR 013).
 - MFA (deferred per ADR 013).
@@ -86,7 +86,7 @@
 ## Exact Next Task
 
 1. Update documentation to reflect the verified production RBAC and API state for all nine module bootstraps (customer, service, staff, attendance, membership, invoice, product, appointment, package).
-2. Implement full inventory stock-management web API/UI for Category, StockItem, and StockMovement models (models exist; API/UI layers incomplete).
+2. ✅ Implement full inventory stock-management web API/UI for Category, StockItem, and StockMovement (DONE — see new section below).
 3. Await approved commercial rules for Commission before any Franchise or settlement implementation (per ADR 014).
 4. Implement Commission, Reports, Settings, AI Assistant, Notification/WhatsApp automation, and Platform administration as separate approved phases.
 
@@ -1515,10 +1515,63 @@ Authenticated as the existing tenant-admin test account via `POST /api/auth/logi
 - **Empty production records**: Staff, attendance, memberships, and invoices currently have no production business records; their APIs return HTTP 200 with empty lists. This is correct fail-closed behavior for authorized-but-empty resources.
 - **Platform administration**: Remains outside the tenant-scoped implementation. No platform super-user management exists in this repository.
 - **Commission**: Remains blocked pending explicitly approved commercial rules per ADR 014. No schema, migration, or RBAC changes are authorized until those rules are documented and approved.
-- **Inventory**: Category, StockItem, and StockMovement Prisma models exist (`packages/database/prisma/schema.prisma`), but no web API or UI routes are implemented for them. The `stock-service.ts` module exists but is not wired to any API route.
+- **Inventory**: Category, StockItem, and StockMovement Prisma models exist (`packages/database/prisma/schema.prisma`). The `stock-service.ts` module has been extended with `getStockItemById`, `listStockMovements`, and `getStockMovement`. Web API/UI routes are implemented for Category (list, get, create, update), StockItem (list, get), and StockMovement (list, get). Movement creation (creating new stock movements with stock quantity updates), StockItem create/update, and low-stock alerts remain NOT SPECIFIED — APPROVAL REQUIRED.
 - **Production tenant-domain**: `builder.lwill.in` has an active `TenantDomain` record mapping to the HDK tenant, enabling login tenancy resolution.
 - **No secrets introduced**: This verification did not create, modify, or expose any credentials, tokens, `DATABASE_URL`, or other secrets.
 
 ### Historical Context
 
 The prior "Phase 1I X Nail Packages Production Verification" section (above) documented production verification for only appointment and package bootstraps. The verification described in this new section (2026-08-28) supersedes that operational state: all nine module permission bootstraps have now been verified in production, confirming the complete RBAC data gap is closed.
+
+---
+
+## Phase 1.7 Inventory Stock-Management Web API/UI Layer — 2026-08-28
+
+### Status: **Implemented and verified locally**
+
+### Implemented Slice
+
+- **Service layer** (`packages/authentication-context-prisma/src/stock-service.ts`): Extended `StockService` with three new methods:
+  - `getStockItemById({ tenantId, stockItemId })` — looks up a stock item by ID with tenant isolation
+  - `listStockMovements({ tenantId })` — lists all stock movements for a tenant
+  - `getStockMovement({ tenantId, stockMovementId })` — gets a stock movement by ID with tenant isolation
+- **Category** (`apps/web/src/lib/crm/category-route-handlers.ts`, `category-runtime.ts`): Full route handlers and runtime following the established Product module pattern. CRUD: list, get, create, update. No delete (not in existing `category-service.ts`).
+- **StockItem** (`apps/web/src/lib/crm/stock-item-route-handlers.ts`, `stock-item-runtime.ts`): Read-only route handlers and runtime. Operations: list, get by ID. No create/update (business rules not in existing service).
+- **StockMovement** (`apps/web/src/lib/crm/stock-movement-route-handlers.ts`, `stock-movement-runtime.ts`): Read-only route handlers and runtime. Operations: list, get by ID. No create via this API (the existing `createStockMovement` does not update stock item quantities; movement-type business rules are NOT SPECIFIED — APPROVAL REQUIRED).
+- **API routes**: `/api/categories`, `/api/categories/[id]`, `/api/stock-items`, `/api/stock-items/[id]`, `/api/stock-movements`, `/api/stock-movements/[id]`.
+- **UI** (`apps/web/src/app/page.tsx`): Inventory tab now shows Categories (list + create form), Products (existing), Current Stock (list), and Movement History (list).
+- **Permissions**: Reused existing `product.read` for list/get and `product.write` for create/update — no new permission codes invented. Consistent with DOC-024 treating categories, products, and stock as a single inventory module.
+- **Tests**:
+  - `apps/web/src/test/category-route-handlers.test.ts` — 12 tests
+  - `apps/web/src/test/stock-item-route-handlers.test.ts` — 6 tests
+  - `apps/web/src/test/stock-movement-route-handlers.test.ts` — 6 tests
+  - `packages/authentication-context-prisma/src/stock-service.test.ts` — 10 tests
+
+### Classification Before Implementation
+
+| Entity | Service | API | UI | Tests |
+|--------|---------|-----|-----|-------|
+| Category | IMPLEMENTED (create/get/list/update) | NOT IMPLEMENTED | NOT IMPLEMENTED | NOT IMPLEMENTED |
+| StockItem | PARTIAL (listStockItems, getStockItem by product+branch) | NOT IMPLEMENTED | NOT IMPLEMENTED | NOT IMPLEMENTED |
+| StockMovement | PARTIAL (createStockMovement, deductStock) | NOT IMPLEMENTED | NOT IMPLEMENTED | NOT IMPLEMENTED |
+
+### Schema Relationships Verified
+
+- **StockItem**: belongs to one `Product` (via `tenantId` + `productId` composite FK) and one `Branch` (via `tenantId` + `branchId` composite FK). Has `quantity: Int @default(0)`. No variant, warehouse, batch, expiry, or serial fields exist in the schema.
+- **StockMovement**: belongs to `Product`, `Branch`, and `StockItem` (all tenant-scoped). `movementType` is a free-form `String` (no enum). `quantity` is `Int`. No batch/expiry/serial foreign keys.
+- **Category**: standalone tenant-scoped model with `name`, `description`, `isActive`. No direct relationship to StockItem or StockMovement.
+
+### Security Controls
+
+- All `tenantId` values originate from `getAuthenticationContext()` → `authorizeFromContext()` in the runtime layer — never from client input.
+- Cross-tenant access is denied by service-level tenant checks (`stockItem.tenantId !== tenantId` → null).
+- Unknown request keys (including `tenantId`) are rejected by the validation layer (`parseCreateInput`/`parseUpdateInput` use an allowlist).
+- No secrets, credentials, session tokens, or password hashes are exposed by any new endpoint.
+- No schema migration was added — all new service methods use existing Prisma model fields.
+
+### Verification Results
+
+- `pnpm test` — Passed: 6 successful monorepo test tasks, 339 web tests + 248 auth-context-prisma tests (487 total).
+- `pnpm lint` — Passed (no errors on all new/modified files).
+- `pnpm build` — Passed (Next.js production build + TypeScript compilation; all 6 new API routes compiled).
+- `git diff --check` — Passed (LF→CRLF notices only, no trailing whitespace errors).
