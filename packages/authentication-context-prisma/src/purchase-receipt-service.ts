@@ -1,3 +1,5 @@
+import { createStockService, type StockPrismaClient } from "./stock-service";
+
 export interface PurchaseReceiptLineItemRecord {
   readonly id: string;
   readonly tenantId: string;
@@ -64,12 +66,22 @@ interface PurchaseReceiptPrismaClient {
   readonly product: {
     findUnique: (args: { where: { id: string } }) => Promise<{ id: string; tenantId: string } | null>;
   };
+  readonly stockItem: {
+    findFirst: (args: { where: Record<string, unknown> }) => Promise<{ id: string; quantity: number } | null>;
+    create: (args: { data: Record<string, unknown> }) => Promise<{ id: string }>;
+    update: (args: { data: Record<string, unknown>; where: { id: string } }) => Promise<{ id: string }>;
+  };
+  readonly stockMovement: {
+    create: (args: { data: Record<string, unknown> }) => Promise<unknown>;
+  };
   $transaction: {
     <T>(callback: (client: PurchaseReceiptPrismaClient) => Promise<T>): Promise<T>;
   };
 }
 
 export function createPurchaseReceiptService(prisma: PurchaseReceiptPrismaClient): PurchaseReceiptService {
+  const stockService = createStockService(prisma as never);
+
   return {
     async createPurchaseReceipt(input) {
       return prisma.$transaction(async (tx) => {
@@ -123,6 +135,20 @@ export function createPurchaseReceiptService(prisma: PurchaseReceiptPrismaClient
               quantity: item.quantity,
             },
           });
+
+          await stockService.recordStockMovement(
+            {
+              tenantId: input.tenantId,
+              productId: item.productId,
+              branchId: input.branchId,
+              movementType: "PURCHASE",
+              quantity: item.quantity,
+              referenceType: "PURCHASE_RECEIPT",
+              referenceId: receipt.id,
+              notes: `Stock received for purchase receipt ${receipt.id}`,
+            },
+            tx as unknown as StockPrismaClient,
+          );
         }
 
         return receipt;
