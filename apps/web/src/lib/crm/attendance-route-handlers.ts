@@ -13,11 +13,22 @@ export interface AttendanceWriteInput {
   readonly notes?: string | null;
 }
 
+export interface AttendanceUpdateInput {
+  readonly checkOutAt?: Date | null;
+  readonly status?: string | null;
+  readonly notes?: string | null;
+}
+
 export interface AttendanceRouteServices {
   readonly authorize: (permissionCode: string) => Promise<AttendanceAuthorization>;
   readonly listAttendance: (tenantId: string) => Promise<readonly unknown[]>;
   readonly getAttendance: (tenantId: string, attendanceId: string) => Promise<unknown | null>;
   readonly createAttendance: (tenantId: string, input: AttendanceWriteInput) => Promise<unknown>;
+  readonly updateAttendance: (
+    tenantId: string,
+    attendanceId: string,
+    input: AttendanceUpdateInput,
+  ) => Promise<unknown | null>;
 }
 
 const RESPONSE_HEADERS = { "cache-control": "no-store" };
@@ -140,6 +151,72 @@ export async function handleCreateAttendance(
   }
   const attendance = await services.createAttendance(authResult.tenantId, input);
   return response(201, { attendance });
+}
+
+function parseUpdateInput(input: unknown): AttendanceUpdateInput | null {
+  if (typeof input !== "object" || input === null) {
+    return null;
+  }
+  const record = input as Record<string, unknown>;
+  const allowedKeys = new Set(["checkOutAt", "status", "notes"]);
+  if (Object.keys(record).length === 0) {
+    return null;
+  }
+  if (Object.keys(record).some((key) => !allowedKeys.has(key))) {
+    return null;
+  }
+  if (record.checkOutAt !== undefined && record.checkOutAt !== null && typeof record.checkOutAt !== "string") {
+    return null;
+  }
+  if (record.checkOutAt !== undefined && record.checkOutAt !== null) {
+    const parsed = new Date(record.checkOutAt);
+    if (Number.isNaN(parsed.getTime())) {
+      return null;
+    }
+  }
+  if (!isOptionalString(record.status)) {
+    return null;
+  }
+  if (!isOptionalString(record.notes)) {
+    return null;
+  }
+  return {
+    checkOutAt: record.checkOutAt === undefined ? undefined : (record.checkOutAt === null ? null : new Date(record.checkOutAt)),
+    status: record.status === undefined ? undefined : record.status,
+    notes: record.notes === undefined ? undefined : record.notes,
+  };
+}
+
+export async function handleUpdateAttendance(
+  request: Request,
+  services: AttendanceRouteServices,
+  attendanceId: string,
+): Promise<Response> {
+  const authorization = await services.authorize("attendance.write");
+  const authResult = authorizationOutcome(authorization);
+  if (!authResult.ok) {
+    return authResult.response;
+  }
+  const body = await readJsonBody(request);
+  if (body === INVALID_JSON) {
+    return response(400);
+  }
+  const input = parseUpdateInput(body);
+  if (input === null) {
+    return response(400);
+  }
+  try {
+    const attendance = await services.updateAttendance(authResult.tenantId, attendanceId, input);
+    if (attendance === null) {
+      return response(404);
+    }
+    return response(200, { attendance });
+  } catch (error) {
+    if (error instanceof Error && error.message === "staff must belong to the same tenant") {
+      return response(403, { error: error.message });
+    }
+    throw error;
+  }
 }
 
 export async function handleGetAttendance(

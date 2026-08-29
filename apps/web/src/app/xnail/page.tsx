@@ -1475,6 +1475,37 @@ export default function Home() {
     setAttendanceNotes("");
   };
 
+  const checkOutAttendance = async (attendanceId: string) => {
+    setAttendanceError(null);
+    const result = await fetch(`/api/attendance/${attendanceId}`, {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        checkOutAt: new Date().toISOString(),
+      }),
+    });
+    if (result.status === 401) {
+      setAttendance([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setAttendanceError("You are not authorized to update attendance.");
+      return;
+    }
+    if (!result.ok) {
+      setAttendanceError("Attendance could not be updated.");
+      return;
+    }
+    const body = (await result.json()) as {
+      attendance: { id: string; staffId: string; checkInAt: string; checkOutAt: string | null; status: string | null };
+    };
+    setAttendance((current) =>
+      current.map((record) => (record.id === attendanceId ? { ...record, checkOutAt: body.attendance.checkOutAt } : record)),
+    );
+  };
+
   const addAppointment = async () => {
     if (!appointmentCustomer || !appointmentService) return;
     setAppointmentError(null);
@@ -1975,9 +2006,19 @@ export default function Home() {
                       <div className="font-medium">Staff {record.staffId}</div>
                       <div className="text-sm text-[#736067]">{record.checkInAt}</div>
                     </div>
-                    <div className="text-right text-sm text-[#736067]">
-                      <div>{record.status ?? "—"}</div>
-                      <div>{record.checkOutAt ?? "—"}</div>
+                    <div className="flex items-center gap-3 text-right text-sm text-[#736067]">
+                      <div>
+                        <div>{record.status ?? "—"}</div>
+                        <div>{record.checkOutAt ?? "—"}</div>
+                      </div>
+                      {record.checkOutAt === null ? (
+                        <button
+                          onClick={() => checkOutAttendance(record.id)}
+                          className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                        >
+                          Check out
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                 ))}

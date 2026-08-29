@@ -44,5 +44,7 @@ export function createAttendanceRouteServices(): AttendanceRouteServices {
     listAttendance: (tenantId) => attendanceService.listAttendance({ tenantId }),
     getAttendance: (tenantId, attendanceId) => attendanceService.getAttendance({ tenantId, attendanceId }),
     createAttendance: (tenantId, input) => attendanceService.createAttendance({ tenantId, ...input }),
+    updateAttendance: (tenantId, attendanceId, input) =>
+      attendanceService.updateAttendance({ tenantId, attendanceId, input }),
   };
 }

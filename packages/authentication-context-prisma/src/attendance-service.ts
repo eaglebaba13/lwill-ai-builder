@@ -19,10 +19,21 @@ export interface AttendanceCreateInput {
   readonly notes?: string | null;
 }
 
+export interface AttendanceUpdateInput {
+  readonly checkOutAt?: Date | null;
+  readonly status?: string | null;
+  readonly notes?: string | null;
+}
+
 export interface AttendanceService {
   createAttendance(input: AttendanceCreateInput): Promise<AttendanceRecord>;
   getAttendance(args: { tenantId: string; attendanceId: string }): Promise<AttendanceRecord | null>;
   listAttendance(args: { tenantId: string }): Promise<AttendanceRecord[]>;
+  updateAttendance(args: {
+    tenantId: string;
+    attendanceId: string;
+    input: AttendanceUpdateInput;
+  }): Promise<AttendanceRecord | null>;
 }
 
 interface AttendancePrismaClient {
@@ -30,6 +41,7 @@ interface AttendancePrismaClient {
     create: (args: { data: Record<string, unknown> }) => Promise<AttendanceRecord>;
     findUnique: (args: { where: { id: string } }) => Promise<AttendanceRecord | null>;
     findMany: (args: { where?: Record<string, unknown> }) => Promise<AttendanceRecord[]>;
+    update: (args: { data: Record<string, unknown>; where: { id: string } }) => Promise<AttendanceRecord>;
   };
   readonly staff: {
     findUnique: (args: { where: { id: string } }) => Promise<{ id: string; tenantId: string } | null>;
@@ -64,6 +76,31 @@ export function createAttendanceService(prisma: AttendancePrismaClient): Attenda
     },
     async listAttendance({ tenantId }) {
       return prisma.attendance.findMany({ where: { tenantId } });
+    },
+
+    async updateAttendance({ tenantId, attendanceId, input }) {
+      const existing = await prisma.attendance.findUnique({ where: { id: attendanceId } });
+      if (existing === null || existing.tenantId !== tenantId) {
+        return null;
+      }
+
+      const staff = await prisma.staff.findUnique({ where: { id: existing.staffId } });
+      if (staff === null || staff.tenantId !== tenantId) {
+        throw new Error("staff must belong to the same tenant");
+      }
+
+      const data: Record<string, unknown> = {};
+      if (input.checkOutAt !== undefined) {
+        data.checkOutAt = input.checkOutAt;
+      }
+      if (input.status !== undefined) {
+        data.status = input.status;
+      }
+      if (input.notes !== undefined) {
+        data.notes = input.notes;
+      }
+
+      return prisma.attendance.update({ where: { id: attendanceId }, data });
     },
   };
 }

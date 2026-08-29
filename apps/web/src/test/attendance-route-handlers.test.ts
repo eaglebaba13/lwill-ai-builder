@@ -3,6 +3,7 @@ import {
   handleCreateAttendance,
   handleGetAttendance,
   handleListAttendance,
+  handleUpdateAttendance,
   type AttendanceAuthorization,
   type AttendanceRouteServices,
 } from "../lib/crm/attendance-route-handlers";
@@ -30,6 +31,7 @@ function createServices(authorization: AttendanceAuthorization): AttendanceRoute
     listAttendance: vi.fn().mockResolvedValue([{ id: "attendance-1" }]),
     getAttendance: vi.fn().mockResolvedValue({ id: "attendance-1" }),
     createAttendance: vi.fn().mockResolvedValue({ id: "attendance-1" }),
+    updateAttendance: vi.fn().mockResolvedValue({ id: "attendance-1" }),
   };
 }
 
@@ -39,7 +41,9 @@ describe("attendance route handlers: authentication/authorization gating", () =>
     expect((await handleListAttendance(request(), services)).status).toBe(401);
     expect((await handleCreateAttendance(request({ staffId: "staff-1", checkInAt: "2026-08-12T09:00:00.000Z" }), services)).status).toBe(401);
     expect((await handleGetAttendance(request(), services, "a1")).status).toBe(401);
+    expect((await handleUpdateAttendance(request({ checkOutAt: "2026-08-12T17:00:00.000Z" }), services, "a1")).status).toBe(401);
     expect(services.listAttendance).not.toHaveBeenCalled();
+    expect(services.getAttendance).not.toHaveBeenCalled();
   });
 
   it("returns 403 for an authenticated caller lacking the permission", async () => {
@@ -60,9 +64,12 @@ describe("attendance route handlers: permission code forwarding", () => {
     expect(services.authorize).toHaveBeenCalledWith("attendance.read");
   });
 
-  it("passes 'attendance.write' to authorize for create operations", async () => {
+  it("passes 'attendance.write' to authorize for create and update operations", async () => {
     const services = createServices({ outcome: "authorized", tenantId: "tenant-1" });
     await handleCreateAttendance(request({ staffId: "staff-1", checkInAt: "2026-08-12T09:00:00.000Z" }), services);
+    expect(services.authorize).toHaveBeenCalledWith("attendance.write");
+
+    await handleUpdateAttendance(request({ checkOutAt: "2026-08-12T17:00:00.000Z" }), services, "a1");
     expect(services.authorize).toHaveBeenCalledWith("attendance.write");
   });
 });
@@ -287,5 +294,119 @@ describe("attendance route handlers: authorized operations", () => {
     const services = createServices(authorized);
     vi.mocked(services.getAttendance).mockResolvedValue(null);
     expect((await handleGetAttendance(request(), services, "missing")).status).toBe(404);
+  });
+});
+
+describe("attendance route handlers: update", () => {
+  const authorized: AttendanceAuthorization = { outcome: "authorized", tenantId: "tenant-1" };
+
+  it("returns 400 for invalid JSON", async () => {
+    const services = createServices(authorized);
+    const result = await handleUpdateAttendance(
+      new Request("https://builder.lwill.in/api/attendance/a1", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: "not-json",
+      }),
+      services,
+      "a1",
+    );
+    expect(result.status).toBe(400);
+    expect(services.updateAttendance).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for an empty update object", async () => {
+    const services = createServices(authorized);
+    expect((await handleUpdateAttendance(request({}), services, "a1")).status).toBe(400);
+    expect(services.updateAttendance).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for an unknown input key", async () => {
+    const services = createServices(authorized);
+    expect((await handleUpdateAttendance(request({ staffId: "staff-1" }), services, "a1")).status).toBe(400);
+    expect(services.updateAttendance).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for an invalid checkOutAt", async () => {
+    const services = createServices(authorized);
+    expect((await handleUpdateAttendance(request({ checkOutAt: "not-a-date" }), services, "a1")).status).toBe(400);
+    expect(services.updateAttendance).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for an invalid status type", async () => {
+    const services = createServices(authorized);
+    expect((await handleUpdateAttendance(request({ status: 123 }), services, "a1")).status).toBe(400);
+    expect(services.updateAttendance).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 for an invalid notes type", async () => {
+    const services = createServices(authorized);
+    expect((await handleUpdateAttendance(request({ notes: true }), services, "a1")).status).toBe(400);
+    expect(services.updateAttendance).not.toHaveBeenCalled();
+  });
+
+  it("returns 200 when status and notes are explicitly set to null", async () => {
+    const services = createServices(authorized);
+    vi.mocked(services.updateAttendance).mockResolvedValue({
+      id: "a1",
+      tenantId: "tenant-1",
+      checkInAt: "2026-08-12T09:00:00.000Z",
+      checkOutAt: "2026-08-12T17:00:00.000Z",
+      status: null,
+      notes: null,
+    });
+
+    const result = await handleUpdateAttendance(
+      request({ status: null, notes: null }),
+      services,
+      "a1",
+    );
+    expect(result.status).toBe(200);
+    expect(services.updateAttendance).toHaveBeenCalledWith("tenant-1", "a1", {
+      checkOutAt: undefined,
+      status: null,
+      notes: null,
+    });
+  });
+
+  it("returns 200 for an authorized update and forwards tenantId from context only", async () => {
+    const services = createServices(authorized);
+    vi.mocked(services.updateAttendance).mockResolvedValue({
+      id: "a1",
+      tenantId: "tenant-1",
+      checkOutAt: "2026-08-12T17:00:00.000Z",
+    });
+
+    const rejected = await handleUpdateAttendance(
+      request({ checkOutAt: "2026-08-12T17:00:00.000Z", tenantId: "attacker-tenant" }),
+      services,
+      "a1",
+    );
+    expect(rejected.status).toBe(400);
+    expect(services.updateAttendance).not.toHaveBeenCalled();
+
+    const result = await handleUpdateAttendance(
+      request({ checkOutAt: "2026-08-12T17:00:00.000Z" }),
+      services,
+      "a1",
+    );
+    expect(result.status).toBe(200);
+    expect(services.updateAttendance).toHaveBeenCalledWith("tenant-1", "a1", {
+      checkOutAt: new Date("2026-08-12T17:00:00.000Z"),
+      status: undefined,
+      notes: undefined,
+    });
+  });
+
+  it("returns 404 when the attendance does not exist or belongs to another tenant", async () => {
+    const services = createServices(authorized);
+    vi.mocked(services.updateAttendance).mockResolvedValue(null);
+    expect((await handleUpdateAttendance(request({ checkOutAt: "2026-08-12T17:00:00.000Z" }), services, "missing")).status).toBe(404);
+  });
+
+  it("returns 403 when staff tenant validation fails", async () => {
+    const services = createServices(authorized);
+    vi.mocked(services.updateAttendance).mockRejectedValue(new Error("staff must belong to the same tenant"));
+    expect((await handleUpdateAttendance(request({ checkOutAt: "2026-08-12T17:00:00.000Z" }), services, "a1")).status).toBe(403);
   });
 });
