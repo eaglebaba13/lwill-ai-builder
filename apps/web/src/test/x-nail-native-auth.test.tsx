@@ -592,7 +592,7 @@ describe("X Nail native authentication integration", () => {
       expect.objectContaining({ method: "POST", credentials: "same-origin" }),
     ));
 
-    expect(await screen.findByText("Customer cust-1")).toBeInTheDocument();
+    expect(await screen.findAllByText("Test Customer")).toHaveLength(2);
     expect(screen.getByText("2026-08-12T10:30:00.000Z")).toBeInTheDocument();
     expect(screen.getByText("Booked")).toBeInTheDocument();
   });

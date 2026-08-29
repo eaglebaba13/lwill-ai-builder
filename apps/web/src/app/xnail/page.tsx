@@ -274,6 +274,10 @@ export default function Home() {
   const customerMap = new Map(customers.map((customer) => [customer.id, customer.name]));
   const productMap = new Map(products.map((product) => [product.id, product.name]));
   const branchMap = new Map(branches.map((branch) => [branch.id, branch.name]));
+  const packageMap = new Map(packages.map((pkg) => [pkg.id, pkg.name]));
+  const staffMap = new Map(staff.map((member) => [member.id, member.displayName]));
+  const serviceMap = new Map(services.map((service) => [service.id, service.name]));
+  const warehouseMap = new Map(warehouses.map((warehouse) => [warehouse.id, warehouse.name]));
 
   useEffect(() => {
     let mounted = true;
@@ -2645,8 +2649,8 @@ export default function Home() {
                 {memberships.map((membership) => (
                   <div key={membership.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
                     <div>
-                      <div className="font-medium">Customer {membership.customerId}</div>
-                      <div className="text-sm text-[#736067]">Package {membership.packageId}</div>
+                      <div className="font-medium">{customerMap.get(membership.customerId) ?? `Customer ${membership.customerId}`}</div>
+                      <div className="text-sm text-[#736067]">{packageMap.get(membership.packageId) ?? `Package ${membership.packageId}`}</div>
                     </div>
                     <div className="text-right text-sm text-[#736067]">
                       <div>{membership.startedAt}</div>
@@ -2752,7 +2756,7 @@ export default function Home() {
                 {attendance.map((record) => (
                   <div key={record.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
                     <div>
-                      <div className="font-medium">Staff {record.staffId}</div>
+                       <div className="font-medium">{staffMap.get(record.staffId) ?? `Staff ${record.staffId}`}</div>
                       <div className="text-sm text-[#736067]">{record.checkInAt}</div>
                     </div>
                     <div className="flex items-center gap-3 text-right text-sm text-[#736067]">
@@ -2842,7 +2846,9 @@ export default function Home() {
                   <div key={`${appointment.customerId}-${index}`} className="rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <div className="font-medium">Customer {appointment.customerId}</div>
+                        <div className="font-medium">{customerMap.get(appointment.customerId) ?? `Customer ${appointment.customerId}`}</div>
+                        <div className="text-sm text-[#736067]">{serviceMap.get(appointment.serviceId) ?? `Service ${appointment.serviceId}`}</div>
+                        <div className="text-sm text-[#736067]">{staffMap.get(appointment.staffId) ?? `Staff ${appointment.staffId}`}</div>
                         <div className="text-sm text-[#736067]">{appointment.startsAt}</div>
                       </div>
                       <button
@@ -3271,8 +3277,8 @@ export default function Home() {
                   {reorderRules.map((rule) => (
                     <div key={rule.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
                       <div>
-                        <div className="font-medium">Product {rule.productId}</div>
-                        <div className="text-sm text-[#736067]">Branch {rule.branchId} / Warehouse {rule.warehouseId}</div>
+                         <div className="font-medium">{productMap.get(rule.productId) ?? `Product ${rule.productId}`}</div>
+                         <div className="text-sm text-[#736067]">{branchMap.get(rule.branchId) ?? `Branch ${rule.branchId}`} / {warehouseMap.get(rule.warehouseId) ?? `Warehouse ${rule.warehouseId}`}</div>
                         <div className="text-sm text-[#736067]">Min: {rule.minQuantity} | Reorder: {rule.reorderQuantity}</div>
                       </div>
                       <div className="text-right text-sm text-[#736067]">
@@ -3341,12 +3347,12 @@ export default function Home() {
                 <div key={receipt.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
                   <div>
                     <div className="font-medium">Receipt {receipt.id}</div>
-                    <div className="text-sm text-[#736067]">Warehouse {receipt.warehouseId} / Branch {receipt.branchId}</div>
-                    <div className="text-sm text-[#736067]">{new Date(receipt.receivedAt).toLocaleString()}</div>
-                    {receipt.lineItems.length > 0 ? (
-                      <div className="text-sm text-[#736067]">
-                        {receipt.lineItems.map((item) => `Product ${item.productId}: ${item.quantity}`).join(", ")}
-                      </div>
+                     <div className="text-sm text-[#736067]">{warehouseMap.get(receipt.warehouseId) ?? `Warehouse ${receipt.warehouseId}`} / {branchMap.get(receipt.branchId) ?? `Branch ${receipt.branchId}`}</div>
+                     <div className="text-sm text-[#736067]">{new Date(receipt.receivedAt).toLocaleString()}</div>
+                     {receipt.lineItems.length > 0 ? (
+                       <div className="text-sm text-[#736067]">
+                         {receipt.lineItems.map((item) => `${productMap.get(item.productId) ?? `Product ${item.productId}`}: ${item.quantity}`).join(", ")}
+                       </div>
                     ) : null}
                   </div>
                   <div className="text-right text-sm text-[#736067]">
@@ -3423,13 +3429,13 @@ export default function Home() {
                 <div key={transfer.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
                   <div>
                     <div className="font-medium">Transfer {transfer.id}</div>
-                    <div className="text-sm text-[#736067]">From: Warehouse {transfer.fromWarehouseId} / Branch {transfer.fromBranchId}</div>
-                    <div className="text-sm text-[#736067]">To: Warehouse {transfer.toWarehouseId} / Branch {transfer.toBranchId}</div>
-                    <div className="text-sm text-[#736067]">Status: {transfer.status}</div>
-                    {transfer.lineItems.length > 0 ? (
-                      <div className="text-sm text-[#736067]">
-                        {transfer.lineItems.map((item) => `Product ${item.productId}: ${item.quantity}`).join(", ")}
-                      </div>
+                     <div className="text-sm text-[#736067]">From: {warehouseMap.get(transfer.fromWarehouseId) ?? `Warehouse ${transfer.fromWarehouseId}`} / {branchMap.get(transfer.fromBranchId) ?? `Branch ${transfer.fromBranchId}`}</div>
+                     <div className="text-sm text-[#736067]">To: {warehouseMap.get(transfer.toWarehouseId) ?? `Warehouse ${transfer.toWarehouseId}`} / {branchMap.get(transfer.toBranchId) ?? `Branch ${transfer.toBranchId}`}</div>
+                     <div className="text-sm text-[#736067]">Status: {transfer.status}</div>
+                     {transfer.lineItems.length > 0 ? (
+                       <div className="text-sm text-[#736067]">
+                         {transfer.lineItems.map((item) => `${productMap.get(item.productId) ?? `Product ${item.productId}`}: ${item.quantity}`).join(", ")}
+                       </div>
                     ) : null}
                   </div>
                   <div className="text-right text-sm text-[#736067]">
@@ -3500,11 +3506,11 @@ export default function Home() {
                 <div key={adjustment.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
                   <div>
                     <div className="font-medium">Adjustment {adjustment.id}</div>
-                    <div className="text-sm text-[#736067]">Branch {adjustment.branchId}</div>
-                    <div className="text-sm text-[#736067]">Direction: {adjustment.direction}</div>
-                    {adjustment.lineItems.length > 0 ? (
-                      <div className="text-sm text-[#736067]">
-                        {adjustment.lineItems.map((item) => `Product ${item.productId}: ${item.quantity}`).join(", ")}
+                     <div className="text-sm text-[#736067]">{branchMap.get(adjustment.branchId) ?? `Branch ${adjustment.branchId}`}</div>
+                     <div className="text-sm text-[#736067]">Direction: {adjustment.direction}</div>
+                     {adjustment.lineItems.length > 0 ? (
+                       <div className="text-sm text-[#736067]">
+                         {adjustment.lineItems.map((item) => `${productMap.get(item.productId) ?? `Product ${item.productId}`}: ${item.quantity}`).join(", ")}
                       </div>
                     ) : null}
                   </div>
