@@ -25,6 +25,7 @@
     "bootstrap:initial-notification-permissions": "tsx src/initial-notification-permissions-bootstrap-cli.ts",
     "bootstrap:initial-warehouse-permissions": "tsx src/initial-warehouse-permissions-bootstrap-cli.ts",
     "bootstrap:initial-supplier-permissions": "tsx src/initial-supplier-permissions-bootstrap-cli.ts",
+    "bootstrap:initial-reorder-rule-permissions": "tsx src/initial-reorder-rule-permissions-bootstrap-cli.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

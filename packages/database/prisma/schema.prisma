@@ -39,6 +39,7 @@ model Tenant {
   notificationLogs      NotificationLog[]
   warehouses            Warehouse[]
   suppliers             Supplier[]
+  reorderRules          ReorderRule[]
 
   @@index([isActive])
 }
@@ -112,6 +113,7 @@ model Branch {
   staff                 Staff[]
   stockItems            StockItem[]
   stockMovements        StockMovement[]
+  reorderRules          ReorderRule[]
 
   @@unique([tenantId, businessUnitId, id])
   @@unique([tenantId, id])
@@ -292,6 +294,7 @@ model Product {
   stockItems   StockItem[]
   movements    StockMovement[]
   invoiceLineItems InvoiceLineItem[]
+  reorderRules ReorderRule[]
 
   @@unique([tenantId, id])
   @@unique([tenantId, sku])
@@ -656,6 +659,8 @@ model Warehouse {
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
 
+  reorderRules ReorderRule[]
+
   @@unique([tenantId, id])
   @@unique([tenantId, name])
   @@index([tenantId, isActive])
@@ -677,5 +682,27 @@ model Supplier {
 
   @@unique([tenantId, id])
   @@unique([tenantId, name])
+  @@index([tenantId, isActive])
+}
+
+model ReorderRule {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @db.Uuid
+  productId      String   @db.Uuid
+  branchId       String   @db.Uuid
+  warehouseId    String   @db.Uuid
+  minQuantity    Int
+  reorderQuantity Int
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  product  Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
+  branch   Branch    @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, productId, branchId, warehouseId])
   @@index([tenantId, isActive])
 }
