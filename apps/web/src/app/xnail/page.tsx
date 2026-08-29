@@ -196,6 +196,16 @@ export default function Home() {
   const [reorderRuleWarehouseId, setReorderRuleWarehouseId] = useState("");
   const [reorderRuleMinQuantity, setReorderRuleMinQuantity] = useState("10");
   const [reorderRuleReorderQuantity, setReorderRuleReorderQuantity] = useState("50");
+  const [purchaseReceipts, setPurchaseReceipts] = useState<Array<{ id: string; supplierId: string | null; warehouseId: string; branchId: string; receivedBy: string | null; receivedAt: string; notes: string | null; lineItems: Array<{ id: string; productId: string; quantity: number }> }>>([]);
+  const [isLoadingPurchaseReceipts, setIsLoadingPurchaseReceipts] = useState(false);
+  const [purchaseReceiptError, setPurchaseReceiptError] = useState<string | null>(null);
+  const [purchaseReceiptSupplierId, setPurchaseReceiptSupplierId] = useState("");
+  const [purchaseReceiptWarehouseId, setPurchaseReceiptWarehouseId] = useState("");
+  const [purchaseReceiptBranchId, setPurchaseReceiptBranchId] = useState("");
+  const [purchaseReceiptReceivedBy, setPurchaseReceiptReceivedBy] = useState("");
+  const [purchaseReceiptNotes, setPurchaseReceiptNotes] = useState("");
+  const [purchaseReceiptProductId, setPurchaseReceiptProductId] = useState("");
+  const [purchaseReceiptQuantity, setPurchaseReceiptQuantity] = useState("1");
   const [staff, setStaff] = useState<StaffRecord[]>([]);
   const [isLoadingStaff, setIsLoadingStaff] = useState(false);
   const [staffError, setStaffError] = useState<string | null>(null);
@@ -941,6 +951,48 @@ export default function Home() {
         }
       });
 
+    void fetch("/api/purchase-receipts", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        if (result.status === 401) {
+          setPurchaseReceipts([]);
+          return;
+        }
+        if (result.status === 403) {
+          setPurchaseReceipts([]);
+          setPurchaseReceiptError("You are not authorized to view purchase receipts.");
+          return;
+        }
+        if (!result.ok) {
+          throw new Error("Purchase receipt list request failed");
+        }
+        const body = await result.json() as {
+          purchaseReceipts?: Array<{
+            id: string;
+            supplierId: string | null;
+            warehouseId: string;
+            branchId: string;
+            receivedBy: string | null;
+            receivedAt: string;
+            notes: string | null;
+            lineItems: Array<{ id: string; productId: string; quantity: number }>;
+          }>;
+        };
+        const loadedPurchaseReceipts = Array.isArray(body.purchaseReceipts) ? body.purchaseReceipts : [];
+        setPurchaseReceipts(loadedPurchaseReceipts);
+      })
+      .catch(() => {
+        if (mounted) {
+          setPurchaseReceipts([]);
+          setPurchaseReceiptError("Purchase receipts could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setIsLoadingPurchaseReceipts(false);
+        }
+      });
+
     return () => {
       mounted = false;
       window.clearTimeout(loadingTimer);
@@ -1659,6 +1711,50 @@ export default function Home() {
     setReorderRuleWarehouseId("");
     setReorderRuleMinQuantity("10");
     setReorderRuleReorderQuantity("50");
+  };
+
+  const addPurchaseReceipt = async () => {
+    if (!purchaseReceiptWarehouseId.trim() || !purchaseReceiptBranchId.trim() || !purchaseReceiptProductId.trim()) return;
+    setPurchaseReceiptError(null);
+    const result = await fetch("/api/purchase-receipts", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        supplierId: purchaseReceiptSupplierId || null,
+        warehouseId: purchaseReceiptWarehouseId,
+        branchId: purchaseReceiptBranchId,
+        receivedBy: purchaseReceiptReceivedBy || null,
+        notes: purchaseReceiptNotes || null,
+        items: [
+          { productId: purchaseReceiptProductId, quantity: Number(purchaseReceiptQuantity) || 1 },
+        ],
+      }),
+    });
+    if (result.status === 401) {
+      setPurchaseReceipts([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setPurchaseReceipts([]);
+      setPurchaseReceiptError("You are not authorized to create purchase receipts.");
+      return;
+    }
+    if (!result.ok) {
+      const body = await result.json().catch(() => ({}));
+      setPurchaseReceiptError(body?.error ?? "Purchase receipt could not be saved.");
+      return;
+    }
+    const body = await result.json() as { purchaseReceipt: { id: string; supplierId: string | null; warehouseId: string; branchId: string; receivedBy: string | null; receivedAt: string; notes: string | null; lineItems: Array<{ id: string; productId: string; quantity: number }> } };
+    setPurchaseReceipts((current) => [body.purchaseReceipt, ...current]);
+    setPurchaseReceiptSupplierId("");
+    setPurchaseReceiptWarehouseId("");
+    setPurchaseReceiptBranchId("");
+    setPurchaseReceiptReceivedBy("");
+    setPurchaseReceiptNotes("");
+    setPurchaseReceiptProductId("");
+    setPurchaseReceiptQuantity("1");
   };
 
   const addStaff = async () => {
@@ -2839,6 +2935,88 @@ export default function Home() {
             </div>
           </section>
         ) : null}
+
+        <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+            <h2 className="text-xl font-semibold">Purchase Receipts</h2>
+            <div className="mt-4 space-y-3">
+              {isLoadingPurchaseReceipts ? <div className="text-sm text-[#736067]">Loading purchase receipts...</div> : null}
+              {!isLoadingPurchaseReceipts && purchaseReceiptError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{purchaseReceiptError}</div> : null}
+              {!isLoadingPurchaseReceipts && !purchaseReceiptError && purchaseReceipts.length === 0 ? <div className="text-sm text-[#736067]">No purchase receipts yet.</div> : null}
+              {purchaseReceipts.map((receipt) => (
+                <div key={receipt.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                  <div>
+                    <div className="font-medium">Receipt {receipt.id}</div>
+                    <div className="text-sm text-[#736067]">Warehouse {receipt.warehouseId} / Branch {receipt.branchId}</div>
+                    <div className="text-sm text-[#736067]">{new Date(receipt.receivedAt).toLocaleString()}</div>
+                    {receipt.lineItems.length > 0 ? (
+                      <div className="text-sm text-[#736067]">
+                        {receipt.lineItems.map((item) => `Product ${item.productId}: ${item.quantity}`).join(", ")}
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="text-right text-sm text-[#736067]">
+                    <div>{receipt.supplierId ? `Supplier ${receipt.supplierId}` : "No supplier"}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+            <h2 className="text-xl font-semibold">Record purchase receipt</h2>
+            <div className="mt-4 space-y-3">
+              <input
+                value={purchaseReceiptSupplierId}
+                onChange={(event) => setPurchaseReceiptSupplierId(event.target.value)}
+                placeholder="Supplier ID (optional)"
+                className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+              />
+              <input
+                value={purchaseReceiptWarehouseId}
+                onChange={(event) => setPurchaseReceiptWarehouseId(event.target.value)}
+                placeholder="Warehouse ID"
+                className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+              />
+              <input
+                value={purchaseReceiptBranchId}
+                onChange={(event) => setPurchaseReceiptBranchId(event.target.value)}
+                placeholder="Branch ID"
+                className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+              />
+              <input
+                value={purchaseReceiptReceivedBy}
+                onChange={(event) => setPurchaseReceiptReceivedBy(event.target.value)}
+                placeholder="Received by (optional)"
+                className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+              />
+              <input
+                value={purchaseReceiptProductId}
+                onChange={(event) => setPurchaseReceiptProductId(event.target.value)}
+                placeholder="Product ID"
+                className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+              />
+              <input
+                value={purchaseReceiptQuantity}
+                onChange={(event) => setPurchaseReceiptQuantity(event.target.value)}
+                placeholder="Quantity"
+                className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+              />
+              <input
+                value={purchaseReceiptNotes}
+                onChange={(event) => setPurchaseReceiptNotes(event.target.value)}
+                placeholder="Notes (optional)"
+                className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+              />
+              <button
+                onClick={addPurchaseReceipt}
+                className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+              >
+                Save purchase receipt
+              </button>
+            </div>
+          </div>
+        </section>
 
         {activeTab === "Billing" ? (
           <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">

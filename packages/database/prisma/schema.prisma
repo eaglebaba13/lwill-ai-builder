@@ -40,6 +40,7 @@ model Tenant {
   warehouses            Warehouse[]
   suppliers             Supplier[]
   reorderRules          ReorderRule[]
+  purchaseReceipts      PurchaseReceipt[]
 
   @@index([isActive])
 }
@@ -114,6 +115,7 @@ model Branch {
   stockItems            StockItem[]
   stockMovements        StockMovement[]
   reorderRules          ReorderRule[]
+  purchaseReceipts      PurchaseReceipt[]
 
   @@unique([tenantId, businessUnitId, id])
   @@unique([tenantId, id])
@@ -295,6 +297,7 @@ model Product {
   movements    StockMovement[]
   invoiceLineItems InvoiceLineItem[]
   reorderRules ReorderRule[]
+  purchaseReceiptLineItems PurchaseReceiptLineItem[]
 
   @@unique([tenantId, id])
   @@unique([tenantId, sku])
@@ -660,6 +663,7 @@ model Warehouse {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
 
   reorderRules ReorderRule[]
+  purchaseReceipts PurchaseReceipt[]
 
   @@unique([tenantId, id])
   @@unique([tenantId, name])
@@ -679,6 +683,8 @@ model Supplier {
   updatedAt   DateTime @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  purchaseReceipts PurchaseReceipt[]
 
   @@unique([tenantId, id])
   @@unique([tenantId, name])
@@ -705,4 +711,40 @@ model ReorderRule {
   @@unique([tenantId, id])
   @@unique([tenantId, productId, branchId, warehouseId])
   @@index([tenantId, isActive])
+}
+
+model PurchaseReceipt {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @db.Uuid
+  supplierId  String?  @db.Uuid
+  warehouseId String   @db.Uuid
+  branchId    String   @db.Uuid
+  receivedBy  String?
+  receivedAt  DateTime @default(now())
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  supplier   Supplier?  @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  warehouse  Warehouse  @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  branch     Branch     @relation(fields: [tenantId, branchId], references: [tenantId, id], onDelete: Restrict)
+  lineItems  PurchaseReceiptLineItem[]
+
+  @@unique([tenantId, id])
+  @@index([tenantId, receivedAt])
+}
+
+model PurchaseReceiptLineItem {
+  id               String   @id @default(uuid()) @db.Uuid
+  tenantId         String   @db.Uuid
+  purchaseReceiptId String   @db.Uuid
+  productId        String   @db.Uuid
+  quantity         Int
+
+  purchaseReceipt PurchaseReceipt @relation(fields: [purchaseReceiptId], references: [id], onDelete: Cascade)
+  product         Product          @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, id])
+  @@index([tenantId, purchaseReceiptId])
 }
