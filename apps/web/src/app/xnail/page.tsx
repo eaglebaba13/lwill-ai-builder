@@ -288,6 +288,9 @@ export default function Home() {
   const [membershipReport, setMembershipReport] = useState<Array<{ status: string; count: number; packageBreakdown: Array<{ packageId: string; packageName: string; count: number }> }>>([]);
   const [isLoadingMembershipReport, setIsLoadingMembershipReport] = useState(false);
   const [membershipReportError, setMembershipReportError] = useState<string | null>(null);
+  const [packageUtilizationReport, setPackageUtilizationReport] = useState<Array<{ packageId: string; packageName: string; totalMemberships: number; activeMemberships: number }>>([]);
+  const [isLoadingPackageUtilizationReport, setIsLoadingPackageUtilizationReport] = useState(false);
+  const [packageUtilizationReportError, setPackageUtilizationReportError] = useState<string | null>(null);
 
   const customerMap = new Map(customers.map((customer) => [customer.id, customer.name]));
   const productMap = new Map(products.map((product) => [product.id, product.name]));
@@ -1674,6 +1677,39 @@ export default function Home() {
       .finally(() => {
         if (mounted) {
           setIsLoadingMembershipReport(false);
+        }
+      });
+
+    void fetch("/api/reports/package-utilization", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        if (result.status === 401) {
+          setPackageUtilizationReport([]);
+          return;
+        }
+        if (result.status === 403) {
+          setPackageUtilizationReport([]);
+          setPackageUtilizationReportError("You are not authorized to view package utilization reports.");
+          return;
+        }
+        if (!result.ok) {
+          throw new Error("Package utilization report request failed");
+        }
+        const body = await result.json() as {
+          packageUtilizationReport?: Array<{ packageId: string; packageName: string; totalMemberships: number; activeMemberships: number }>;
+        };
+        const loadedPackageUtilizationReport = Array.isArray(body.packageUtilizationReport) ? body.packageUtilizationReport : [];
+        setPackageUtilizationReport(loadedPackageUtilizationReport);
+      })
+      .catch(() => {
+        if (mounted) {
+          setPackageUtilizationReport([]);
+          setPackageUtilizationReportError("Package utilization report could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setIsLoadingPackageUtilizationReport(false);
         }
       });
 
@@ -4160,6 +4196,24 @@ export default function Home() {
                             </div>
                           ))}
                         </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            {isLoadingPackageUtilizationReport ? <div className="text-sm text-[#736067]">Loading package utilization...</div> : null}
+            {!isLoadingPackageUtilizationReport && packageUtilizationReportError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{packageUtilizationReportError}</div> : null}
+            {!isLoadingPackageUtilizationReport && !packageUtilizationReportError && packageUtilizationReport.length === 0 ? <div className="text-sm text-[#736067]">No package utilization data yet.</div> : null}
+            {packageUtilizationReport.length > 0 ? (
+              <div className="mt-6 rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+                <h2 className="text-xl font-semibold">Package Utilization</h2>
+                <div className="mt-4 space-y-3">
+                  {packageUtilizationReport.map((item) => (
+                    <div key={item.packageId} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                      <div>
+                        <div className="font-medium">{item.packageName}</div>
+                        <div className="text-sm text-[#736067]">{item.totalMemberships} total / {item.activeMemberships} active</div>
                       </div>
                     </div>
                   ))}

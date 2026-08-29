@@ -44,6 +44,12 @@ export interface ReportService {
       readonly count: number;
     }>;
   }>>;
+  listPackageUtilizationReport(args: { tenantId: string }): Promise<ReadonlyArray<{
+    readonly packageId: string;
+    readonly packageName: string;
+    readonly totalMemberships: number;
+    readonly activeMemberships: number;
+  }>>;
 }
 
 interface ReportPrismaClient {
@@ -63,11 +69,11 @@ interface ReportPrismaClient {
   readonly stockMovement: {
     count(args: { where: Record<string, unknown> }): Promise<number>;
   };
-  readonly membership: {
-    findMany(args: { where?: Record<string, unknown>; select?: Record<string, unknown> }): Promise<ReadonlyArray<{ readonly status: string; readonly packageId: string }>>;
-  };
   readonly package: {
     findMany(args: { where?: Record<string, unknown>; select?: Record<string, unknown> }): Promise<ReadonlyArray<{ readonly id: string; readonly name: string }>>;
+  };
+  readonly membership: {
+    findMany(args: { where?: Record<string, unknown>; select?: Record<string, unknown> }): Promise<ReadonlyArray<{ readonly status: string; readonly packageId: string }>>;
   };
 }
 
@@ -211,6 +217,38 @@ export function createReportService(prisma: ReportPrismaClient): ReportService {
           packageName: packageName,
           count,
         })),
+      }));
+    },
+
+    async listPackageUtilizationReport({ tenantId }) {
+      const [memberships, packages] = await Promise.all([
+        prisma.membership.findMany({
+          where: { tenantId },
+          select: { packageId: true, status: true },
+        }),
+        prisma.package.findMany({
+          where: { tenantId },
+          select: { id: true, name: true },
+        }),
+      ]);
+
+      const packageMap = new Map(packages.map((pkg) => [pkg.id, pkg.name]));
+      const utilizationMap = new Map<string, { total: number; active: number }>();
+
+      for (const membership of memberships) {
+        const entry = utilizationMap.get(membership.packageId) ?? { total: 0, active: 0 };
+        entry.total += 1;
+        if (membership.status === "active" || membership.status === "Active") {
+          entry.active += 1;
+        }
+        utilizationMap.set(membership.packageId, entry);
+      }
+
+      return Array.from(utilizationMap.entries()).map(([packageId, entry]) => ({
+        packageId,
+        packageName: packageMap.get(packageId) ?? "Unknown",
+        totalMemberships: entry.total,
+        activeMemberships: entry.active,
       }));
     },
   };
