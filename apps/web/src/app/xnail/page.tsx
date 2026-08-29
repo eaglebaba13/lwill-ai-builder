@@ -206,6 +206,22 @@ export default function Home() {
   const [purchaseReceiptNotes, setPurchaseReceiptNotes] = useState("");
   const [purchaseReceiptProductId, setPurchaseReceiptProductId] = useState("");
   const [purchaseReceiptQuantity, setPurchaseReceiptQuantity] = useState("1");
+  const [stockTransfers, setStockTransfers] = useState<Array<{ id: string; fromWarehouseId: string; toWarehouseId: string; fromBranchId: string; toBranchId: string; status: string; notes: string | null; lineItems: Array<{ id: string; productId: string; quantity: number }> }>>([]);
+  const [isLoadingStockTransfers, setIsLoadingStockTransfers] = useState(false);
+  const [stockTransferError, setStockTransferError] = useState<string | null>(null);
+  const [stockTransferFromWarehouseId, setStockTransferFromWarehouseId] = useState("");
+  const [stockTransferToWarehouseId, setStockTransferToWarehouseId] = useState("");
+  const [stockTransferFromBranchId, setStockTransferFromBranchId] = useState("");
+  const [stockTransferToBranchId, setStockTransferToBranchId] = useState("");
+  const [stockTransferProductId, setStockTransferProductId] = useState("");
+  const [stockTransferQuantity, setStockTransferQuantity] = useState("1");
+  const [stockAdjustments, setStockAdjustments] = useState<Array<{ id: string; branchId: string; direction: string; notes: string | null; lineItems: Array<{ id: string; productId: string; quantity: number }> }>>([]);
+  const [isLoadingStockAdjustments, setIsLoadingStockAdjustments] = useState(false);
+  const [stockAdjustmentError, setStockAdjustmentError] = useState<string | null>(null);
+  const [stockAdjustmentBranchId, setStockAdjustmentBranchId] = useState("");
+  const [stockAdjustmentDirection, setStockAdjustmentDirection] = useState("IN");
+  const [stockAdjustmentProductId, setStockAdjustmentProductId] = useState("");
+  const [stockAdjustmentQuantity, setStockAdjustmentQuantity] = useState("1");
   const [staff, setStaff] = useState<StaffRecord[]>([]);
   const [isLoadingStaff, setIsLoadingStaff] = useState(false);
   const [staffError, setStaffError] = useState<string | null>(null);
@@ -993,6 +1009,87 @@ export default function Home() {
         }
       });
 
+    void fetch("/api/stock-transfers", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        if (result.status === 401) {
+          setStockTransfers([]);
+          return;
+        }
+        if (result.status === 403) {
+          setStockTransfers([]);
+          setStockTransferError("You are not authorized to view stock transfers.");
+          return;
+        }
+        if (!result.ok) {
+          throw new Error("Stock transfer list request failed");
+        }
+        const body = await result.json() as {
+          stockTransfers?: Array<{
+            id: string;
+            fromWarehouseId: string;
+            toWarehouseId: string;
+            fromBranchId: string;
+            toBranchId: string;
+            status: string;
+            notes: string | null;
+            lineItems: Array<{ id: string; productId: string; quantity: number }>;
+          }>;
+        };
+        const loadedStockTransfers = Array.isArray(body.stockTransfers) ? body.stockTransfers : [];
+        setStockTransfers(loadedStockTransfers);
+      })
+      .catch(() => {
+        if (mounted) {
+          setStockTransfers([]);
+          setStockTransferError("Stock transfers could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setIsLoadingStockTransfers(false);
+        }
+      });
+
+    void fetch("/api/stock-adjustments", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        if (result.status === 401) {
+          setStockAdjustments([]);
+          return;
+        }
+        if (result.status === 403) {
+          setStockAdjustments([]);
+          setStockAdjustmentError("You are not authorized to view stock adjustments.");
+          return;
+        }
+        if (!result.ok) {
+          throw new Error("Stock adjustment list request failed");
+        }
+        const body = await result.json() as {
+          stockAdjustments?: Array<{
+            id: string;
+            branchId: string;
+            direction: string;
+            notes: string | null;
+            lineItems: Array<{ id: string; productId: string; quantity: number }>;
+          }>;
+        };
+        const loadedStockAdjustments = Array.isArray(body.stockAdjustments) ? body.stockAdjustments : [];
+        setStockAdjustments(loadedStockAdjustments);
+      })
+      .catch(() => {
+        if (mounted) {
+          setStockAdjustments([]);
+          setStockAdjustmentError("Stock adjustments could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setIsLoadingStockAdjustments(false);
+        }
+      });
+
     return () => {
       mounted = false;
       window.clearTimeout(loadingTimer);
@@ -1755,6 +1852,86 @@ export default function Home() {
     setPurchaseReceiptNotes("");
     setPurchaseReceiptProductId("");
     setPurchaseReceiptQuantity("1");
+  };
+
+  const addStockTransfer = async () => {
+    if (!stockTransferFromWarehouseId.trim() || !stockTransferToWarehouseId.trim() || !stockTransferFromBranchId.trim() || !stockTransferToBranchId.trim() || !stockTransferProductId.trim()) return;
+    setStockTransferError(null);
+    const result = await fetch("/api/stock-transfers", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        fromWarehouseId: stockTransferFromWarehouseId,
+        toWarehouseId: stockTransferToWarehouseId,
+        fromBranchId: stockTransferFromBranchId,
+        toBranchId: stockTransferToBranchId,
+        items: [
+          { productId: stockTransferProductId, quantity: Number(stockTransferQuantity) || 1 },
+        ],
+      }),
+    });
+    if (result.status === 401) {
+      setStockTransfers([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setStockTransfers([]);
+      setStockTransferError("You are not authorized to create stock transfers.");
+      return;
+    }
+    if (!result.ok) {
+      const body = await result.json().catch(() => ({}));
+      setStockTransferError(body?.error ?? "Stock transfer could not be saved.");
+      return;
+    }
+    const body = await result.json() as { stockTransfer: { id: string; fromWarehouseId: string; toWarehouseId: string; fromBranchId: string; toBranchId: string; status: string; notes: string | null; lineItems: Array<{ id: string; productId: string; quantity: number }> } };
+    setStockTransfers((current) => [body.stockTransfer, ...current]);
+    setStockTransferFromWarehouseId("");
+    setStockTransferToWarehouseId("");
+    setStockTransferFromBranchId("");
+    setStockTransferToBranchId("");
+    setStockTransferProductId("");
+    setStockTransferQuantity("1");
+  };
+
+  const addStockAdjustment = async () => {
+    if (!stockAdjustmentBranchId.trim() || !stockAdjustmentProductId.trim()) return;
+    setStockAdjustmentError(null);
+    const result = await fetch("/api/stock-adjustments", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        branchId: stockAdjustmentBranchId,
+        direction: stockAdjustmentDirection,
+        items: [
+          { productId: stockAdjustmentProductId, quantity: Number(stockAdjustmentQuantity) || 1 },
+        ],
+      }),
+    });
+    if (result.status === 401) {
+      setStockAdjustments([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setStockAdjustments([]);
+      setStockAdjustmentError("You are not authorized to create stock adjustments.");
+      return;
+    }
+    if (!result.ok) {
+      const body = await result.json().catch(() => ({}));
+      setStockAdjustmentError(body?.error ?? "Stock adjustment could not be saved.");
+      return;
+    }
+    const body = await result.json() as { stockAdjustment: { id: string; branchId: string; direction: string; notes: string | null; lineItems: Array<{ id: string; productId: string; quantity: number }> } };
+    setStockAdjustments((current) => [body.stockAdjustment, ...current]);
+    setStockAdjustmentBranchId("");
+    setStockAdjustmentDirection("IN");
+    setStockAdjustmentProductId("");
+    setStockAdjustmentQuantity("1");
   };
 
   const addStaff = async () => {
@@ -3013,6 +3190,149 @@ export default function Home() {
                 className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
               >
                 Save purchase receipt
+              </button>
+            </div>
+          </div>
+          </section>
+
+        <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+            <h2 className="text-xl font-semibold">Stock Transfers</h2>
+            <div className="mt-4 space-y-3">
+              {isLoadingStockTransfers ? <div className="text-sm text-[#736067]">Loading stock transfers...</div> : null}
+              {!isLoadingStockTransfers && stockTransferError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{stockTransferError}</div> : null}
+              {!isLoadingStockTransfers && !stockTransferError && stockTransfers.length === 0 ? <div className="text-sm text-[#736067]">No stock transfers yet.</div> : null}
+              {stockTransfers.map((transfer) => (
+                <div key={transfer.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                  <div>
+                    <div className="font-medium">Transfer {transfer.id}</div>
+                    <div className="text-sm text-[#736067]">From: Warehouse {transfer.fromWarehouseId} / Branch {transfer.fromBranchId}</div>
+                    <div className="text-sm text-[#736067]">To: Warehouse {transfer.toWarehouseId} / Branch {transfer.toBranchId}</div>
+                    <div className="text-sm text-[#736067]">Status: {transfer.status}</div>
+                    {transfer.lineItems.length > 0 ? (
+                      <div className="text-sm text-[#736067]">
+                        {transfer.lineItems.map((item) => `Product ${item.productId}: ${item.quantity}`).join(", ")}
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="text-right text-sm text-[#736067]">
+                    <div>{transfer.notes ?? "—"}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+            <h2 className="text-xl font-semibold">Create stock transfer</h2>
+            <div className="mt-4 space-y-3">
+              <input
+                value={stockTransferFromWarehouseId}
+                onChange={(event) => setStockTransferFromWarehouseId(event.target.value)}
+                placeholder="From Warehouse ID"
+                className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+              />
+              <input
+                value={stockTransferToWarehouseId}
+                onChange={(event) => setStockTransferToWarehouseId(event.target.value)}
+                placeholder="To Warehouse ID"
+                className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+              />
+              <input
+                value={stockTransferFromBranchId}
+                onChange={(event) => setStockTransferFromBranchId(event.target.value)}
+                placeholder="From Branch ID"
+                className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+              />
+              <input
+                value={stockTransferToBranchId}
+                onChange={(event) => setStockTransferToBranchId(event.target.value)}
+                placeholder="To Branch ID"
+                className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+              />
+              <input
+                value={stockTransferProductId}
+                onChange={(event) => setStockTransferProductId(event.target.value)}
+                placeholder="Product ID"
+                className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+              />
+              <input
+                value={stockTransferQuantity}
+                onChange={(event) => setStockTransferQuantity(event.target.value)}
+                placeholder="Quantity"
+                className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+              />
+              <button
+                onClick={addStockTransfer}
+                className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+              >
+                Save stock transfer
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+            <h2 className="text-xl font-semibold">Stock Adjustments</h2>
+            <div className="mt-4 space-y-3">
+              {isLoadingStockAdjustments ? <div className="text-sm text-[#736067]">Loading stock adjustments...</div> : null}
+              {!isLoadingStockAdjustments && stockAdjustmentError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{stockAdjustmentError}</div> : null}
+              {!isLoadingStockAdjustments && !stockAdjustmentError && stockAdjustments.length === 0 ? <div className="text-sm text-[#736067]">No stock adjustments yet.</div> : null}
+              {stockAdjustments.map((adjustment) => (
+                <div key={adjustment.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                  <div>
+                    <div className="font-medium">Adjustment {adjustment.id}</div>
+                    <div className="text-sm text-[#736067]">Branch {adjustment.branchId}</div>
+                    <div className="text-sm text-[#736067]">Direction: {adjustment.direction}</div>
+                    {adjustment.lineItems.length > 0 ? (
+                      <div className="text-sm text-[#736067]">
+                        {adjustment.lineItems.map((item) => `Product ${item.productId}: ${item.quantity}`).join(", ")}
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="text-right text-sm text-[#736067]">
+                    <div>{adjustment.notes ?? "—"}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+            <h2 className="text-xl font-semibold">Record stock adjustment</h2>
+            <div className="mt-4 space-y-3">
+              <input
+                value={stockAdjustmentBranchId}
+                onChange={(event) => setStockAdjustmentBranchId(event.target.value)}
+                placeholder="Branch ID"
+                className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+              />
+              <select
+                value={stockAdjustmentDirection}
+                onChange={(event) => setStockAdjustmentDirection(event.target.value)}
+                className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+              >
+                <option value="IN">Stock In (+)</option>
+                <option value="OUT">Stock Out (-)</option>
+              </select>
+              <input
+                value={stockAdjustmentProductId}
+                onChange={(event) => setStockAdjustmentProductId(event.target.value)}
+                placeholder="Product ID"
+                className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+              />
+              <input
+                value={stockAdjustmentQuantity}
+                onChange={(event) => setStockAdjustmentQuantity(event.target.value)}
+                placeholder="Quantity"
+                className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+              />
+              <button
+                onClick={addStockAdjustment}
+                className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+              >
+                Save stock adjustment
               </button>
             </div>
           </div>
