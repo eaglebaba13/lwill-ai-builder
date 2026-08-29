@@ -90,7 +90,7 @@ function toLocalAppointment(apiRecord: {
   };
 }
 
-const tabs = ["Overview", "Customers", "Services", "Packages", "Memberships", "Inventory", "Staff", "Attendance", "Appointments", "Billing", "Branches"] as const;
+const tabs = ["Overview", "Customers", "Services", "Packages", "Memberships", "Inventory", "Staff", "Attendance", "Appointments", "Billing", "Branches", "Reports"] as const;
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<(typeof tabs)[number]>("Overview");
@@ -2619,6 +2619,67 @@ export default function Home() {
                   <div className="mt-2 font-medium">{step}</div>
                 </div>
               ))}
+            </div>
+          </section>
+        ) : null}
+
+        {activeTab === "Reports" ? (
+          <section className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
+              <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Customers</div>
+              <div className="mt-2 text-3xl font-semibold">{customers.length}</div>
+            </div>
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
+              <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Services</div>
+              <div className="mt-2 text-3xl font-semibold">{services.length}</div>
+            </div>
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
+              <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Appointments</div>
+              <div className="mt-2 text-3xl font-semibold">{appointments.length}</div>
+            </div>
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
+              <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Invoices</div>
+              <div className="mt-2 text-3xl font-semibold">{invoices.length}</div>
+            </div>
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
+              <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Revenue</div>
+              <div className="mt-2 text-3xl font-semibold">₹{invoices.reduce((sum, invoice) => sum + invoice.totalCents, 0) / 100}</div>
+            </div>
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
+              <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Products</div>
+              <div className="mt-2 text-3xl font-semibold">{products.length}</div>
+            </div>
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
+              <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Staff</div>
+              <div className="mt-2 text-3xl font-semibold">{staff.length}</div>
+            </div>
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
+              <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Packages</div>
+              <div className="mt-2 text-3xl font-semibold">{packages.length}</div>
+            </div>
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
+              <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Memberships</div>
+              <div className="mt-2 text-3xl font-semibold">{memberships.length}</div>
+            </div>
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
+              <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Stock Items</div>
+              <div className="mt-2 text-3xl font-semibold">{stockItems.length}</div>
+            </div>
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
+              <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Movements</div>
+              <div className="mt-2 text-3xl font-semibold">{stockMovements.length}</div>
+            </div>
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
+              <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Business Units</div>
+              <div className="mt-2 text-3xl font-semibold">{businessUnits.length}</div>
+            </div>
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
+              <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Branches</div>
+              <div className="mt-2 text-3xl font-semibold">{branches.length}</div>
+            </div>
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
+              <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Categories</div>
+              <div className="mt-2 text-3xl font-semibold">{categories.length}</div>
             </div>
           </section>
         ) : null}
