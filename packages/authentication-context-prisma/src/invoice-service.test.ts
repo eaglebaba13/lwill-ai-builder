@@ -304,4 +304,92 @@ describe("billing invoice service", () => {
 
     expect(invoice.id).toBe("invoice-1");
   });
+
+  it("creates an invoice with mixed product, service, and package line items", async () => {
+    const invoiceService = createBillingInvoiceService({
+      invoice: {
+        create: async ({ data }: { data: Record<string, unknown> }) => ({ id: "invoice-1", ...data }),
+        findUnique: async () => null,
+        findMany: async () => [],
+      },
+      invoiceLineItem: {
+        create: async ({ data }: { data: Record<string, unknown> }) => ({ id: "line-1", ...data }),
+        findMany: async () => [],
+      },
+      customer: {
+        findUnique: async () => ({ id: "customer-1", tenantId: "tenant-1" }),
+      },
+      service: {
+        findUnique: async () => ({ id: "service-1", tenantId: "tenant-1" }),
+      },
+      package: {
+        findUnique: async () => ({ id: "pkg-1", tenantId: "tenant-1" }),
+      },
+      product: {
+        findUnique: async () => ({ id: "product-1", tenantId: "tenant-1" }),
+      },
+      stockItem: {
+        findFirst: async () => ({ id: "stock-item-1", quantity: 10 }),
+        create: async () => ({ id: "stock-item-1" }),
+        update: async () => ({ id: "stock-item-1" }),
+      },
+      stockMovement: {
+        create: async () => ({ id: "movement-1" }),
+      },
+      branch: {
+        findUnique: async () => ({ id: "branch-1", tenantId: "tenant-1" }),
+      },
+      $transaction: async (callback: (client: unknown) => Promise<unknown>) =>
+        callback({
+          invoice: {
+            create: async ({ data }: { data: Record<string, unknown> }) => ({ id: "invoice-1", ...data }),
+            findUnique: async () => null,
+            findMany: async () => [],
+          },
+          invoiceLineItem: {
+            create: async ({ data }: { data: Record<string, unknown> }) => ({ id: "line-1", ...data }),
+            findMany: async () => [],
+          },
+          customer: {
+            findUnique: async () => ({ id: "customer-1", tenantId: "tenant-1" }),
+          },
+          service: {
+            findUnique: async () => ({ id: "service-1", tenantId: "tenant-1" }),
+          },
+          package: {
+            findUnique: async () => ({ id: "pkg-1", tenantId: "tenant-1" }),
+          },
+          product: {
+            findUnique: async () => ({ id: "product-1", tenantId: "tenant-1" }),
+          },
+          stockItem: {
+            findFirst: async () => ({ id: "stock-item-1", quantity: 10 }),
+            create: async () => ({ id: "stock-item-1" }),
+            update: async () => ({ id: "stock-item-1" }),
+          },
+          stockMovement: {
+            create: async () => ({ id: "movement-1" }),
+          },
+          branch: {
+            findUnique: async () => ({ id: "branch-1", tenantId: "tenant-1" }),
+          },
+        } as unknown),
+    } as never);
+
+    const invoice = await invoiceService.createInvoice({
+      tenantId: "tenant-1",
+      customerId: "customer-1",
+      issuedAt: new Date("2026-08-12T10:00:00.000Z"),
+      branchId: "branch-1",
+      items: [
+        { description: "Service", serviceId: "service-1", quantity: 1, unitPriceCents: 1500 },
+        { description: "Product", productId: "product-1", quantity: 2, unitPriceCents: 500 },
+        { description: "Package", packageId: "pkg-1", quantity: 1, unitPriceCents: 2500 },
+      ],
+    });
+
+    expect(invoice.id).toBe("invoice-1");
+    expect(invoice.subtotalCents).toBe(5000);
+    expect(invoice.totalCents).toBe(5000);
+  });
 });

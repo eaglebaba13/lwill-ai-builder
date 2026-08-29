@@ -9,6 +9,7 @@ export interface InvoiceLineItemWriteInput {
   readonly description: string;
   readonly serviceId?: string | null;
   readonly packageId?: string | null;
+  readonly productId?: string | null;
   readonly quantity: number;
   readonly unitPriceCents: number;
 }
@@ -78,7 +79,7 @@ function parseLineItem(input: unknown): InvoiceLineItemWriteInput | null {
     return null;
   }
   const record = input as Record<string, unknown>;
-  const allowedKeys = new Set(["description", "serviceId", "packageId", "quantity", "unitPriceCents"]);
+  const allowedKeys = new Set(["description", "serviceId", "packageId", "productId", "quantity", "unitPriceCents"]);
   if (Object.keys(record).some((key) => !allowedKeys.has(key))) {
     return null;
   }
@@ -91,6 +92,9 @@ function parseLineItem(input: unknown): InvoiceLineItemWriteInput | null {
   if (!isOptionalString(record.packageId)) {
     return null;
   }
+  if (!isOptionalString(record.productId)) {
+    return null;
+  }
   if (!isNonNegativeInteger(record.quantity)) {
     return null;
   }
@@ -101,6 +105,7 @@ function parseLineItem(input: unknown): InvoiceLineItemWriteInput | null {
     description: record.description,
     serviceId: record.serviceId ?? null,
     packageId: record.packageId ?? null,
+    productId: record.productId ?? null,
     quantity: record.quantity,
     unitPriceCents: record.unitPriceCents,
   };

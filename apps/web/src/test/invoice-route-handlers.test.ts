@@ -257,6 +257,35 @@ describe("invoice route handlers: authorized operations", () => {
     expect((await handleCreateInvoice(request({ customerId: "cust-1", issuedAt: "2026-08-12T10:00:00.000Z", items: [{ description: "X", quantity: 1, unitPriceCents: 1000, serviceId: 123 }] }), services)).status).toBe(400);
   });
 
+  it("accepts productId in line items for product sales", async () => {
+    const services = createServices(authorized);
+    const result = await handleCreateInvoice(
+      request({
+        customerId: "cust-1",
+        issuedAt: "2026-08-12T10:00:00.000Z",
+        items: [
+          { description: "Nail polish", productId: "product-1", quantity: 2, unitPriceCents: 500 },
+        ],
+      }),
+      services,
+    );
+    expect(result.status).toBe(201);
+    expect(services.createInvoice).toHaveBeenCalledWith(
+      "tenant-1",
+      "branch-1",
+      expect.objectContaining({
+        items: expect.arrayContaining([
+          expect.objectContaining({ productId: "product-1", quantity: 2 }),
+        ]),
+      }),
+    );
+  });
+
+  it("rejects invalid productId type in line items", async () => {
+    const services = createServices(authorized);
+    expect((await handleCreateInvoice(request({ customerId: "cust-1", issuedAt: "2026-08-12T10:00:00.000Z", items: [{ description: "X", productId: 123, quantity: 1, unitPriceCents: 1000 }] }), services)).status).toBe(400);
+  });
+
   it("rejects create with invalid discountCents and gstCents", async () => {
     const services = createServices(authorized);
     expect((await handleCreateInvoice(request({ customerId: "cust-1", issuedAt: "2026-08-12T10:00:00.000Z", items: [{ description: "X", quantity: 1, unitPriceCents: 1000 }], discountCents: -1 }), services)).status).toBe(400);

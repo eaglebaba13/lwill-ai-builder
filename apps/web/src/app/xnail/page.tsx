@@ -134,15 +134,13 @@ export default function Home() {
   const [isLoadingInvoices, setIsLoadingInvoices] = useState(false);
   const [invoiceError, setInvoiceError] = useState<string | null>(null);
   const [invoiceCustomerId, setInvoiceCustomerId] = useState("");
-  const [invoiceIssuedAt, setInvoiceIssuedAt] = useState(
-    new Date().toISOString(),
-  );
-  const [invoiceDescription, setInvoiceDescription] = useState("");
-  const [invoiceQuantity, setInvoiceQuantity] = useState("1");
-  const [invoiceUnitPrice, setInvoiceUnitPrice] = useState("1500");
-  const [invoiceDiscount, setInvoiceDiscount] = useState("0");
-  const [invoiceGst, setInvoiceGst] = useState("0");
   const [invoiceNotes, setInvoiceNotes] = useState("");
+  const [cartItems, setCartItems] = useState<Array<{ id: string; type: "product" | "service" | "package"; itemId: string; description: string; unitPriceCents: number; quantity: number }>>([]);
+  const [cartItemType, setCartItemType] = useState<"product" | "service" | "package">("product");
+  const [cartItemId, setCartItemId] = useState("");
+  const [cartItemQuantity, setCartItemQuantity] = useState("1");
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
   const [products, setProducts] = useState<Array<{ id: string; name: string; sku: string; priceCents: number; isActive: boolean }>>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   const [productError, setProductError] = useState<string | null>(null);
@@ -1774,56 +1772,79 @@ export default function Home() {
     setMembershipStatus("");
   };
 
-  const addInvoice = async () => {
-    if (!invoiceCustomerId.trim() || !invoiceDescription.trim()) return;
+  const addToCart = () => {
+    if (!cartItemId) return;
+    const item = cartItemType === "product"
+      ? products.find((product) => product.id === cartItemId)
+      : cartItemType === "service"
+        ? services.find((service) => service.id === cartItemId)
+        : packages.find((pkg) => pkg.id === cartItemId);
+
+    if (!item) return;
+    const quantity = Math.max(1, Number(cartItemQuantity) || 1);
+    const cartEntry = {
+      id: `${cartItemType}-${item.id}-${Date.now()}`,
+      type: cartItemType,
+      itemId: item.id,
+      description: item.name,
+      unitPriceCents: item.priceCents ?? 0,
+      quantity,
+    };
+    setCartItems((current) => [...current, cartEntry]);
+    setCartItemId("");
+    setCartItemQuantity("1");
+  };
+
+  const removeFromCart = (cartId: string) => {
+    setCartItems((current) => current.filter((item) => item.id !== cartId));
+  };
+
+  const cartSubtotalCents = cartItems.reduce((sum, item) => sum + item.unitPriceCents * item.quantity, 0);
+
+  const checkout = async () => {
+    if (!invoiceCustomerId.trim() || cartItems.length === 0) return;
+    setIsCheckingOut(true);
+    setCheckoutError(null);
     setInvoiceError(null);
-    const quantity = Number(invoiceQuantity) || 1;
-    const unitPriceCents = Number(invoiceUnitPrice) || 0;
-    const discountCents = Number(invoiceDiscount) || 0;
-    const gstCents = Number(invoiceGst) || 0;
     const result = await fetch("/api/invoices", {
       method: "POST",
       credentials: "same-origin",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         customerId: invoiceCustomerId,
-        issuedAt: invoiceIssuedAt,
-        items: [
-          {
-            description: invoiceDescription,
-            quantity,
-            unitPriceCents,
-          },
-        ],
-        discountCents,
-        gstCents,
+        issuedAt: new Date().toISOString(),
+        items: cartItems.map((item) => ({
+          description: item.description,
+          productId: item.type === "product" ? item.itemId : null,
+          serviceId: item.type === "service" ? item.itemId : null,
+          packageId: item.type === "package" ? item.itemId : null,
+          quantity: item.quantity,
+          unitPriceCents: item.unitPriceCents,
+        })),
         notes: invoiceNotes || null,
       }),
     });
     if (result.status === 401) {
       setInvoices([]);
       setAuthenticated(false);
+      setIsCheckingOut(false);
       return;
     }
     if (result.status === 403) {
-      setInvoices([]);
       setInvoiceError("You are not authorized to create invoices.");
+      setIsCheckingOut(false);
       return;
     }
     if (!result.ok) {
-      setInvoiceError("Invoice could not be saved.");
+      setCheckoutError("Checkout failed. Please try again.");
+      setIsCheckingOut(false);
       return;
     }
     const body = await result.json() as { invoice: { id: string; customerId: string; issuedAt: string; subtotalCents: number; discountCents: number; gstCents: number; totalCents: number; notes: string | null } };
     setInvoices((current) => [body.invoice, ...current]);
-    setInvoiceCustomerId("");
-    setInvoiceDescription("");
-    setInvoiceQuantity("1");
-    setInvoiceUnitPrice("1500");
-    setInvoiceDiscount("0");
-    setInvoiceGst("0");
+    setCartItems([]);
     setInvoiceNotes("");
-    setInvoiceIssuedAt(new Date().toISOString());
+    setIsCheckingOut(false);
   };
 
   const addProduct = async () => {
@@ -3652,65 +3673,99 @@ export default function Home() {
             </div>
 
             <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
-              <h2 className="text-xl font-semibold">Create invoice</h2>
+              <h2 className="text-xl font-semibold">POS checkout</h2>
               <div className="mt-4 space-y-3">
-                <input
+                <select
                   value={invoiceCustomerId}
                   onChange={(event) => setInvoiceCustomerId(event.target.value)}
-                  placeholder="Customer ID"
                   className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
-                />
-                <input
-                  value={invoiceIssuedAt}
-                  onChange={(event) => setInvoiceIssuedAt(event.target.value)}
-                  placeholder="Issued at (ISO date)"
+                >
+                  <option value="">Select customer</option>
+                  {customers.map((customer) => (
+                    <option key={customer.id} value={customer.id}>{customer.name}</option>
+                  ))}
+                </select>
+                <select
+                  value={cartItemType}
+                  onChange={(event) => { setCartItemType(event.target.value as "product" | "service" | "package"); setCartItemId(""); }}
                   className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
-                />
-                <input
-                  value={invoiceDescription}
-                  onChange={(event) => setInvoiceDescription(event.target.value)}
-                  placeholder="Item description"
+                >
+                  <option value="product">Product</option>
+                  <option value="service">Service</option>
+                  <option value="package">Package</option>
+                </select>
+                <select
+                  value={cartItemId}
+                  onChange={(event) => setCartItemId(event.target.value)}
                   className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
-                />
+                >
+                  <option value="">Select item</option>
+                  {cartItemType === "product" && products.filter((product) => product.isActive).map((product) => (
+                    <option key={product.id} value={product.id}>{product.name} (₹{product.priceCents / 100})</option>
+                  ))}
+                  {cartItemType === "service" && services.filter((service) => service.isActive).map((service) => (
+                    <option key={service.id} value={service.id}>{service.name} (₹{service.priceCents / 100})</option>
+                  ))}
+                  {cartItemType === "package" && packages.filter((pkg) => pkg.isActive).map((pkg) => (
+                    <option key={pkg.id} value={pkg.id}>{pkg.name} (₹{(pkg.priceCents ?? 0) / 100})</option>
+                  ))}
+                </select>
                 <div className="grid grid-cols-2 gap-3">
                   <input
-                    value={invoiceQuantity}
-                    onChange={(event) => setInvoiceQuantity(event.target.value)}
+                    value={cartItemQuantity}
+                    onChange={(event) => setCartItemQuantity(event.target.value)}
                     placeholder="Qty"
+                    type="number"
+                    min="1"
                     className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
                   />
-                  <input
-                    value={invoiceUnitPrice}
-                    onChange={(event) => setInvoiceUnitPrice(event.target.value)}
-                    placeholder="Unit price (cents)"
-                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
-                  />
+                  <button
+                    onClick={addToCart}
+                    className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                  >
+                    Add to cart
+                  </button>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <input
-                    value={invoiceDiscount}
-                    onChange={(event) => setInvoiceDiscount(event.target.value)}
-                    placeholder="Discount (cents)"
-                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
-                  />
-                  <input
-                    value={invoiceGst}
-                    onChange={(event) => setInvoiceGst(event.target.value)}
-                    placeholder="GST (cents)"
-                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
-                  />
-                </div>
+                {cartItems.length > 0 ? (
+                  <div className="mt-4 space-y-2">
+                    <div className="max-h-48 overflow-y-auto space-y-2">
+                      {cartItems.map((item) => (
+                        <div key={item.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                          <div className="flex-1">
+                            <div className="font-medium">{item.description}</div>
+                            <div className="text-sm text-[#736067]">₹{item.unitPriceCents / 100} × {item.quantity}</div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="text-sm font-medium">₹{item.unitPriceCents * item.quantity / 100}</div>
+                            <button
+                              onClick={() => removeFromCart(item.id)}
+                              className="text-sm text-[#8f3f3f]"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex items-center justify-between rounded-xl bg-[#fff6f6] p-3 text-sm">
+                      <span className="font-medium">Subtotal</span>
+                      <span className="font-semibold">₹{cartSubtotalCents / 100}</span>
+                    </div>
+                  </div>
+                ) : null}
                 <input
                   value={invoiceNotes}
                   onChange={(event) => setInvoiceNotes(event.target.value)}
                   placeholder="Notes (optional)"
                   className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
                 />
+                {checkoutError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{checkoutError}</div> : null}
                 <button
-                  onClick={addInvoice}
-                  className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                  onClick={checkout}
+                  disabled={isCheckingOut || cartItems.length === 0 || !invoiceCustomerId}
+                  className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
                 >
-                  Save invoice
+                  {isCheckingOut ? "Processing..." : "Checkout"}
                 </button>
               </div>
             </div>
