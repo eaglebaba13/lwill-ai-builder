@@ -196,7 +196,7 @@ export default function Home() {
   const [servicePrice, setServicePrice] = useState("1500");
   const [appointmentCustomer, setAppointmentCustomer] = useState("");
   const [appointmentService, setAppointmentService] = useState("");
-  const [appointmentStaff, setAppointmentStaff] = useState("staff-1");
+  const [appointmentStaff, setAppointmentStaff] = useState("");
   const [appointmentError, setAppointmentError] = useState<string | null>(null);
   const [businessUnits, setBusinessUnits] = useState<Array<{ id: string; name: string; slug: string; isActive: boolean }>>([]);
   const [isLoadingBusinessUnits, setIsLoadingBusinessUnits] = useState(false);
@@ -1513,6 +1513,9 @@ export default function Home() {
   const addAppointment = async () => {
     if (!appointmentCustomer || !appointmentService) return;
     setAppointmentError(null);
+    const selectedService = services.find((service) => service.id === appointmentService);
+    const startsAt = new Date();
+    const endsAt = new Date(startsAt.getTime() + (selectedService?.durationMinutes || 60) * 60 * 1000);
     const result = await fetch("/api/appointments", {
       method: "POST",
       credentials: "same-origin",
@@ -1520,8 +1523,8 @@ export default function Home() {
       body: JSON.stringify({
         customerId: appointmentCustomer,
         serviceId: appointmentService,
-        startsAt: "2026-08-12T10:30:00.000Z",
-        endsAt: "2026-08-12T11:15:00.000Z",
+        startsAt: startsAt.toISOString(),
+        endsAt: endsAt.toISOString(),
         status: "Booked",
         notes: null,
       }),
@@ -2142,8 +2145,9 @@ export default function Home() {
                   onChange={(event) => setAppointmentStaff(event.target.value)}
                   className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
                 >
-                  {staff.map((member, index) => (
-                    <option key={`${member.displayName}-${index}`} value={`staff-${index + 1}`}>
+                  <option value="">Select staff</option>
+                  {staff.map((member) => (
+                    <option key={member.id} value={member.id}>
                       {member.displayName}
                     </option>
                   ))}
