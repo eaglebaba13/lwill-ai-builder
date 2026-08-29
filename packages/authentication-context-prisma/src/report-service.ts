@@ -22,14 +22,27 @@ export interface ReportSummaryRecord {
 
 export interface ReportService {
   getReportSummary(args: { tenantId: string }): Promise<ReportSummaryRecord>;
+  listDailySales(args: { tenantId: string }): Promise<ReadonlyArray<{
+    readonly date: string;
+    readonly invoiceCount: number;
+    readonly totalRevenueCents: number;
+  }>>;
+  listAppointmentReport(args: { tenantId: string }): Promise<ReadonlyArray<{
+    readonly date: string;
+    readonly appointmentCount: number;
+    readonly statusBreakdown: ReadonlyArray<{
+      readonly status: string;
+      readonly count: number;
+    }>;
+  }>>;
 }
 
 interface ReportPrismaClient {
   readonly invoice: {
-    findMany(args: { where?: Record<string, unknown>; select?: Record<string, unknown> }): Promise<ReadonlyArray<{ readonly totalCents: number }>>;
+    findMany(args: { where?: Record<string, unknown>; select?: Record<string, unknown>; orderBy?: Record<string, unknown> }): Promise<ReadonlyArray<{ readonly totalCents: number; readonly issuedAt: Date }>>;
   };
   readonly appointment: {
-    findMany(args: { where?: Record<string, unknown>; select?: Record<string, unknown> }): Promise<ReadonlyArray<{ readonly status: string }>>;
+    findMany(args: { where?: Record<string, unknown>; select?: Record<string, unknown>; orderBy?: Record<string, unknown> }): Promise<ReadonlyArray<{ readonly status: string; readonly startsAt: Date }>>;
   };
   readonly customer: {
     count(args: { where: Record<string, unknown> }): Promise<number>;
@@ -48,7 +61,7 @@ export function createReportService(prisma: ReportPrismaClient): ReportService {
     async getReportSummary({ tenantId }) {
       const invoices = await prisma.invoice.findMany({
         where: { tenantId },
-        select: { totalCents: true },
+        select: { totalCents: true, issuedAt: true },
       });
 
       const appointments = await prisma.appointment.findMany({
@@ -99,6 +112,56 @@ export function createReportService(prisma: ReportPrismaClient): ReportService {
           movementCount,
         },
       };
+    },
+
+    async listDailySales({ tenantId }) {
+      const invoices = await prisma.invoice.findMany({
+        where: { tenantId },
+        select: { totalCents: true, issuedAt: true },
+        orderBy: { issuedAt: "asc" },
+      });
+
+      const dailyMap = new Map<string, { invoiceCount: number; totalRevenueCents: number }>();
+      for (const invoice of invoices) {
+        const dateKey = new Date(invoice.issuedAt).toISOString().slice(0, 10);
+        const current = dailyMap.get(dateKey) ?? { invoiceCount: 0, totalRevenueCents: 0 };
+        dailyMap.set(dateKey, {
+          invoiceCount: current.invoiceCount + 1,
+          totalRevenueCents: current.totalRevenueCents + invoice.totalCents,
+        });
+      }
+
+      return Array.from(dailyMap.entries()).map(([date, values]) => ({
+        date,
+        ...values,
+      }));
+    },
+
+    async listAppointmentReport({ tenantId }) {
+      const appointments = await prisma.appointment.findMany({
+        where: { tenantId },
+        select: { startsAt: true, status: true },
+        orderBy: { startsAt: "asc" },
+      });
+
+      const dateMap = new Map<string, { appointmentCount: number; statusBreakdown: Map<string, number> }>();
+      for (const appointment of appointments) {
+        const dateKey = new Date(appointment.startsAt).toISOString().slice(0, 10);
+        const entry = dateMap.get(dateKey) ?? { appointmentCount: 0, statusBreakdown: new Map() };
+        entry.appointmentCount += 1;
+        const current = entry.statusBreakdown.get(appointment.status) ?? 0;
+        entry.statusBreakdown.set(appointment.status, current + 1);
+        dateMap.set(dateKey, entry);
+      }
+
+      return Array.from(dateMap.entries()).map(([date, entry]) => ({
+        date,
+        appointmentCount: entry.appointmentCount,
+        statusBreakdown: Array.from(entry.statusBreakdown.entries()).map(([status, count]) => ({
+          status,
+          count,
+        })),
+      }));
     },
   };
 }

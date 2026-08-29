@@ -5,7 +5,7 @@
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
 - **Current Branch**: `phase-1d-native-auth`
-- **Current HEAD Commit**: `6c298e3` (`feat(attendance): add check-out update endpoint and UI control`)
+- **Current HEAD Commit**: `0afe1c8` (`feat(reports): add daily-sales and low-stock reporting endpoints and UI`)
 - **Git State**: `phase-1d-native-auth` at `6c298e3`; working tree clean (attendance check-out committed and pushed; untracked SRS extracts and scripts/ remain).
 
 ## State Breakdown
@@ -1795,3 +1795,57 @@ The prior "Phase 1I X Nail Packages Production Verification" section (above) doc
 - No authentication or authorization code was modified.
 - No production database connection or mutation was performed.
 - No new roles were introduced.
+
+## X Nail Low-Stock Reporting — 2026-08-29
+
+### Status: **Implemented and verified locally; committed as `0afe1c8`**
+
+### Implemented Slice
+
+- **Service layer** (`packages/authentication-context-prisma/src/report-service.ts`): Added `listLowStockItems` which returns stock items whose `quantity` is at or below a configurable `thresholdCents` (default 500). Reuses existing `listStockItems` tenant-scoped retrieval and maps results to `{ stockItemId, productName, currentQuantityCents, thresholdCents }`.
+- **API route** (`apps/web/src/app/api/reports/low-stock/route.ts`): `GET /api/reports/low-stock` with `attendance.read` authorization. Accepts optional `thresholdCents` query parameter (non-negative integer). Returns tenant-scoped low-stock list or 401/403/400 on auth/input failure.
+- **UI** (`apps/web/src/app/xnail/page.tsx`): Added "Low Stock Items" reporting section in the Reports tab. Shows loading/empty/error states and renders a card list with product name, current quantity, and threshold badge.
+- **Tests**:
+  - `apps/web/src/test/low-stock-route-handlers.test.ts` — 8 tests covering auth gating, permission forwarding, threshold validation, tenant filtering, empty results, and error states.
+  - `packages/authentication-context-prisma/src/report-service.test.ts` — 6 tests covering empty results, default threshold, custom threshold, tenant isolation, zero threshold, and large threshold.
+
+### Verification Results
+
+- `pnpm test` — Passed: 441 web tests, 398 authentication-context-prisma tests.
+- `pnpm lint` — Passed (0 errors; 14 pre-existing unused-import warnings in unrelated API route files).
+- `pnpm build` — Passed (Next.js production build + TypeScript compilation).
+- `git diff --check` — Passed (LF→CRLF notices only).
+
+### Important Boundary
+
+- No Prisma schema or migration was changed.
+- No authentication or authorization architecture was modified.
+- No production database connection or mutation was performed.
+- No new roles were introduced; reuses existing `attendance.read` permission.
+
+## X Nail Daily Sales Reporting — 2026-08-29
+
+### Status: **Implemented and verified locally; committed as `0afe1c8`**
+
+### Implemented Slice
+
+- **Service layer** (`packages/authentication-context-prisma/src/report-service.ts`): Added `listDailySales` which returns revenue aggregated by invoice `issuedAt` date. Uses Prisma `_sum` and `_count` with `groupBy`, filtered by `tenantId`, `issuedAt` range, and optional `branchId`. Returns `{ date, totalRevenueCents, invoiceCount }` ordered by date ascending.
+- **API route** (`apps/web/src/app/api/reports/daily-sales/route.ts`): `GET /api/reports/daily-sales` with `attendance.read` authorization. Accepts optional `startDate`/`endDate` query parameters (ISO-8601 dates) and optional `branchId`. Validates date range and rejects invalid inputs with 400.
+- **UI** (`apps/web/src/app/xnail/page.tsx`): Added "Daily Sales" reporting section in the Reports tab. Shows loading/empty/error states and renders a card list with date, invoice count, and revenue.
+- **Tests**:
+  - `apps/web/src/test/daily-sales-route-handlers.test.ts` — 7 tests covering auth gating, permission forwarding, date validation, branch filtering, tenant isolation, empty results, and error states.
+  - `packages/authentication-context-prisma/src/report-service.test.ts` — 3 tests covering empty results, ordered date results, and revenue aggregation.
+
+### Verification Results
+
+- `pnpm test` — Passed: 441 web tests, 398 authentication-context-prisma tests.
+- `pnpm lint` — Passed (0 errors; 14 pre-existing unused-import warnings in unrelated API route files).
+- `pnpm build` — Passed (Next.js production build + TypeScript compilation).
+- `git diff --check` — Passed (LF→CRLF notices only).
+
+### Important Boundary
+
+- No Prisma schema or migration was changed.
+- No authentication or authorization architecture was modified.
+- No production database connection or mutation was performed.
+- No new roles were introduced; reuses existing `attendance.read` permission.

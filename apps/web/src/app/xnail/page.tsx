@@ -279,6 +279,12 @@ export default function Home() {
   } | null>(null);
   const [isLoadingReport, setIsLoadingReport] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
+  const [dailySales, setDailySales] = useState<Array<{ date: string; invoiceCount: number; totalRevenueCents: number }>>([]);
+  const [isLoadingDailySales, setIsLoadingDailySales] = useState(false);
+  const [dailySalesError, setDailySalesError] = useState<string | null>(null);
+  const [appointmentReport, setAppointmentReport] = useState<Array<{ date: string; appointmentCount: number; statusBreakdown: Array<{ status: string; count: number }> }>>([]);
+  const [isLoadingAppointmentReport, setIsLoadingAppointmentReport] = useState(false);
+  const [appointmentReportError, setAppointmentReportError] = useState<string | null>(null);
 
   const customerMap = new Map(customers.map((customer) => [customer.id, customer.name]));
   const productMap = new Map(products.map((product) => [product.id, product.name]));
@@ -1566,6 +1572,72 @@ export default function Home() {
         if (mounted) {
           window.clearTimeout(loadingTimer);
           setIsLoadingReport(false);
+        }
+      });
+
+    void fetch("/api/reports/daily-sales", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        if (result.status === 401) {
+          setDailySales([]);
+          return;
+        }
+        if (result.status === 403) {
+          setDailySales([]);
+          setDailySalesError("You are not authorized to view daily sales.");
+          return;
+        }
+        if (!result.ok) {
+          throw new Error("Daily sales request failed");
+        }
+        const body = await result.json() as {
+          dailySales?: Array<{ date: string; invoiceCount: number; totalRevenueCents: number }>;
+        };
+        const loadedDailySales = Array.isArray(body.dailySales) ? body.dailySales : [];
+        setDailySales(loadedDailySales);
+      })
+      .catch(() => {
+        if (mounted) {
+          setDailySales([]);
+          setDailySalesError("Daily sales could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setIsLoadingDailySales(false);
+        }
+      });
+
+    void fetch("/api/reports/appointments", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        if (result.status === 401) {
+          setAppointmentReport([]);
+          return;
+        }
+        if (result.status === 403) {
+          setAppointmentReport([]);
+          setAppointmentReportError("You are not authorized to view appointment reports.");
+          return;
+        }
+        if (!result.ok) {
+          throw new Error("Appointment report request failed");
+        }
+        const body = await result.json() as {
+          appointmentReport?: Array<{ date: string; appointmentCount: number; statusBreakdown: Array<{ status: string; count: number }> }>;
+        };
+        const loadedAppointmentReport = Array.isArray(body.appointmentReport) ? body.appointmentReport : [];
+        setAppointmentReport(loadedAppointmentReport);
+      })
+      .catch(() => {
+        if (mounted) {
+          setAppointmentReport([]);
+          setAppointmentReportError("Appointment report could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setIsLoadingAppointmentReport(false);
         }
       });
 
@@ -3984,6 +4056,53 @@ export default function Home() {
                   <div className="mt-2 text-3xl font-semibold">{report.inventory.movementCount}</div>
                 </div>
               </>
+            ) : null}
+            {isLoadingDailySales ? <div className="text-sm text-[#736067]">Loading daily sales...</div> : null}
+            {!isLoadingDailySales && dailySalesError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{dailySalesError}</div> : null}
+            {!isLoadingDailySales && !dailySalesError && dailySales.length === 0 ? <div className="text-sm text-[#736067]">No daily sales yet.</div> : null}
+            {dailySales.length > 0 ? (
+              <div className="mt-6 rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+                <h2 className="text-xl font-semibold">Daily Sales</h2>
+                <div className="mt-4 space-y-3">
+                  {dailySales.map((item) => (
+                    <div key={item.date} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                      <div>
+                        <div className="font-medium">{item.date}</div>
+                        <div className="text-sm text-[#736067]">{item.invoiceCount} invoice{item.invoiceCount === 1 ? "" : "s"}</div>
+                      </div>
+                      <div className="text-right text-sm text-[#736067]">
+                        <div>₹{item.totalRevenueCents / 100}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            {isLoadingAppointmentReport ? <div className="text-sm text-[#736067]">Loading appointment report...</div> : null}
+            {!isLoadingAppointmentReport && appointmentReportError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{appointmentReportError}</div> : null}
+            {!isLoadingAppointmentReport && !appointmentReportError && appointmentReport.length === 0 ? <div className="text-sm text-[#736067]">No appointment data yet.</div> : null}
+            {appointmentReport.length > 0 ? (
+              <div className="mt-6 rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+                <h2 className="text-xl font-semibold">Appointment Report</h2>
+                <div className="mt-4 space-y-3">
+                  {appointmentReport.map((item) => (
+                    <div key={item.date} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                      <div>
+                        <div className="font-medium">{item.date}</div>
+                        <div className="text-sm text-[#736067]">{item.appointmentCount} appointment{item.appointmentCount === 1 ? "" : "s"}</div>
+                        <div className="mt-1 space-y-1">
+                          {item.statusBreakdown.map((status) => (
+                            <div key={status.status} className="flex items-center justify-between text-xs text-[#736067]">
+                              <span>{status.status}</span>
+                              <span className="font-medium">{status.count}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             ) : null}
           </section>
         ) : null}
