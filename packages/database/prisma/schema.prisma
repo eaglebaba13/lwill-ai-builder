@@ -41,6 +41,7 @@ model Tenant {
   suppliers             Supplier[]
   reorderRules          ReorderRule[]
   purchaseReceipts      PurchaseReceipt[]
+  stockTransfers        StockTransfer[]
 
   @@index([isActive])
 }
@@ -116,6 +117,8 @@ model Branch {
   stockMovements        StockMovement[]
   reorderRules          ReorderRule[]
   purchaseReceipts      PurchaseReceipt[]
+  outgoingTransfers     StockTransfer[] @relation("FromBranch")
+  incomingTransfers     StockTransfer[] @relation("ToBranch")
 
   @@unique([tenantId, businessUnitId, id])
   @@unique([tenantId, id])
@@ -298,6 +301,7 @@ model Product {
   invoiceLineItems InvoiceLineItem[]
   reorderRules ReorderRule[]
   purchaseReceiptLineItems PurchaseReceiptLineItem[]
+  stockTransferLineItems StockTransferLineItem[]
 
   @@unique([tenantId, id])
   @@unique([tenantId, sku])
@@ -663,7 +667,9 @@ model Warehouse {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
 
   reorderRules ReorderRule[]
-  purchaseReceipts PurchaseReceipt[]
+  purchaseReceipts      PurchaseReceipt[]
+  outgoingTransfers     StockTransfer[] @relation("FromWarehouse")
+  incomingTransfers     StockTransfer[] @relation("ToWarehouse")
 
   @@unique([tenantId, id])
   @@unique([tenantId, name])
@@ -747,4 +753,41 @@ model PurchaseReceiptLineItem {
 
   @@unique([tenantId, id])
   @@index([tenantId, purchaseReceiptId])
+}
+
+model StockTransfer {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @db.Uuid
+  fromWarehouseId String @db.Uuid
+  toWarehouseId   String @db.Uuid
+  fromBranchId    String @db.Uuid
+  toBranchId      String @db.Uuid
+  status      String   @default("PENDING")
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  fromWarehouse Warehouse      @relation("FromWarehouse", fields: [fromWarehouseId], references: [id], onDelete: Restrict)
+  toWarehouse   Warehouse      @relation("ToWarehouse", fields: [toWarehouseId], references: [id], onDelete: Restrict)
+  fromBranch    Branch         @relation("FromBranch", fields: [tenantId, fromBranchId], references: [tenantId, id], onDelete: Restrict)
+  toBranch      Branch         @relation("ToBranch", fields: [tenantId, toBranchId], references: [tenantId, id], onDelete: Restrict)
+  lineItems     StockTransferLineItem[]
+
+  @@unique([tenantId, id])
+  @@index([tenantId, status])
+}
+
+model StockTransferLineItem {
+  id               String   @id @default(uuid()) @db.Uuid
+  tenantId         String   @db.Uuid
+  stockTransferId  String   @db.Uuid
+  productId        String   @db.Uuid
+  quantity         Int
+
+  stockTransfer StockTransfer @relation(fields: [stockTransferId], references: [id], onDelete: Cascade)
+  product       Product       @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, id])
+  @@index([tenantId, stockTransferId])
 }
