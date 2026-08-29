@@ -24,6 +24,7 @@
     "bootstrap:initial-setting-permissions": "tsx src/initial-setting-permissions-bootstrap-cli.ts",
     "bootstrap:initial-notification-permissions": "tsx src/initial-notification-permissions-bootstrap-cli.ts",
     "bootstrap:initial-warehouse-permissions": "tsx src/initial-warehouse-permissions-bootstrap-cli.ts",
+    "bootstrap:initial-supplier-permissions": "tsx src/initial-supplier-permissions-bootstrap-cli.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
