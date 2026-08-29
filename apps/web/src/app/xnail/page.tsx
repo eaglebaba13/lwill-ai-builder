@@ -1740,22 +1740,22 @@ export default function Home() {
         <section className="grid gap-4 md:grid-cols-4">
           <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
             <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Today</div>
-            <div className="mt-2 text-3xl font-semibold">18</div>
+            <div className="mt-2 text-3xl font-semibold">—</div>
             <div className="mt-1 text-sm text-[#715a62]">Appointments</div>
           </div>
           <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
             <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Revenue</div>
-            <div className="mt-2 text-3xl font-semibold">₹42.5k</div>
+            <div className="mt-2 text-3xl font-semibold">—</div>
             <div className="mt-1 text-sm text-[#715a62]">Gross sales</div>
           </div>
           <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
             <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Members</div>
-            <div className="mt-2 text-3xl font-semibold">128</div>
+            <div className="mt-2 text-3xl font-semibold">—</div>
             <div className="mt-1 text-sm text-[#715a62]">Loyalty</div>
           </div>
           <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
             <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Staff</div>
-            <div className="mt-2 text-3xl font-semibold">6</div>
+            <div className="mt-2 text-3xl font-semibold">—</div>
             <div className="mt-1 text-sm text-[#715a62]">On duty</div>
           </div>
         </section>
