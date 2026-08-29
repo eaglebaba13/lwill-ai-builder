@@ -1906,6 +1906,11 @@ export default function Home() {
       }
       return [body.stockItem, ...current];
     });
+    const movementsResult = await fetch("/api/stock-movements", { credentials: "same-origin" });
+    if (movementsResult.ok) {
+      const movementsBody = await movementsResult.json() as { stockMovements?: Array<{ id: string; productId: string; branchId: string; movementType: string; quantity: number; notes: string | null; createdAt: string }> };
+      setStockMovements(movementsBody.stockMovements ?? []);
+    }
     setStockMovementProductId("");
     setStockMovementBranchId("");
     setStockMovementQuantity("1");
