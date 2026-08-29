@@ -17,9 +17,18 @@ function createFixture() {
     movementType: string;
     quantity: number;
   };
+  type ReorderRuleState = {
+    tenantId: string;
+    productId: string;
+    branchId: string;
+    minQuantity: number;
+    reorderQuantity: number;
+    isActive: boolean;
+  };
   const state = {
     stockItems: new Map<string, StockItemState>(),
     stockMovements: new Map<string, StockMovementState>(),
+    reorderRules: new Map<string, ReorderRuleState>(),
     products: new Map<string, { id: string; tenantId: string }>(),
     branches: new Map<string, { id: string; tenantId: string }>(),
   };
@@ -76,6 +85,23 @@ function createFixture() {
     branch: {
       findUnique: vi.fn(async ({ where }: { where: { id: string } }) =>
         state.branches.get(where.id) ?? null),
+    },
+    reorderRule: {
+      findMany: vi.fn(async ({ where }: { where?: Record<string, unknown> }) => {
+        let rules = [...state.reorderRules.values()];
+        if (where?.tenantId) {
+          rules = rules.filter((r) => r.tenantId === where.tenantId);
+        }
+        if (where?.isActive !== undefined) {
+          rules = rules.filter((r) => r.isActive === where.isActive);
+        }
+        return rules.map((r) => ({
+          productId: r.productId,
+          branchId: r.branchId,
+          minQuantity: r.minQuantity,
+          reorderQuantity: r.reorderQuantity,
+        }));
+      }),
     },
     $transaction: vi.fn(async (callback: (client: typeof prisma) => Promise<unknown>) => callback(prisma)),
   };
@@ -547,5 +573,110 @@ describe("stock service: recordStockMovement", () => {
         adjustmentDirection: "OUT",
       }),
     ).rejects.toThrow("insufficient stock for this operation");
+  });
+});
+
+describe("stock service: listLowStockItems", () => {
+  it("returns items where quantity is below minQuantity", async () => {
+    const { prisma, state } = createFixture();
+    state.stockItems.set("si-1", {
+      id: "si-1", tenantId: "tenant-1", productId: "p1", branchId: "b1", quantity: 3,
+    });
+    state.reorderRules.set("rr-1", {
+      tenantId: "tenant-1", productId: "p1", branchId: "b1", minQuantity: 10, reorderQuantity: 50, isActive: true,
+    });
+    const service = createStockService(prisma as never);
+
+    const lowStock = await service.listLowStockItems("tenant-1");
+
+    expect(lowStock).toHaveLength(1);
+    expect(lowStock[0]).toMatchObject({
+      stockItemId: "si-1",
+      productId: "p1",
+      branchId: "b1",
+      quantity: 3,
+      minQuantity: 10,
+      reorderQuantity: 50,
+    });
+  });
+
+  it("returns items where quantity equals minQuantity", async () => {
+    const { prisma, state } = createFixture();
+    state.stockItems.set("si-1", {
+      id: "si-1", tenantId: "tenant-1", productId: "p1", branchId: "b1", quantity: 10,
+    });
+    state.reorderRules.set("rr-1", {
+      tenantId: "tenant-1", productId: "p1", branchId: "b1", minQuantity: 10, reorderQuantity: 50, isActive: true,
+    });
+    const service = createStockService(prisma as never);
+
+    const lowStock = await service.listLowStockItems("tenant-1");
+
+    expect(lowStock).toHaveLength(1);
+    expect(lowStock[0]?.quantity).toBe(10);
+  });
+
+  it("excludes items where quantity is above minQuantity", async () => {
+    const { prisma, state } = createFixture();
+    state.stockItems.set("si-1", {
+      id: "si-1", tenantId: "tenant-1", productId: "p1", branchId: "b1", quantity: 20,
+    });
+    state.reorderRules.set("rr-1", {
+      tenantId: "tenant-1", productId: "p1", branchId: "b1", minQuantity: 10, reorderQuantity: 50, isActive: true,
+    });
+    const service = createStockService(prisma as never);
+
+    const lowStock = await service.listLowStockItems("tenant-1");
+
+    expect(lowStock).toHaveLength(0);
+  });
+
+  it("excludes items without an active reorder rule", async () => {
+    const { prisma, state } = createFixture();
+    state.stockItems.set("si-1", {
+      id: "si-1", tenantId: "tenant-1", productId: "p1", branchId: "b1", quantity: 3,
+    });
+    const service = createStockService(prisma as never);
+
+    const lowStock = await service.listLowStockItems("tenant-1");
+
+    expect(lowStock).toHaveLength(0);
+  });
+
+  it("returns empty array when no stock items are low", async () => {
+    const { prisma, state } = createFixture();
+    state.stockItems.set("si-1", {
+      id: "si-1", tenantId: "tenant-1", productId: "p1", branchId: "b1", quantity: 100,
+    });
+    state.reorderRules.set("rr-1", {
+      tenantId: "tenant-1", productId: "p1", branchId: "b1", minQuantity: 10, reorderQuantity: 50, isActive: true,
+    });
+    const service = createStockService(prisma as never);
+
+    const lowStock = await service.listLowStockItems("tenant-1");
+
+    expect(lowStock).toHaveLength(0);
+  });
+
+  it("scopes results to the requesting tenant", async () => {
+    const { prisma, state } = createFixture();
+    state.stockItems.set("si-1", {
+      id: "si-1", tenantId: "tenant-1", productId: "p1", branchId: "b1", quantity: 3,
+    });
+    state.stockItems.set("si-2", {
+      id: "si-2", tenantId: "tenant-2", productId: "p2", branchId: "b2", quantity: 1,
+    });
+    state.reorderRules.set("rr-1", {
+      tenantId: "tenant-1", productId: "p1", branchId: "b1", minQuantity: 10, reorderQuantity: 50, isActive: true,
+    });
+    state.reorderRules.set("rr-2", {
+      tenantId: "tenant-2", productId: "p2", branchId: "b2", minQuantity: 5, reorderQuantity: 20, isActive: true,
+    });
+    const service = createStockService(prisma as never);
+
+    const lowStock = await service.listLowStockItems("tenant-1");
+
+    expect(lowStock).toHaveLength(1);
+    expect(lowStock[0]?.stockItemId).toBe("si-1");
   });
 });

@@ -64,6 +64,14 @@ export interface StockService {
     notes?: string | null;
   }): Promise<StockMovementRecord>;
   recordStockMovement(input: StockMovementCreateInput, transactionClient?: StockPrismaClient): Promise<StockItemRecord>;
+  listLowStockItems(tenantId: string): Promise<ReadonlyArray<{
+    readonly stockItemId: string;
+    readonly productId: string;
+    readonly branchId: string;
+    readonly quantity: number;
+    readonly minQuantity: number;
+    readonly reorderQuantity: number;
+  }>>;
 }
 
 export interface StockPrismaClient {
@@ -84,6 +92,14 @@ export interface StockPrismaClient {
   };
   readonly branch: {
     findUnique: (args: { where: { id: string } }) => Promise<{ id: string; tenantId: string } | null>;
+  };
+  readonly reorderRule: {
+    findMany: (args: { where?: Record<string, unknown>; select?: Record<string, unknown> }) => Promise<ReadonlyArray<{
+      readonly productId: string;
+      readonly branchId: string;
+      readonly minQuantity: number;
+      readonly reorderQuantity: number;
+    }>>;
   };
   $transaction: {
     <T>(callback: (client: StockPrismaClient) => Promise<T>): Promise<T>;
@@ -271,6 +287,49 @@ export function createStockService(prisma: StockPrismaClient): StockService {
           notes: input.notes ?? null,
         },
       });
+    },
+
+    async listLowStockItems(tenantId) {
+      const [reorderRules, stockItems] = await Promise.all([
+        prisma.reorderRule.findMany({
+          where: { tenantId, isActive: true },
+          select: { productId: true, branchId: true, minQuantity: true, reorderQuantity: true },
+        }),
+        prisma.stockItem.findMany({
+          where: { tenantId },
+        }),
+      ]);
+
+      const stockItemMap = new Map(
+        stockItems.map((item) => [`${item.productId}:${item.branchId}`, item]),
+      );
+
+      const lowStockMap = new Map<string, {
+        readonly stockItemId: string;
+        readonly productId: string;
+        readonly branchId: string;
+        readonly quantity: number;
+        readonly minQuantity: number;
+        readonly reorderQuantity: number;
+      }>();
+
+      for (const rule of reorderRules) {
+        const key = `${rule.productId}:${rule.branchId}`;
+        const stockItem = stockItemMap.get(key);
+        if (stockItem === undefined || stockItem.quantity > rule.minQuantity) {
+          continue;
+        }
+        lowStockMap.set(key, {
+          stockItemId: stockItem.id,
+          productId: stockItem.productId,
+          branchId: stockItem.branchId,
+          quantity: stockItem.quantity,
+          minQuantity: rule.minQuantity,
+          reorderQuantity: rule.reorderQuantity,
+        });
+      }
+
+      return Array.from(lowStockMap.values());
     },
   };
 }

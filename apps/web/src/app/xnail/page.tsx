@@ -194,6 +194,9 @@ export default function Home() {
   const [reorderRuleWarehouseId, setReorderRuleWarehouseId] = useState("");
   const [reorderRuleMinQuantity, setReorderRuleMinQuantity] = useState("10");
   const [reorderRuleReorderQuantity, setReorderRuleReorderQuantity] = useState("50");
+  const [lowStockItems, setLowStockItems] = useState<Array<{ stockItemId: string; productId: string; branchId: string; quantity: number; minQuantity: number; reorderQuantity: number }>>([]);
+  const [isLoadingLowStockItems, setIsLoadingLowStockItems] = useState(false);
+  const [lowStockItemError, setLowStockItemError] = useState<string | null>(null);
   const [purchaseReceipts, setPurchaseReceipts] = useState<Array<{ id: string; supplierId: string | null; warehouseId: string; branchId: string; receivedBy: string | null; receivedAt: string; notes: string | null; lineItems: Array<{ id: string; productId: string; quantity: number }> }>>([]);
   const [isLoadingPurchaseReceipts, setIsLoadingPurchaseReceipts] = useState(false);
   const [purchaseReceiptError, setPurchaseReceiptError] = useState<string | null>(null);
@@ -1112,6 +1115,39 @@ export default function Home() {
       .finally(() => {
         if (mounted) {
           setIsLoadingStockAdjustments(false);
+        }
+      });
+
+    void fetch("/api/reports/low-stock", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        if (result.status === 401) {
+          setLowStockItems([]);
+          return;
+        }
+        if (result.status === 403) {
+          setLowStockItems([]);
+          setLowStockItemError("You are not authorized to view low stock items.");
+          return;
+        }
+        if (!result.ok) {
+          throw new Error("Low stock list request failed");
+        }
+        const body = await result.json() as {
+          lowStockItems?: Array<{ stockItemId: string; productId: string; branchId: string; quantity: number; minQuantity: number; reorderQuantity: number }>;
+        };
+        const loadedLowStockItems = Array.isArray(body.lowStockItems) ? body.lowStockItems : [];
+        setLowStockItems(loadedLowStockItems);
+      })
+      .catch(() => {
+        if (mounted) {
+          setLowStockItems([]);
+          setLowStockItemError("Low stock items could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setIsLoadingLowStockItems(false);
         }
       });
 
@@ -3419,6 +3455,27 @@ export default function Home() {
                     Save reorder rule
                   </button>
                 </div>
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <h2 className="text-xl font-semibold">Low Stock Alerts</h2>
+              <div className="mt-4 space-y-3">
+                {isLoadingLowStockItems ? <div className="text-sm text-[#736067]">Loading low stock items...</div> : null}
+                {!isLoadingLowStockItems && lowStockItemError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{lowStockItemError}</div> : null}
+                {!isLoadingLowStockItems && !lowStockItemError && lowStockItems.length === 0 ? <div className="text-sm text-[#736067]">No low stock items.</div> : null}
+                {lowStockItems.map((item) => (
+                  <div key={item.stockItemId} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    <div>
+                      <div className="font-medium">{productMap.get(item.productId) ?? `Product ${item.productId}`}</div>
+                      <div className="text-sm text-[#736067]">{branchMap.get(item.branchId) ?? `Branch ${item.branchId}`}</div>
+                    </div>
+                    <div className="text-right text-sm text-[#736067]">
+                      <div>Qty: {item.quantity} / Min: {item.minQuantity}</div>
+                      <div>Reorder: {item.reorderQuantity}</div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </section>
