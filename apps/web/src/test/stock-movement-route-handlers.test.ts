@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  handleCreateStockMovement,
   handleGetStockMovement,
   handleListStockMovements,
   type StockMovementAuthorization,
@@ -17,6 +18,7 @@ function createServices(authorization: StockMovementAuthorization): StockMovemen
     authorize: vi.fn().mockResolvedValue(authorization),
     listStockMovements: vi.fn().mockResolvedValue([{ id: "movement-1" }]),
     getStockMovement: vi.fn().mockResolvedValue({ id: "movement-1" }),
+    createStockMovement: vi.fn().mockResolvedValue({ id: "stock-item-1" }),
   };
 }
 
@@ -69,5 +71,109 @@ describe("stock-movement route handlers: authorized operations", () => {
     const services = createServices({ outcome: "authorized", tenantId: "tenant-1" });
     vi.mocked(services.getStockMovement).mockResolvedValue(null);
     expect((await handleGetStockMovement(request(), services, "missing")).status).toBe(404);
+  });
+});
+
+describe("stock-movement route handlers: create", () => {
+  it("passes 'product.write' to authorize for create operations", async () => {
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1" });
+    await handleCreateStockMovement(
+      new Request("https://builder.lwill.in/api/stock-movements", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ productId: "p1", branchId: "b1", movementType: "PURCHASE", quantity: 5 }),
+      }),
+      services,
+    );
+    expect(services.authorize).toHaveBeenCalledWith("product.write");
+  });
+
+  it("returns 401 for an unauthenticated caller on create", async () => {
+    const services = createServices({ outcome: "unauthenticated" });
+    const result = await handleCreateStockMovement(
+      new Request("https://builder.lwill.in/api/stock-movements", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ productId: "p1", branchId: "b1", movementType: "PURCHASE", quantity: 5 }),
+      }),
+      services,
+    );
+    expect(result.status).toBe(401);
+    expect(services.createStockMovement).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 for an unauthorized caller on create", async () => {
+    const services = createServices({ outcome: "forbidden" });
+    const result = await handleCreateStockMovement(
+      new Request("https://builder.lwill.in/api/stock-movements", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ productId: "p1", branchId: "b1", movementType: "PURCHASE", quantity: 5 }),
+      }),
+      services,
+    );
+    expect(result.status).toBe(403);
+    expect(services.createStockMovement).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid create input", async () => {
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1" });
+    expect(
+      (await handleCreateStockMovement(
+        new Request("https://builder.lwill.in/api/stock-movements", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({}),
+        }),
+        services,
+      )).status,
+    ).toBe(400);
+    expect(
+      (await handleCreateStockMovement(
+        new Request("https://builder.lwill.in/api/stock-movements", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ productId: "p1", branchId: "b1", movementType: "PURCHASE", quantity: 0 }),
+        }),
+        services,
+      )).status,
+    ).toBe(400);
+  });
+
+  it("returns 201 for a valid create request", async () => {
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1" });
+    vi.mocked(services.createStockMovement).mockResolvedValue({ id: "si-1", tenantId: "tenant-1", productId: "p1", branchId: "b1", quantity: 5 });
+    const result = await handleCreateStockMovement(
+      new Request("https://builder.lwill.in/api/stock-movements", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ productId: "p1", branchId: "b1", movementType: "PURCHASE", quantity: 5 }),
+      }),
+      services,
+    );
+    expect(result.status).toBe(201);
+    expect(services.createStockMovement).toHaveBeenCalledWith("tenant-1", {
+      productId: "p1",
+      branchId: "b1",
+      movementType: "PURCHASE",
+      quantity: 5,
+      referenceType: null,
+      referenceId: null,
+      notes: null,
+    });
+  });
+
+  it("returns 403 when service throws tenant validation error", async () => {
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1" });
+    vi.mocked(services.createStockMovement).mockRejectedValue(new Error("product must belong to the same tenant"));
+    const result = await handleCreateStockMovement(
+      new Request("https://builder.lwill.in/api/stock-movements", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ productId: "p1", branchId: "b1", movementType: "PURCHASE", quantity: 5 }),
+      }),
+      services,
+    );
+    expect(result.status).toBe(403);
   });
 });

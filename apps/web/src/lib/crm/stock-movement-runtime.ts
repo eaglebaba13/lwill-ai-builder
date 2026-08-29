@@ -44,5 +44,6 @@ export function createStockMovementRouteServices(): StockMovementRouteServices {
     listStockMovements: (tenantId) => stockService.listStockMovements({ tenantId }),
     getStockMovement: (tenantId, stockMovementId) =>
       stockService.getStockMovement({ tenantId, stockMovementId }),
+    createStockMovement: (tenantId, input) => stockService.recordStockMovement({ tenantId, ...input }),
   };
 }

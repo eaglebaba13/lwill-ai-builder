@@ -5,8 +5,8 @@
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
 - **Current Branch**: `phase-1d-native-auth`
-- **Current HEAD Commit**: `2e960e1` (`feat(branch): add business unit and branch management`)
-- **Git State**: `phase-1d-native-auth` at `2e960e1` (`feat(branch): add business unit and branch management`); working tree clean and branch is up to date with remote.
+- **Current HEAD Commit**: `c3e84f9` (`feat(web): separate corporate builder and xnail applications`)
+- **Git State**: `phase-1d-native-auth` at `c3e84f9` (`feat(web): separate corporate builder and xnail applications`); working tree clean and branch is up to date with remote.
 
 ## State Breakdown
 
@@ -31,7 +31,7 @@
 - Notification / WhatsApp automation.
 - Platform administration (control-plane super-user management).
 - Full POS / accounting workflows (invoice APIs exist; POS checkout, payments, and general ledger remain incomplete).
-- Inventory stock-management web API/UI layer implemented for Category (list, get, create, update), StockItem (list, get), and StockMovement (list, get); current stock information and movement history exposed in the X Nail Inventory tab. Category/StockItem/StockMovement create, update of stock quantities, stock transfer, and low-stock alerts remain NOT SPECIFIED — APPROVAL REQUIRED.
+- Inventory stock-management web API/UI layer implemented for Category (list, get, create, update), Product (list, get, create, update), StockItem (list, get, create, update), and StockMovement (list, get, create); current stock information, stock item management, and movement history are exposed in the X Nail Inventory tab. Warehouse, Supplier, Purchase, Transfer, Adjustment, Batch/Expiry, Serial Number, Barcode/QR, Reorder Level, Inventory Valuation, and Inventory Movement Reporting remain NOT SPECIFIED — APPROVAL REQUIRED.
 - NestJS backend/API application (platform uses Next.js App Router, not NestJS).
 - Password reset via verified email (deferred per ADR 013).
 - MFA (deferred per ADR 013).

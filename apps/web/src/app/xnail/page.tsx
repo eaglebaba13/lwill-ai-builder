@@ -162,11 +162,19 @@ export default function Home() {
   >([]);
   const [isLoadingStockItems, setIsLoadingStockItems] = useState(false);
   const [stockItemError, setStockItemError] = useState<string | null>(null);
+  const [stockItemProductId, setStockItemProductId] = useState("");
+  const [stockItemBranchId, setStockItemBranchId] = useState("");
+  const [stockItemQuantity, setStockItemQuantity] = useState("0");
   const [stockMovements, setStockMovements] = useState<
     Array<{ id: string; productId: string; movementType: string; quantity: number; notes: string | null; createdAt: string }>
   >([]);
   const [isLoadingStockMovements, setIsLoadingStockMovements] = useState(false);
   const [stockMovementError, setStockMovementError] = useState<string | null>(null);
+  const [stockMovementProductId, setStockMovementProductId] = useState("");
+  const [stockMovementBranchId, setStockMovementBranchId] = useState("");
+  const [stockMovementType, setStockMovementType] = useState("PURCHASE");
+  const [stockMovementQuantity, setStockMovementQuantity] = useState("1");
+  const [stockMovementNotes, setStockMovementNotes] = useState("");
   const [staff, setStaff] = useState<StaffRecord[]>([]);
   const [isLoadingStaff, setIsLoadingStaff] = useState(false);
   const [staffError, setStaffError] = useState<string | null>(null);
@@ -1314,6 +1322,89 @@ export default function Home() {
     setCategoryDescription("");
   };
 
+  const addStockItem = async () => {
+    if (!stockItemProductId.trim() || !stockItemBranchId.trim()) return;
+    setStockItemError(null);
+    const result = await fetch("/api/stock-items", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        productId: stockItemProductId,
+        branchId: stockItemBranchId,
+        quantity: Number(stockItemQuantity) || 0,
+      }),
+    });
+    if (result.status === 401) {
+      setStockItems([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setStockItems([]);
+      setStockItemError("You are not authorized to manage stock items.");
+      return;
+    }
+    if (!result.ok) {
+      const body = await result.json().catch(() => ({}));
+      setStockItemError(body?.error ?? "Stock item could not be saved.");
+      return;
+    }
+    const body = await result.json() as { stockItem: { id: string; productId: string; branchId: string; quantity: number } };
+    setStockItems((current) => [body.stockItem, ...current]);
+    setStockItemProductId("");
+    setStockItemBranchId("");
+    setStockItemQuantity("0");
+  };
+
+  const addStockMovement = async () => {
+    if (!stockMovementProductId.trim() || !stockMovementBranchId.trim() || !stockMovementType.trim()) return;
+    setStockMovementError(null);
+    const result = await fetch("/api/stock-movements", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        productId: stockMovementProductId,
+        branchId: stockMovementBranchId,
+        movementType: stockMovementType,
+        quantity: Number(stockMovementQuantity) || 0,
+        notes: stockMovementNotes || null,
+      }),
+    });
+    if (result.status === 401) {
+      setStockMovements([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setStockMovements([]);
+      setStockMovementError("You are not authorized to record stock movements.");
+      return;
+    }
+    if (!result.ok) {
+      const body = await result.json().catch(() => ({}));
+      setStockMovementError(body?.error ?? "Stock movement could not be recorded.");
+      return;
+    }
+    const body = await result.json() as { stockItem: { id: string; productId: string; branchId: string; quantity: number } };
+    setStockItems((current) => {
+      const existing = current.find((item) => item.productId === stockMovementProductId && item.branchId === stockMovementBranchId);
+      if (existing) {
+        return current.map((item) =>
+          item.productId === stockMovementProductId && item.branchId === stockMovementBranchId
+            ? { ...item, quantity: body.stockItem.quantity }
+            : item,
+        );
+      }
+      return [body.stockItem, ...current];
+    });
+    setStockMovementProductId("");
+    setStockMovementBranchId("");
+    setStockMovementQuantity("1");
+    setStockMovementNotes("");
+  };
+
   const addStaff = async () => {
     if (!staffName.trim()) return;
     setStaffError(null);
@@ -2151,6 +2242,36 @@ export default function Home() {
             </div>
 
             <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <h2 className="text-xl font-semibold">Add stock item</h2>
+              <div className="mt-4 space-y-3">
+                <input
+                  value={stockItemProductId}
+                  onChange={(event) => setStockItemProductId(event.target.value)}
+                  placeholder="Product ID"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <input
+                  value={stockItemBranchId}
+                  onChange={(event) => setStockItemBranchId(event.target.value)}
+                  placeholder="Branch ID"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <input
+                  value={stockItemQuantity}
+                  onChange={(event) => setStockItemQuantity(event.target.value)}
+                  placeholder="Quantity"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <button
+                  onClick={addStockItem}
+                  className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                >
+                  Save stock item
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
               <h2 className="text-xl font-semibold">Movement History</h2>
               <div className="mt-4 space-y-3">
                 {isLoadingStockMovements ? <div className="text-sm text-[#736067]">Loading stock movements...</div> : null}
@@ -2169,6 +2290,52 @@ export default function Home() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <h2 className="text-xl font-semibold">Record movement</h2>
+              <div className="mt-4 space-y-3">
+                <input
+                  value={stockMovementProductId}
+                  onChange={(event) => setStockMovementProductId(event.target.value)}
+                  placeholder="Product ID"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <input
+                  value={stockMovementBranchId}
+                  onChange={(event) => setStockMovementBranchId(event.target.value)}
+                  placeholder="Branch ID"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <select
+                  value={stockMovementType}
+                  onChange={(event) => setStockMovementType(event.target.value)}
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                >
+                  <option value="PURCHASE">Purchase</option>
+                  <option value="SALE">Sale</option>
+                  <option value="TRANSFER">Transfer</option>
+                  <option value="ADJUSTMENT">Adjustment</option>
+                </select>
+                <input
+                  value={stockMovementQuantity}
+                  onChange={(event) => setStockMovementQuantity(event.target.value)}
+                  placeholder="Quantity"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <input
+                  value={stockMovementNotes}
+                  onChange={(event) => setStockMovementNotes(event.target.value)}
+                  placeholder="Notes (optional)"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <button
+                  onClick={addStockMovement}
+                  className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                >
+                  Record movement
+                </button>
               </div>
             </div>
           </section>

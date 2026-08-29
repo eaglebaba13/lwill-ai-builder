@@ -22,12 +22,36 @@ export interface StockMovementRecord {
   readonly updatedAt: Date;
 }
 
+export interface StockItemCreateInput {
+  readonly tenantId: string;
+  readonly productId: string;
+  readonly branchId: string;
+  readonly quantity?: number;
+}
+
+export interface StockItemUpdateInput {
+  readonly quantity?: number;
+}
+
+export interface StockMovementCreateInput {
+  readonly tenantId: string;
+  readonly productId: string;
+  readonly branchId: string;
+  readonly movementType: string;
+  readonly quantity: number;
+  readonly referenceType?: string | null;
+  readonly referenceId?: string | null;
+  readonly notes?: string | null;
+}
+
 export interface StockService {
   getStockItem(args: { tenantId: string; productId: string; branchId: string }): Promise<StockItemRecord | null>;
   getStockItemById(args: { tenantId: string; stockItemId: string }): Promise<StockItemRecord | null>;
   listStockItems(args: { tenantId: string; branchId?: string }): Promise<StockItemRecord[]>;
   listStockMovements(args: { tenantId: string }): Promise<StockMovementRecord[]>;
   getStockMovement(args: { tenantId: string; stockMovementId: string }): Promise<StockMovementRecord | null>;
+  createStockItem(input: StockItemCreateInput): Promise<StockItemRecord>;
+  updateStockItem(args: { tenantId: string; stockItemId: string; input: StockItemUpdateInput }): Promise<StockItemRecord | null>;
   createStockMovement(input: {
     tenantId: string;
     productId: string;
@@ -38,6 +62,7 @@ export interface StockService {
     referenceId?: string | null;
     notes?: string | null;
   }): Promise<StockMovementRecord>;
+  recordStockMovement(input: StockMovementCreateInput): Promise<StockItemRecord>;
   deductStock(args: {
     tenantId: string;
     productId: string;
@@ -67,6 +92,9 @@ interface StockPrismaClient {
   };
   readonly branch: {
     findUnique: (args: { where: { id: string } }) => Promise<{ id: string; tenantId: string } | null>;
+  };
+  $transaction: {
+    <T>(callback: (client: StockPrismaClient) => Promise<T>): Promise<T>;
   };
 }
 
@@ -108,6 +136,97 @@ export function createStockService(prisma: StockPrismaClient): StockService {
         return null;
       }
       return movement;
+    },
+
+    async createStockItem(input) {
+      const product = await prisma.product.findUnique({ where: { id: input.productId } });
+      if (product === null || product.tenantId !== input.tenantId) {
+        throw new Error("product must belong to the same tenant");
+      }
+
+      const branch = await prisma.branch.findUnique({ where: { id: input.branchId } });
+      if (branch === null || branch.tenantId !== input.tenantId) {
+        throw new Error("branch must belong to the same tenant");
+      }
+
+      const existing = await prisma.stockItem.findFirst({
+        where: { tenantId: input.tenantId, productId: input.productId, branchId: input.branchId },
+      });
+      if (existing !== null) {
+        throw new Error("stock item already exists for this product and branch");
+      }
+
+      return prisma.stockItem.create({
+        data: {
+          tenantId: input.tenantId,
+          productId: input.productId,
+          branchId: input.branchId,
+          quantity: input.quantity ?? 0,
+        },
+      });
+    },
+
+    async updateStockItem({ tenantId, stockItemId, input }) {
+      const existing = await prisma.stockItem.findUnique({ where: { id: stockItemId } });
+      if (existing === null || existing.tenantId !== tenantId) {
+        return null;
+      }
+
+      const data: Record<string, unknown> = {};
+      if (input.quantity !== undefined) {
+        data.quantity = input.quantity;
+      }
+
+      return prisma.stockItem.update({ where: { id: stockItemId }, data });
+    },
+
+    async recordStockMovement(input) {
+      const product = await prisma.product.findUnique({ where: { id: input.productId } });
+      if (product === null || product.tenantId !== input.tenantId) {
+        throw new Error("product must belong to the same tenant");
+      }
+
+      const branch = await prisma.branch.findUnique({ where: { id: input.branchId } });
+      if (branch === null || branch.tenantId !== input.tenantId) {
+        throw new Error("branch must belong to the same tenant");
+      }
+
+      return prisma.$transaction(async (transaction) => {
+        let stockItem = await transaction.stockItem.findFirst({
+          where: { tenantId: input.tenantId, productId: input.productId, branchId: input.branchId },
+        });
+
+        if (stockItem === null) {
+          stockItem = await transaction.stockItem.create({
+            data: {
+              tenantId: input.tenantId,
+              productId: input.productId,
+              branchId: input.branchId,
+              quantity: 0,
+            },
+          });
+        }
+
+        const updated = await transaction.stockItem.update({
+          where: { id: stockItem.id },
+          data: { quantity: { increment: input.quantity } },
+        });
+
+        await transaction.stockMovement.create({
+          data: {
+            tenantId: input.tenantId,
+            productId: input.productId,
+            branchId: input.branchId,
+            movementType: input.movementType,
+            quantity: input.quantity,
+            referenceType: input.referenceType ?? null,
+            referenceId: input.referenceId ?? null,
+            notes: input.notes ?? null,
+          },
+        });
+
+        return updated;
+      });
     },
 
     async createStockMovement(input) {

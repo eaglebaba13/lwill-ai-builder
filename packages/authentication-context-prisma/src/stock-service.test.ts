@@ -43,7 +43,15 @@ function createFixture() {
       }),
       update: vi.fn(async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => {
         const existing = state.stockItems.get(where.id);
-        const updated = { ...existing, ...data } as StockItemState;
+        const resolved: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(data)) {
+          if (key === "quantity" && typeof value === "object" && value !== null && "increment" in (value as Record<string, unknown>)) {
+            resolved.quantity = (existing?.quantity as number ?? 0) + ((value as Record<string, unknown>).increment as number);
+          } else {
+            resolved[key] = value;
+          }
+        }
+        const updated = { ...existing, ...resolved } as StockItemState;
         state.stockItems.set(where.id, updated);
         return updated;
       }),
@@ -69,6 +77,7 @@ function createFixture() {
       findUnique: vi.fn(async ({ where }: { where: { id: string } }) =>
         state.branches.get(where.id) ?? null),
     },
+    $transaction: vi.fn(async (callback: (client: typeof prisma) => Promise<unknown>) => callback(prisma)),
   };
   return { prisma, state };
 }
@@ -215,6 +224,207 @@ describe("stock service: deductStock tenant validation", () => {
         quantity: 5,
         referenceType: "SALE",
         referenceId: "sale-1",
+      }),
+    ).rejects.toThrow("branch must belong to the same tenant");
+  });
+});
+
+describe("stock service: createStockItem", () => {
+  it("creates a stock item for a valid product and branch", async () => {
+    const { prisma, state } = createFixture();
+    state.products.set("p1", { id: "p1", tenantId: "tenant-1" });
+    state.branches.set("b1", { id: "b1", tenantId: "tenant-1" });
+    const service = createStockService(prisma as never);
+
+    const stockItem = await service.createStockItem({
+      tenantId: "tenant-1",
+      productId: "p1",
+      branchId: "b1",
+      quantity: 10,
+    });
+
+    expect(stockItem).toMatchObject({
+      tenantId: "tenant-1",
+      productId: "p1",
+      branchId: "b1",
+      quantity: 10,
+    });
+  });
+
+  it("throws when the product belongs to another tenant", async () => {
+    const { prisma, state } = createFixture();
+    state.products.set("p1", { id: "p1", tenantId: "tenant-2" });
+    state.branches.set("b1", { id: "b1", tenantId: "tenant-1" });
+    const service = createStockService(prisma as never);
+
+    await expect(
+      service.createStockItem({
+        tenantId: "tenant-1",
+        productId: "p1",
+        branchId: "b1",
+      }),
+    ).rejects.toThrow("product must belong to the same tenant");
+  });
+
+  it("throws when the branch belongs to another tenant", async () => {
+    const { prisma, state } = createFixture();
+    state.products.set("p1", { id: "p1", tenantId: "tenant-1" });
+    state.branches.set("b1", { id: "b1", tenantId: "tenant-2" });
+    const service = createStockService(prisma as never);
+
+    await expect(
+      service.createStockItem({
+        tenantId: "tenant-1",
+        productId: "p1",
+        branchId: "b1",
+      }),
+    ).rejects.toThrow("branch must belong to the same tenant");
+  });
+
+  it("rejects duplicate stock items for the same product and branch", async () => {
+    const { prisma, state } = createFixture();
+    state.products.set("p1", { id: "p1", tenantId: "tenant-1" });
+    state.branches.set("b1", { id: "b1", tenantId: "tenant-1" });
+    state.stockItems.set("si-1", {
+      id: "si-1", tenantId: "tenant-1", productId: "p1", branchId: "b1", quantity: 5,
+    });
+    const service = createStockService(prisma as never);
+
+    await expect(
+      service.createStockItem({
+        tenantId: "tenant-1",
+        productId: "p1",
+        branchId: "b1",
+      }),
+    ).rejects.toThrow("stock item already exists for this product and branch");
+  });
+});
+
+describe("stock service: updateStockItem", () => {
+  it("updates quantity for an existing stock item", async () => {
+    const { prisma, state } = createFixture();
+    state.stockItems.set("si-1", {
+      id: "si-1", tenantId: "tenant-1", productId: "p1", branchId: "b1", quantity: 10,
+    });
+    const service = createStockService(prisma as never);
+
+    const updated = await service.updateStockItem({
+      tenantId: "tenant-1",
+      stockItemId: "si-1",
+      input: { quantity: 20 },
+    });
+
+    expect(updated).toMatchObject({ id: "si-1", quantity: 20 });
+  });
+
+  it("returns null when updating a non-existent stock item", async () => {
+    const { prisma } = createFixture();
+    const service = createStockService(prisma as never);
+
+    const updated = await service.updateStockItem({
+      tenantId: "tenant-1",
+      stockItemId: "missing",
+      input: { quantity: 10 },
+    });
+
+    expect(updated).toBeNull();
+  });
+
+  it("returns null when updating a stock item belonging to another tenant", async () => {
+    const { prisma, state } = createFixture();
+    state.stockItems.set("si-1", {
+      id: "si-1", tenantId: "tenant-2", productId: "p1", branchId: "b1", quantity: 10,
+    });
+    const service = createStockService(prisma as never);
+
+    const updated = await service.updateStockItem({
+      tenantId: "tenant-1",
+      stockItemId: "si-1",
+      input: { quantity: 20 },
+    });
+
+    expect(updated).toBeNull();
+  });
+});
+
+describe("stock service: recordStockMovement", () => {
+  it("creates a movement and updates stock balance atomically", async () => {
+    const { prisma, state } = createFixture();
+    state.products.set("p1", { id: "p1", tenantId: "tenant-1" });
+    state.branches.set("b1", { id: "b1", tenantId: "tenant-1" });
+    state.stockItems.set("si-1", {
+      id: "si-1", tenantId: "tenant-1", productId: "p1", branchId: "b1", quantity: 10,
+    });
+    const service = createStockService(prisma as never);
+
+    const updated = await service.recordStockMovement({
+      tenantId: "tenant-1",
+      productId: "p1",
+      branchId: "b1",
+      movementType: "PURCHASE",
+      quantity: 5,
+    });
+
+    expect(updated).toMatchObject({ id: "si-1", quantity: 15 });
+    expect(state.stockMovements.size).toBe(1);
+    const movement = [...state.stockMovements.values()][0]!;
+    expect(movement).toMatchObject({
+      tenantId: "tenant-1",
+      productId: "p1",
+      branchId: "b1",
+      movementType: "PURCHASE",
+      quantity: 5,
+    });
+  });
+
+  it("creates a new stock item when none exists", async () => {
+    const { prisma, state } = createFixture();
+    state.products.set("p1", { id: "p1", tenantId: "tenant-1" });
+    state.branches.set("b1", { id: "b1", tenantId: "tenant-1" });
+    const service = createStockService(prisma as never);
+
+    const updated = await service.recordStockMovement({
+      tenantId: "tenant-1",
+      productId: "p1",
+      branchId: "b1",
+      movementType: "PURCHASE",
+      quantity: 5,
+    });
+
+    expect(updated).toMatchObject({ tenantId: "tenant-1", productId: "p1", branchId: "b1", quantity: 5 });
+    expect(state.stockItems.size).toBe(1);
+  });
+
+  it("throws when the product belongs to another tenant", async () => {
+    const { prisma, state } = createFixture();
+    state.products.set("p1", { id: "p1", tenantId: "tenant-2" });
+    state.branches.set("b1", { id: "b1", tenantId: "tenant-1" });
+    const service = createStockService(prisma as never);
+
+    await expect(
+      service.recordStockMovement({
+        tenantId: "tenant-1",
+        productId: "p1",
+        branchId: "b1",
+        movementType: "PURCHASE",
+        quantity: 5,
+      }),
+    ).rejects.toThrow("product must belong to the same tenant");
+  });
+
+  it("throws when the branch belongs to another tenant", async () => {
+    const { prisma, state } = createFixture();
+    state.products.set("p1", { id: "p1", tenantId: "tenant-1" });
+    state.branches.set("b1", { id: "b1", tenantId: "tenant-2" });
+    const service = createStockService(prisma as never);
+
+    await expect(
+      service.recordStockMovement({
+        tenantId: "tenant-1",
+        productId: "p1",
+        branchId: "b1",
+        movementType: "PURCHASE",
+        quantity: 5,
       }),
     ).rejects.toThrow("branch must belong to the same tenant");
   });

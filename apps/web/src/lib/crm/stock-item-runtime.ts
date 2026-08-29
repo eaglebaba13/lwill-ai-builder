@@ -44,5 +44,8 @@ export function createStockItemRouteServices(): StockItemRouteServices {
     listStockItems: (tenantId) => stockService.listStockItems({ tenantId }),
     getStockItem: (tenantId, stockItemId) =>
       stockService.getStockItemById({ tenantId, stockItemId }),
+    createStockItem: (tenantId, input) => stockService.createStockItem({ tenantId, ...input }),
+    updateStockItem: (tenantId, stockItemId, input) =>
+      stockService.updateStockItem({ tenantId, stockItemId, input }),
   };
 }
