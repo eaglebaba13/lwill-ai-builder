@@ -3,6 +3,7 @@ import {
   handleCreateMembership,
   handleGetMembership,
   handleListMemberships,
+  handleUpdateMembership,
   type MembershipAuthorization,
   type MembershipRouteServices,
 } from "../lib/crm/membership-route-handlers";
@@ -30,6 +31,7 @@ function createServices(authorization: MembershipAuthorization): MembershipRoute
     listMemberships: vi.fn().mockResolvedValue([{ id: "membership-1" }]),
     getMembership: vi.fn().mockResolvedValue({ id: "membership-1" }),
     createMembership: vi.fn().mockResolvedValue({ id: "membership-1" }),
+    updateMembership: vi.fn().mockResolvedValue({ id: "membership-1" }),
   };
 }
 
@@ -314,5 +316,80 @@ describe("membership route handlers: authorized operations", () => {
     const services = createServices(authorized);
     vi.mocked(services.getMembership).mockResolvedValue(null);
     expect((await handleGetMembership(request(), services, "missing")).status).toBe(404);
+  });
+});
+
+describe("membership route handlers: update operations", () => {
+  const authorized: MembershipAuthorization = { outcome: "authorized", tenantId: "tenant-1" };
+
+  it("returns 401 for an unauthenticated caller", async () => {
+    const services = createServices({ outcome: "unauthenticated" });
+    expect((await handleUpdateMembership(request({ status: "active" }), services, "m1")).status).toBe(401);
+    expect(services.updateMembership).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 for an authenticated caller lacking the permission", async () => {
+    const services = createServices({ outcome: "forbidden" });
+    expect((await handleUpdateMembership(request({ status: "active" }), services, "m1")).status).toBe(403);
+    expect(services.updateMembership).not.toHaveBeenCalled();
+  });
+
+  it("passes 'membership.write' to authorize for update", async () => {
+    const services = createServices(authorized);
+    await handleUpdateMembership(request({ status: "active" }), services, "m1");
+    expect(services.authorize).toHaveBeenCalledWith("membership.write");
+  });
+
+  it("returns 400 for invalid JSON body", async () => {
+    const services = createServices(authorized);
+    const badRequest = new Request("https://builder.lwill.in/api/memberships/m1", {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: "not-json",
+    });
+    expect((await handleUpdateMembership(badRequest, services, "m1")).status).toBe(400);
+  });
+
+  it("rejects unknown keys in update input", async () => {
+    const services = createServices(authorized);
+    expect((await handleUpdateMembership(request({ status: "active", customerId: "cust-1" }), services, "m1")).status).toBe(400);
+    expect((await handleUpdateMembership(request({ status: "active", tenantId: "attacker" }), services, "m1")).status).toBe(400);
+  });
+
+  it("returns 404 when the membership does not exist or belongs to another tenant", async () => {
+    const services = createServices(authorized);
+    vi.mocked(services.updateMembership).mockResolvedValue(null);
+    expect((await handleUpdateMembership(request({ status: "active" }), services, "missing")).status).toBe(404);
+  });
+
+  it("updates membership with valid partial fields", async () => {
+    const services = createServices(authorized);
+    const result = await handleUpdateMembership(
+      request({ status: "active", endsAt: "2026-09-12T00:00:00.000Z" }),
+      services,
+      "m1",
+    );
+    expect(result.status).toBe(200);
+    expect(services.updateMembership).toHaveBeenCalledWith(
+      "tenant-1",
+      "m1",
+      expect.objectContaining({ status: "active", endsAt: expect.any(Date) }),
+    );
+  });
+
+  it("accepts null status and null endsAt", async () => {
+    const services = createServices(authorized);
+    const result = await handleUpdateMembership(request({ status: null, endsAt: null }), services, "m1");
+    expect(result.status).toBe(200);
+  });
+
+  it("rejects invalid endsAt date", async () => {
+    const services = createServices(authorized);
+    expect((await handleUpdateMembership(request({ endsAt: "not-a-date" }), services, "m1")).status).toBe(400);
+  });
+
+  it("rejects invalid status type", async () => {
+    const services = createServices(authorized);
+    expect((await handleUpdateMembership(request({ status: 123 }), services, "m1")).status).toBe(400);
   });
 });

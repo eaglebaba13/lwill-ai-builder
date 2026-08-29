@@ -19,10 +19,18 @@ export interface MembershipCreateInput {
   readonly status?: string | null;
 }
 
+export interface MembershipUpdateInput {
+  readonly packageId?: string;
+  readonly startedAt?: Date;
+  readonly endsAt?: Date | null;
+  readonly status?: string | null;
+}
+
 export interface MembershipService {
   createMembership(input: MembershipCreateInput): Promise<MembershipRecord>;
   getMembership(args: { tenantId: string; membershipId: string }): Promise<MembershipRecord | null>;
   listMemberships(args: { tenantId: string }): Promise<MembershipRecord[]>;
+  updateMembership(args: { tenantId: string; membershipId: string; input: MembershipUpdateInput }): Promise<MembershipRecord | null>;
 }
 
 interface MembershipPrismaClient {
@@ -30,6 +38,7 @@ interface MembershipPrismaClient {
     create: (args: { data: Record<string, unknown> }) => Promise<MembershipRecord>;
     findUnique: (args: { where: { id: string } }) => Promise<MembershipRecord | null>;
     findMany: (args: { where?: Record<string, unknown> }) => Promise<MembershipRecord[]>;
+    update: (args: { data: Record<string, unknown>; where: { id: string } }) => Promise<MembershipRecord>;
   };
   readonly customer: {
     findUnique: (args: { where: { id: string } }) => Promise<{ id: string; tenantId: string } | null>;
@@ -69,6 +78,33 @@ export function createMembershipService(prisma: MembershipPrismaClient): Members
     },
     async listMemberships({ tenantId }) {
       return prisma.membership.findMany({ where: { tenantId } });
+    },
+
+    async updateMembership({ tenantId, membershipId, input }) {
+      const existing = await prisma.membership.findUnique({ where: { id: membershipId } });
+      if (existing === null || existing.tenantId !== tenantId) {
+        return null;
+      }
+
+      const data: Record<string, unknown> = {};
+      if (input.packageId !== undefined) {
+        const pkg = await prisma.package.findUnique({ where: { id: input.packageId } });
+        if (pkg === null || pkg.tenantId !== tenantId) {
+          throw new Error("package must belong to the same tenant");
+        }
+        data.packageId = input.packageId;
+      }
+      if (input.startedAt !== undefined) {
+        data.startedAt = input.startedAt;
+      }
+      if (input.endsAt !== undefined) {
+        data.endsAt = input.endsAt;
+      }
+      if (input.status !== undefined) {
+        data.status = input.status;
+      }
+
+      return prisma.membership.update({ where: { id: membershipId }, data });
     },
   };
 }

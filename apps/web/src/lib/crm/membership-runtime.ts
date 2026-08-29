@@ -44,5 +44,6 @@ export function createMembershipRouteServices(): MembershipRouteServices {
     listMemberships: (tenantId) => membershipService.listMemberships({ tenantId }),
     getMembership: (tenantId, membershipId) => membershipService.getMembership({ tenantId, membershipId }),
     createMembership: (tenantId, input) => membershipService.createMembership({ tenantId, ...input }),
+    updateMembership: (tenantId, membershipId, input) => membershipService.updateMembership({ tenantId, membershipId, input }),
   };
 }

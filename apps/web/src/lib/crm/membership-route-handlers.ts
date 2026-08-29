@@ -13,11 +13,19 @@ export interface MembershipWriteInput {
   readonly status?: string | null;
 }
 
+export interface MembershipUpdateInput {
+  readonly packageId?: string;
+  readonly startedAt?: Date;
+  readonly endsAt?: Date | null;
+  readonly status?: string | null;
+}
+
 export interface MembershipRouteServices {
   readonly authorize: (permissionCode: string) => Promise<MembershipAuthorization>;
   readonly listMemberships: (tenantId: string) => Promise<readonly unknown[]>;
   readonly getMembership: (tenantId: string, membershipId: string) => Promise<unknown | null>;
   readonly createMembership: (tenantId: string, input: MembershipWriteInput) => Promise<unknown>;
+  readonly updateMembership: (tenantId: string, membershipId: string, input: MembershipUpdateInput) => Promise<unknown | null>;
 }
 
 const RESPONSE_HEADERS = { "cache-control": "no-store" };
@@ -98,6 +106,46 @@ function parseCreateInput(input: unknown): MembershipWriteInput | null {
   };
 }
 
+function parseUpdateInput(input: unknown): MembershipUpdateInput | null {
+  if (typeof input !== "object" || input === null) {
+    return null;
+  }
+  const record = input as Record<string, unknown>;
+  const allowedKeys = new Set(["packageId", "startedAt", "endsAt", "status"]);
+  if (Object.keys(record).some((key) => !allowedKeys.has(key))) {
+    return null;
+  }
+  if (record.packageId !== undefined && !isNonEmptyString(record.packageId)) {
+    return null;
+  }
+  if (record.startedAt !== undefined) {
+    const startedAt = parseDate(record.startedAt);
+    if (startedAt === null) {
+      return null;
+    }
+    record.startedAt = startedAt;
+  }
+  if (record.endsAt !== undefined && !isOptionalString(record.endsAt)) {
+    return null;
+  }
+  if (record.endsAt !== undefined && record.endsAt !== null) {
+    const endsAt = parseDate(record.endsAt);
+    if (endsAt === null) {
+      return null;
+    }
+    record.endsAt = endsAt;
+  }
+  if (record.status !== undefined && !isOptionalString(record.status)) {
+    return null;
+  }
+  return {
+    packageId: record.packageId as string | undefined,
+    startedAt: record.startedAt as Date | undefined,
+    endsAt: record.endsAt as Date | null | undefined,
+    status: record.status as string | null | undefined,
+  };
+}
+
 const INVALID_JSON = Symbol("invalid-json");
 
 async function readJsonBody(request: Request): Promise<unknown | typeof INVALID_JSON> {
@@ -153,6 +201,31 @@ export async function handleGetMembership(
     return authResult.response;
   }
   const membership = await services.getMembership(authResult.tenantId, membershipId);
+  if (membership === null) {
+    return response(404);
+  }
+  return response(200, { membership });
+}
+
+export async function handleUpdateMembership(
+  request: Request,
+  services: MembershipRouteServices,
+  membershipId: string,
+): Promise<Response> {
+  const authorization = await services.authorize("membership.write");
+  const authResult = authorizationOutcome(authorization);
+  if (!authResult.ok) {
+    return authResult.response;
+  }
+  const body = await readJsonBody(request);
+  if (body === INVALID_JSON) {
+    return response(400);
+  }
+  const input = parseUpdateInput(body);
+  if (input === null) {
+    return response(400);
+  }
+  const membership = await services.updateMembership(authResult.tenantId, membershipId, input);
   if (membership === null) {
     return response(404);
   }

@@ -153,6 +153,110 @@ describe("package and membership services", () => {
   });
 });
 
+describe("membership service: updateMembership", () => {
+  it("updates valid supplied fields and preserves unspecified fields", async () => {
+    const membershipService = createMembershipService({
+      membership: {
+        create: async () => ({ id: "membership-1" }),
+        findUnique: async () => ({ id: "membership-1", tenantId: "tenant-1", customerId: "customer-1", packageId: "pkg-1", startedAt: new Date("2026-08-12T00:00:00.000Z"), endsAt: new Date("2026-09-12T00:00:00.000Z"), status: "active", createdAt: new Date(), updatedAt: new Date() }),
+        findMany: async () => [],
+        update: async ({ where, data }) => ({ id: where.id, ...data } as never),
+      },
+      customer: {
+        findUnique: async () => ({ id: "customer-1", tenantId: "tenant-1" }),
+      },
+      package: {
+        findUnique: async () => ({ id: "pkg-1", tenantId: "tenant-1" }),
+      },
+    } as never);
+
+    const updated = await membershipService.updateMembership({
+      tenantId: "tenant-1",
+      membershipId: "membership-1",
+      input: { status: "expired", endsAt: new Date("2026-09-12T00:00:00.000Z") },
+    });
+
+    expect(updated).not.toBeNull();
+    expect(updated?.status).toBe("expired");
+    expect(updated?.endsAt).toEqual(new Date("2026-09-12T00:00:00.000Z"));
+  });
+
+  it("returns null when updating a nonexistent membership", async () => {
+    const membershipService = createMembershipService({
+      membership: {
+        create: async () => ({ id: "membership-1" }),
+        findUnique: async () => null,
+        findMany: async () => [],
+        update: async () => ({ id: "membership-1" } as never),
+      },
+      customer: {
+        findUnique: async () => ({ id: "customer-1", tenantId: "tenant-1" }),
+      },
+      package: {
+        findUnique: async () => ({ id: "pkg-1", tenantId: "tenant-1" }),
+      },
+    } as never);
+
+    const updated = await membershipService.updateMembership({
+      tenantId: "tenant-1",
+      membershipId: "missing",
+      input: { status: "expired" },
+    });
+
+    expect(updated).toBeNull();
+  });
+
+  it("returns null for cross-tenant update", async () => {
+    const membershipService = createMembershipService({
+      membership: {
+        create: async () => ({ id: "membership-1" }),
+        findUnique: async () => ({ id: "membership-1", tenantId: "tenant-2" }),
+        findMany: async () => [],
+        update: async () => ({ id: "membership-1" } as never),
+      },
+      customer: {
+        findUnique: async () => ({ id: "customer-1", tenantId: "tenant-1" }),
+      },
+      package: {
+        findUnique: async () => ({ id: "pkg-1", tenantId: "tenant-1" }),
+      },
+    } as never);
+
+    const updated = await membershipService.updateMembership({
+      tenantId: "tenant-1",
+      membershipId: "membership-1",
+      input: { status: "expired" },
+    });
+
+    expect(updated).toBeNull();
+  });
+
+  it("rejects update when the new package belongs to another tenant", async () => {
+    const membershipService = createMembershipService({
+      membership: {
+        create: async () => ({ id: "membership-1" }),
+        findUnique: async () => ({ id: "membership-1", tenantId: "tenant-1", customerId: "customer-1", packageId: "pkg-1", startedAt: new Date("2026-08-12T00:00:00.000Z"), endsAt: new Date("2026-09-12T00:00:00.000Z"), status: "active", createdAt: new Date(), updatedAt: new Date() }),
+        findMany: async () => [],
+        update: async () => ({ id: "membership-1" } as never),
+      },
+      customer: {
+        findUnique: async () => ({ id: "customer-1", tenantId: "tenant-1" }),
+      },
+      package: {
+        findUnique: async () => ({ id: "pkg-2", tenantId: "tenant-2" }),
+      },
+    } as never);
+
+    await expect(
+      membershipService.updateMembership({
+        tenantId: "tenant-1",
+        membershipId: "membership-1",
+        input: { packageId: "pkg-2" },
+      }),
+    ).rejects.toThrow("package must belong to the same tenant");
+  });
+});
+
 describe("package service: updatePackage", () => {
   it("updates valid supplied fields and preserves unspecified fields", async () => {
     const { prisma, state } = createPackageFixture();
