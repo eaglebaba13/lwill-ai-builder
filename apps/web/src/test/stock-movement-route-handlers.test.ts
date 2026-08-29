@@ -140,7 +140,7 @@ describe("stock-movement route handlers: create", () => {
     ).toBe(400);
   });
 
-  it("returns 201 for a valid create request", async () => {
+  it("returns 201 for a valid PURCHASE create request", async () => {
     const services = createServices({ outcome: "authorized", tenantId: "tenant-1" });
     vi.mocked(services.createStockMovement).mockResolvedValue({ id: "si-1", tenantId: "tenant-1", productId: "p1", branchId: "b1", quantity: 5 });
     const result = await handleCreateStockMovement(
@@ -160,7 +160,98 @@ describe("stock-movement route handlers: create", () => {
       referenceType: null,
       referenceId: null,
       notes: null,
+      adjustmentDirection: null,
     });
+  });
+
+  it("returns 201 for a valid SALE create request", async () => {
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1" });
+    vi.mocked(services.createStockMovement).mockResolvedValue({ id: "si-1", tenantId: "tenant-1", productId: "p1", branchId: "b1", quantity: -5 });
+    const result = await handleCreateStockMovement(
+      new Request("https://builder.lwill.in/api/stock-movements", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ productId: "p1", branchId: "b1", movementType: "SALE", quantity: 5 }),
+      }),
+      services,
+    );
+    expect(result.status).toBe(201);
+    expect(services.createStockMovement).toHaveBeenCalledWith("tenant-1", {
+      productId: "p1",
+      branchId: "b1",
+      movementType: "SALE",
+      quantity: 5,
+      referenceType: null,
+      referenceId: null,
+      notes: null,
+      adjustmentDirection: null,
+    });
+  });
+
+  it("returns 201 for a valid ADJUSTMENT create request with direction", async () => {
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1" });
+    vi.mocked(services.createStockMovement).mockResolvedValue({ id: "si-1", tenantId: "tenant-1", productId: "p1", branchId: "b1", quantity: 3 });
+    const result = await handleCreateStockMovement(
+      new Request("https://builder.lwill.in/api/stock-movements", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ productId: "p1", branchId: "b1", movementType: "ADJUSTMENT", quantity: 3, adjustmentDirection: "IN" }),
+      }),
+      services,
+    );
+    expect(result.status).toBe(201);
+    expect(services.createStockMovement).toHaveBeenCalledWith("tenant-1", {
+      productId: "p1",
+      branchId: "b1",
+      movementType: "ADJUSTMENT",
+      quantity: 3,
+      referenceType: null,
+      referenceId: null,
+      notes: null,
+      adjustmentDirection: "IN",
+    });
+  });
+
+  it("rejects unsupported movement types", async () => {
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1" });
+    const result = await handleCreateStockMovement(
+      new Request("https://builder.lwill.in/api/stock-movements", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ productId: "p1", branchId: "b1", movementType: "TRANSFER", quantity: 5 }),
+      }),
+      services,
+    );
+    expect(result.status).toBe(400);
+    expect(services.createStockMovement).not.toHaveBeenCalled();
+  });
+
+  it("rejects ADJUSTMENT without adjustmentDirection", async () => {
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1" });
+    const result = await handleCreateStockMovement(
+      new Request("https://builder.lwill.in/api/stock-movements", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ productId: "p1", branchId: "b1", movementType: "ADJUSTMENT", quantity: 5 }),
+      }),
+      services,
+    );
+    expect(result.status).toBe(400);
+    expect(services.createStockMovement).not.toHaveBeenCalled();
+  });
+
+  it("rejects adjustmentDirection on non-ADJUSTMENT types", async () => {
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1" });
+    const result = await handleCreateStockMovement(
+      new Request("https://builder.lwill.in/api/stock-movements", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ productId: "p1", branchId: "b1", movementType: "PURCHASE", quantity: 5, adjustmentDirection: "IN" }),
+      }),
+      services,
+    );
+    expect(result.status).toBe(400);
+    expect(services.createStockMovement).not.toHaveBeenCalled();
   });
 
   it("returns 403 when service throws tenant validation error", async () => {
@@ -175,5 +266,19 @@ describe("stock-movement route handlers: create", () => {
       services,
     );
     expect(result.status).toBe(403);
+  });
+
+  it("returns 409 when service throws insufficient stock error", async () => {
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1" });
+    vi.mocked(services.createStockMovement).mockRejectedValue(new Error("insufficient stock for this operation"));
+    const result = await handleCreateStockMovement(
+      new Request("https://builder.lwill.in/api/stock-movements", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ productId: "p1", branchId: "b1", movementType: "SALE", quantity: 5 }),
+      }),
+      services,
+    );
+    expect(result.status).toBe(409);
   });
 });

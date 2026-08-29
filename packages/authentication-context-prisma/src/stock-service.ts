@@ -42,6 +42,7 @@ export interface StockMovementCreateInput {
   readonly referenceType?: string | null;
   readonly referenceId?: string | null;
   readonly notes?: string | null;
+  readonly adjustmentDirection?: "IN" | "OUT" | null;
 }
 
 export interface StockService {
@@ -62,19 +63,10 @@ export interface StockService {
     referenceId?: string | null;
     notes?: string | null;
   }): Promise<StockMovementRecord>;
-  recordStockMovement(input: StockMovementCreateInput): Promise<StockItemRecord>;
-  deductStock(args: {
-    tenantId: string;
-    productId: string;
-    branchId: string;
-    quantity: number;
-    referenceType: string;
-    referenceId: string;
-    notes?: string | null;
-  }): Promise<StockItemRecord>;
+  recordStockMovement(input: StockMovementCreateInput, transactionClient?: StockPrismaClient): Promise<StockItemRecord>;
 }
 
-interface StockPrismaClient {
+export interface StockPrismaClient {
   readonly stockItem: {
     findUnique: (args: { where: { id: string } }) => Promise<StockItemRecord | null>;
     findFirst: (args: { where: Record<string, unknown> }) => Promise<StockItemRecord | null>;
@@ -97,6 +89,8 @@ interface StockPrismaClient {
     <T>(callback: (client: StockPrismaClient) => Promise<T>): Promise<T>;
   };
 }
+
+const APPROVED_MOVEMENT_TYPES = new Set(["PURCHASE", "SALE", "ADJUSTMENT"]);
 
 export function createStockService(prisma: StockPrismaClient): StockService {
   return {
@@ -180,24 +174,49 @@ export function createStockService(prisma: StockPrismaClient): StockService {
       return prisma.stockItem.update({ where: { id: stockItemId }, data });
     },
 
-    async recordStockMovement(input) {
-      const product = await prisma.product.findUnique({ where: { id: input.productId } });
-      if (product === null || product.tenantId !== input.tenantId) {
-        throw new Error("product must belong to the same tenant");
+    async recordStockMovement(input, transactionClient?: StockPrismaClient) {
+      if (!APPROVED_MOVEMENT_TYPES.has(input.movementType)) {
+        throw new Error("unsupported movement type");
       }
 
-      const branch = await prisma.branch.findUnique({ where: { id: input.branchId } });
-      if (branch === null || branch.tenantId !== input.tenantId) {
-        throw new Error("branch must belong to the same tenant");
-      }
+      const run = async (db: StockPrismaClient): Promise<StockItemRecord> => {
+        const product = await db.product.findUnique({ where: { id: input.productId } });
+        if (product === null || product.tenantId !== input.tenantId) {
+          throw new Error("product must belong to the same tenant");
+        }
 
-      return prisma.$transaction(async (transaction) => {
-        let stockItem = await transaction.stockItem.findFirst({
+        const branch = await db.branch.findUnique({ where: { id: input.branchId } });
+        if (branch === null || branch.tenantId !== input.tenantId) {
+          throw new Error("branch must belong to the same tenant");
+        }
+
+        let delta: number;
+        switch (input.movementType) {
+          case "PURCHASE":
+            delta = input.quantity;
+            break;
+          case "SALE":
+            delta = -input.quantity;
+            break;
+          case "ADJUSTMENT":
+            if (input.adjustmentDirection === "IN") {
+              delta = input.quantity;
+            } else if (input.adjustmentDirection === "OUT") {
+              delta = -input.quantity;
+            } else {
+              throw new Error("adjustmentDirection is required for ADJUSTMENT movements");
+            }
+            break;
+          default:
+            throw new Error("unsupported movement type");
+        }
+
+        let stockItem = await db.stockItem.findFirst({
           where: { tenantId: input.tenantId, productId: input.productId, branchId: input.branchId },
         });
 
         if (stockItem === null) {
-          stockItem = await transaction.stockItem.create({
+          stockItem = await db.stockItem.create({
             data: {
               tenantId: input.tenantId,
               productId: input.productId,
@@ -207,18 +226,22 @@ export function createStockService(prisma: StockPrismaClient): StockService {
           });
         }
 
-        const updated = await transaction.stockItem.update({
+        if (delta < 0 && stockItem.quantity < Math.abs(delta)) {
+          throw new Error("insufficient stock for this operation");
+        }
+
+        const updated = await db.stockItem.update({
           where: { id: stockItem.id },
-          data: { quantity: { increment: input.quantity } },
+          data: { quantity: { increment: delta } },
         });
 
-        await transaction.stockMovement.create({
+        await db.stockMovement.create({
           data: {
             tenantId: input.tenantId,
             productId: input.productId,
             branchId: input.branchId,
             movementType: input.movementType,
-            quantity: input.quantity,
+            quantity: delta,
             referenceType: input.referenceType ?? null,
             referenceId: input.referenceId ?? null,
             notes: input.notes ?? null,
@@ -226,7 +249,13 @@ export function createStockService(prisma: StockPrismaClient): StockService {
         });
 
         return updated;
-      });
+      };
+
+      if (transactionClient) {
+        return run(transactionClient);
+      }
+
+      return prisma.$transaction(run);
     },
 
     async createStockMovement(input) {
@@ -242,53 +271,6 @@ export function createStockService(prisma: StockPrismaClient): StockService {
           notes: input.notes ?? null,
         },
       });
-    },
-
-    async deductStock({ tenantId, productId, branchId, quantity, referenceType, referenceId, notes }) {
-      const product = await prisma.product.findUnique({ where: { id: productId } });
-      if (product === null || product.tenantId !== tenantId) {
-        throw new Error("product must belong to the same tenant");
-      }
-
-      const branch = await prisma.branch.findUnique({ where: { id: branchId } });
-      if (branch === null || branch.tenantId !== tenantId) {
-        throw new Error("branch must belong to the same tenant");
-      }
-
-      let stockItem = await prisma.stockItem.findFirst({
-        where: { tenantId, productId, branchId },
-      });
-
-      if (stockItem === null) {
-        stockItem = await prisma.stockItem.create({
-          data: {
-            tenantId,
-            productId,
-            branchId,
-            quantity: 0,
-          },
-        });
-      }
-
-      const updated = await prisma.stockItem.update({
-        where: { id: stockItem.id },
-        data: { quantity: { decrement: quantity } },
-      });
-
-      await prisma.stockMovement.create({
-        data: {
-          tenantId,
-          productId,
-          branchId,
-          movementType: "SALE",
-          quantity: -quantity,
-          referenceType: referenceType,
-          referenceId: referenceId,
-          notes: notes ?? `Stock deducted for ${referenceType} ${referenceId}`,
-        },
-      });
-
-      return updated;
     },
   };
 }

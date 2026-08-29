@@ -191,44 +191,6 @@ describe("stock service: stock movements", () => {
   });
 });
 
-describe("stock service: deductStock tenant validation", () => {
-  it("throws when the product belongs to another tenant", async () => {
-    const { prisma, state } = createFixture();
-    state.products.set("p1", { id: "p1", tenantId: "tenant-2" });
-    state.branches.set("b1", { id: "b1", tenantId: "tenant-1" });
-    const service = createStockService(prisma as never);
-
-    await expect(
-      service.deductStock({
-        tenantId: "tenant-1",
-        productId: "p1",
-        branchId: "b1",
-        quantity: 5,
-        referenceType: "SALE",
-        referenceId: "sale-1",
-      }),
-    ).rejects.toThrow("product must belong to the same tenant");
-  });
-
-  it("throws when the branch belongs to another tenant", async () => {
-    const { prisma, state } = createFixture();
-    state.products.set("p1", { id: "p1", tenantId: "tenant-1" });
-    state.branches.set("b1", { id: "b1", tenantId: "tenant-2" });
-    const service = createStockService(prisma as never);
-
-    await expect(
-      service.deductStock({
-        tenantId: "tenant-1",
-        productId: "p1",
-        branchId: "b1",
-        quantity: 5,
-        referenceType: "SALE",
-        referenceId: "sale-1",
-      }),
-    ).rejects.toThrow("branch must belong to the same tenant");
-  });
-});
-
 describe("stock service: createStockItem", () => {
   it("creates a stock item for a valid product and branch", async () => {
     const { prisma, state } = createFixture();
@@ -348,7 +310,7 @@ describe("stock service: updateStockItem", () => {
 });
 
 describe("stock service: recordStockMovement", () => {
-  it("creates a movement and updates stock balance atomically", async () => {
+  it("creates a PURCHASE movement and increments stock balance atomically", async () => {
     const { prisma, state } = createFixture();
     state.products.set("p1", { id: "p1", tenantId: "tenant-1" });
     state.branches.set("b1", { id: "b1", tenantId: "tenant-1" });
@@ -377,6 +339,89 @@ describe("stock service: recordStockMovement", () => {
     });
   });
 
+  it("creates a SALE movement and decrements stock balance atomically", async () => {
+    const { prisma, state } = createFixture();
+    state.products.set("p1", { id: "p1", tenantId: "tenant-1" });
+    state.branches.set("b1", { id: "b1", tenantId: "tenant-1" });
+    state.stockItems.set("si-1", {
+      id: "si-1", tenantId: "tenant-1", productId: "p1", branchId: "b1", quantity: 10,
+    });
+    const service = createStockService(prisma as never);
+
+    const updated = await service.recordStockMovement({
+      tenantId: "tenant-1",
+      productId: "p1",
+      branchId: "b1",
+      movementType: "SALE",
+      quantity: 5,
+    });
+
+    expect(updated).toMatchObject({ id: "si-1", quantity: 5 });
+    expect(state.stockMovements.size).toBe(1);
+    const movement = [...state.stockMovements.values()][0]!;
+    expect(movement).toMatchObject({
+      tenantId: "tenant-1",
+      productId: "p1",
+      branchId: "b1",
+      movementType: "SALE",
+      quantity: -5,
+    });
+  });
+
+  it("creates an ADJUSTMENT_IN movement and increments stock balance", async () => {
+    const { prisma, state } = createFixture();
+    state.products.set("p1", { id: "p1", tenantId: "tenant-1" });
+    state.branches.set("b1", { id: "b1", tenantId: "tenant-1" });
+    state.stockItems.set("si-1", {
+      id: "si-1", tenantId: "tenant-1", productId: "p1", branchId: "b1", quantity: 10,
+    });
+    const service = createStockService(prisma as never);
+
+    const updated = await service.recordStockMovement({
+      tenantId: "tenant-1",
+      productId: "p1",
+      branchId: "b1",
+      movementType: "ADJUSTMENT",
+      quantity: 3,
+      adjustmentDirection: "IN",
+    });
+
+    expect(updated).toMatchObject({ id: "si-1", quantity: 13 });
+    expect(state.stockMovements.size).toBe(1);
+    const movement = [...state.stockMovements.values()][0]!;
+    expect(movement).toMatchObject({
+      movementType: "ADJUSTMENT",
+      quantity: 3,
+    });
+  });
+
+  it("creates an ADJUSTMENT_OUT movement and decrements stock balance", async () => {
+    const { prisma, state } = createFixture();
+    state.products.set("p1", { id: "p1", tenantId: "tenant-1" });
+    state.branches.set("b1", { id: "b1", tenantId: "tenant-1" });
+    state.stockItems.set("si-1", {
+      id: "si-1", tenantId: "tenant-1", productId: "p1", branchId: "b1", quantity: 10,
+    });
+    const service = createStockService(prisma as never);
+
+    const updated = await service.recordStockMovement({
+      tenantId: "tenant-1",
+      productId: "p1",
+      branchId: "b1",
+      movementType: "ADJUSTMENT",
+      quantity: 4,
+      adjustmentDirection: "OUT",
+    });
+
+    expect(updated).toMatchObject({ id: "si-1", quantity: 6 });
+    expect(state.stockMovements.size).toBe(1);
+    const movement = [...state.stockMovements.values()][0]!;
+    expect(movement).toMatchObject({
+      movementType: "ADJUSTMENT",
+      quantity: -4,
+    });
+  });
+
   it("creates a new stock item when none exists", async () => {
     const { prisma, state } = createFixture();
     state.products.set("p1", { id: "p1", tenantId: "tenant-1" });
@@ -393,6 +438,40 @@ describe("stock service: recordStockMovement", () => {
 
     expect(updated).toMatchObject({ tenantId: "tenant-1", productId: "p1", branchId: "b1", quantity: 5 });
     expect(state.stockItems.size).toBe(1);
+  });
+
+  it("throws for unsupported movement types", async () => {
+    const { prisma, state } = createFixture();
+    state.products.set("p1", { id: "p1", tenantId: "tenant-1" });
+    state.branches.set("b1", { id: "b1", tenantId: "tenant-1" });
+    const service = createStockService(prisma as never);
+
+    await expect(
+      service.recordStockMovement({
+        tenantId: "tenant-1",
+        productId: "p1",
+        branchId: "b1",
+        movementType: "TRANSFER",
+        quantity: 5,
+      }),
+    ).rejects.toThrow("unsupported movement type");
+  });
+
+  it("throws when adjustmentDirection is missing for ADJUSTMENT", async () => {
+    const { prisma, state } = createFixture();
+    state.products.set("p1", { id: "p1", tenantId: "tenant-1" });
+    state.branches.set("b1", { id: "b1", tenantId: "tenant-1" });
+    const service = createStockService(prisma as never);
+
+    await expect(
+      service.recordStockMovement({
+        tenantId: "tenant-1",
+        productId: "p1",
+        branchId: "b1",
+        movementType: "ADJUSTMENT",
+        quantity: 5,
+      }),
+    ).rejects.toThrow("adjustmentDirection is required for ADJUSTMENT movements");
   });
 
   it("throws when the product belongs to another tenant", async () => {
@@ -427,5 +506,46 @@ describe("stock service: recordStockMovement", () => {
         quantity: 5,
       }),
     ).rejects.toThrow("branch must belong to the same tenant");
+  });
+
+  it("throws when SALE would result in negative stock", async () => {
+    const { prisma, state } = createFixture();
+    state.products.set("p1", { id: "p1", tenantId: "tenant-1" });
+    state.branches.set("b1", { id: "b1", tenantId: "tenant-1" });
+    state.stockItems.set("si-1", {
+      id: "si-1", tenantId: "tenant-1", productId: "p1", branchId: "b1", quantity: 3,
+    });
+    const service = createStockService(prisma as never);
+
+    await expect(
+      service.recordStockMovement({
+        tenantId: "tenant-1",
+        productId: "p1",
+        branchId: "b1",
+        movementType: "SALE",
+        quantity: 5,
+      }),
+    ).rejects.toThrow("insufficient stock for this operation");
+  });
+
+  it("throws when ADJUSTMENT_OUT would result in negative stock", async () => {
+    const { prisma, state } = createFixture();
+    state.products.set("p1", { id: "p1", tenantId: "tenant-1" });
+    state.branches.set("b1", { id: "b1", tenantId: "tenant-1" });
+    state.stockItems.set("si-1", {
+      id: "si-1", tenantId: "tenant-1", productId: "p1", branchId: "b1", quantity: 3,
+    });
+    const service = createStockService(prisma as never);
+
+    await expect(
+      service.recordStockMovement({
+        tenantId: "tenant-1",
+        productId: "p1",
+        branchId: "b1",
+        movementType: "ADJUSTMENT",
+        quantity: 5,
+        adjustmentDirection: "OUT",
+      }),
+    ).rejects.toThrow("insufficient stock for this operation");
   });
 });

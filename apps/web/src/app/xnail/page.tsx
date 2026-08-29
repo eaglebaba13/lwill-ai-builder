@@ -175,6 +175,7 @@ export default function Home() {
   const [stockMovementType, setStockMovementType] = useState("PURCHASE");
   const [stockMovementQuantity, setStockMovementQuantity] = useState("1");
   const [stockMovementNotes, setStockMovementNotes] = useState("");
+  const [adjustmentDirection, setAdjustmentDirection] = useState<"IN" | "OUT">("IN");
   const [staff, setStaff] = useState<StaffRecord[]>([]);
   const [isLoadingStaff, setIsLoadingStaff] = useState(false);
   const [staffError, setStaffError] = useState<string | null>(null);
@@ -1359,6 +1360,7 @@ export default function Home() {
 
   const addStockMovement = async () => {
     if (!stockMovementProductId.trim() || !stockMovementBranchId.trim() || !stockMovementType.trim()) return;
+    if (stockMovementType === "ADJUSTMENT" && !adjustmentDirection) return;
     setStockMovementError(null);
     const result = await fetch("/api/stock-movements", {
       method: "POST",
@@ -1370,6 +1372,7 @@ export default function Home() {
         movementType: stockMovementType,
         quantity: Number(stockMovementQuantity) || 0,
         notes: stockMovementNotes || null,
+        adjustmentDirection: stockMovementType === "ADJUSTMENT" ? adjustmentDirection : null,
       }),
     });
     if (result.status === 401) {
@@ -1403,6 +1406,7 @@ export default function Home() {
     setStockMovementBranchId("");
     setStockMovementQuantity("1");
     setStockMovementNotes("");
+    setAdjustmentDirection("IN");
   };
 
   const addStaff = async () => {
@@ -2356,9 +2360,35 @@ export default function Home() {
                 >
                   <option value="PURCHASE">Purchase</option>
                   <option value="SALE">Sale</option>
-                  <option value="TRANSFER">Transfer</option>
+                  <option value="TRANSFER" disabled>Transfer (coming soon)</option>
                   <option value="ADJUSTMENT">Adjustment</option>
                 </select>
+                {stockMovementType === "ADJUSTMENT" ? (
+                  <div className="flex items-center gap-4">
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="radio"
+                        name="adjustmentDirection"
+                        value="IN"
+                        checked={adjustmentDirection === "IN"}
+                        onChange={() => setAdjustmentDirection("IN")}
+                        className="h-4 w-4 border-[#ead7df] text-[#5a1838] focus:ring-[#5a1838]"
+                      />
+                      Stock In (+)
+                    </label>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="radio"
+                        name="adjustmentDirection"
+                        value="OUT"
+                        checked={adjustmentDirection === "OUT"}
+                        onChange={() => setAdjustmentDirection("OUT")}
+                        className="h-4 w-4 border-[#ead7df] text-[#5a1838] focus:ring-[#5a1838]"
+                      />
+                      Stock Out (-)
+                    </label>
+                  </div>
+                ) : null}
                 <input
                   value={stockMovementQuantity}
                   onChange={(event) => setStockMovementQuantity(event.target.value)}

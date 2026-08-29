@@ -1,3 +1,5 @@
+import { createStockService, type StockPrismaClient, type StockService } from "./stock-service";
+
 export interface InvoiceLineItemRecord {
   readonly id: string;
   readonly tenantId: string;
@@ -86,6 +88,9 @@ interface InvoicePrismaClient {
   readonly branch: {
     findUnique: (args: { where: { id: string } }) => Promise<{ id: string; tenantId: string } | null>;
   };
+  $transaction: {
+    <T>(callback: (client: InvoicePrismaClient) => Promise<T>): Promise<T>;
+  };
 }
 
 function calculateTotals(items: readonly InvoiceLineItemInput[], discountCents: number, gstCents: number) {
@@ -101,119 +106,108 @@ function calculateTotals(items: readonly InvoiceLineItemInput[], discountCents: 
 }
 
 export function createBillingInvoiceService(prisma: InvoicePrismaClient): InvoiceService {
+  const stockService = createStockService(prisma as never);
+
   return {
     async createInvoice(input) {
-      const customer = await prisma.customer.findUnique({ where: { id: input.customerId } });
-      if (customer === null || customer.tenantId !== input.tenantId) {
-        throw new Error("customer must belong to the same tenant");
-      }
-
-      const normalizedItems = input.items.map((item) => ({
-        ...item,
-        quantity: Number(item.quantity),
-        unitPriceCents: Number(item.unitPriceCents),
-      }));
-
-      for (const item of normalizedItems) {
-        if (item.serviceId) {
-          const service = await prisma.service.findUnique({ where: { id: item.serviceId } });
-          if (service === null || service.tenantId !== input.tenantId) {
-            throw new Error("service must belong to the same tenant");
-          }
+      return prisma.$transaction(async (tx) => {
+        const customer = await tx.customer.findUnique({ where: { id: input.customerId } });
+        if (customer === null || customer.tenantId !== input.tenantId) {
+          throw new Error("customer must belong to the same tenant");
         }
 
-        if (item.packageId) {
-          const pkg = await prisma.package.findUnique({ where: { id: item.packageId } });
-          if (pkg === null || pkg.tenantId !== input.tenantId) {
-            throw new Error("package must belong to the same tenant");
-          }
-        }
-
-        if (item.productId) {
-          const product = await prisma.product.findUnique({ where: { id: item.productId } });
-          if (product === null || product.tenantId !== input.tenantId) {
-            throw new Error("product must belong to the same tenant");
-          }
-        }
-      }
-
-      const discountCents = input.discountCents ?? 0;
-      const gstCents = input.gstCents ?? 0;
-      const totals = calculateTotals(normalizedItems, discountCents, gstCents);
-
-      const invoice = await prisma.invoice.create({
-        data: {
-          tenantId: input.tenantId,
-          customerId: input.customerId,
-          issuedAt: input.issuedAt,
-          subtotalCents: totals.subtotalCents,
-          discountCents: totals.discountCents,
-          gstCents: totals.gstCents,
-          totalCents: totals.totalCents,
-          notes: input.notes ?? null,
-        },
-      });
-
-      for (const item of normalizedItems) {
-        const lineTotalCents = item.quantity * item.unitPriceCents;
-        await prisma.invoiceLineItem.create({
-          data: {
-            tenantId: input.tenantId,
-            invoiceId: invoice.id,
-            description: item.description,
-            serviceId: item.serviceId ?? null,
-            packageId: item.packageId ?? null,
-            productId: item.productId ?? null,
-            quantity: item.quantity,
-            unitPriceCents: item.unitPriceCents,
-            lineTotalCents,
-          },
-        });
-      }
-
-      if (input.branchId) {
-        const branch = await prisma.branch.findUnique({ where: { id: input.branchId } });
-        if (branch === null || branch.tenantId !== input.tenantId) {
-          throw new Error("branch must belong to the same tenant");
-        }
+        const normalizedItems = input.items.map((item) => ({
+          ...item,
+          quantity: Number(item.quantity),
+          unitPriceCents: Number(item.unitPriceCents),
+        }));
 
         for (const item of normalizedItems) {
-          if (!item.productId) {
-            continue;
+          if (item.serviceId) {
+            const service = await tx.service.findUnique({ where: { id: item.serviceId } });
+            if (service === null || service.tenantId !== input.tenantId) {
+              throw new Error("service must belong to the same tenant");
+            }
           }
-          let stockItem = await prisma.stockItem.findFirst({
-            where: { tenantId: input.tenantId, productId: item.productId, branchId: input.branchId },
-          });
-          if (stockItem === null) {
-            stockItem = await prisma.stockItem.create({
-              data: {
-                tenantId: input.tenantId,
-                productId: item.productId,
-                branchId: input.branchId,
-                quantity: 0,
-              },
-            });
+
+          if (item.packageId) {
+            const pkg = await tx.package.findUnique({ where: { id: item.packageId } });
+            if (pkg === null || pkg.tenantId !== input.tenantId) {
+              throw new Error("package must belong to the same tenant");
+            }
           }
-          await prisma.stockItem.update({
-            where: { id: stockItem.id },
-            data: { quantity: { decrement: item.quantity } },
-          });
-          await prisma.stockMovement.create({
+
+          if (item.productId) {
+            const product = await tx.product.findUnique({ where: { id: item.productId } });
+            if (product === null || product.tenantId !== input.tenantId) {
+              throw new Error("product must belong to the same tenant");
+            }
+          }
+        }
+
+        const discountCents = input.discountCents ?? 0;
+        const gstCents = input.gstCents ?? 0;
+        const totals = calculateTotals(normalizedItems, discountCents, gstCents);
+
+        const invoice = await tx.invoice.create({
+          data: {
+            tenantId: input.tenantId,
+            customerId: input.customerId,
+            issuedAt: input.issuedAt,
+            subtotalCents: totals.subtotalCents,
+            discountCents: totals.discountCents,
+            gstCents: totals.gstCents,
+            totalCents: totals.totalCents,
+            notes: input.notes ?? null,
+          },
+        });
+
+        for (const item of normalizedItems) {
+          const lineTotalCents = item.quantity * item.unitPriceCents;
+          await tx.invoiceLineItem.create({
             data: {
               tenantId: input.tenantId,
-              productId: item.productId,
-              branchId: input.branchId,
-              movementType: "SALE",
-              quantity: -item.quantity,
-              referenceType: "INVOICE",
-              referenceId: invoice.id,
-              notes: `Stock deducted for invoice ${invoice.id}`,
+              invoiceId: invoice.id,
+              description: item.description,
+              serviceId: item.serviceId ?? null,
+              packageId: item.packageId ?? null,
+              productId: item.productId ?? null,
+              quantity: item.quantity,
+              unitPriceCents: item.unitPriceCents,
+              lineTotalCents,
             },
           });
         }
-      }
 
-      return invoice;
+        if (input.branchId) {
+          const branch = await tx.branch.findUnique({ where: { id: input.branchId } });
+          if (branch === null || branch.tenantId !== input.tenantId) {
+            throw new Error("branch must belong to the same tenant");
+          }
+
+          for (const item of normalizedItems) {
+            if (!item.productId) {
+              continue;
+            }
+
+            await stockService.recordStockMovement(
+              {
+                tenantId: input.tenantId,
+                productId: item.productId,
+                branchId: input.branchId,
+                movementType: "SALE",
+                quantity: item.quantity,
+                referenceType: "INVOICE",
+                referenceId: invoice.id,
+                notes: `Stock deducted for invoice ${invoice.id}`,
+              },
+              tx as unknown as StockPrismaClient,
+            );
+          }
+        }
+
+        return invoice;
+      });
     },
     async getInvoice({ tenantId, invoiceId }) {
       const invoice = await prisma.invoice.findUnique({ where: { id: invoiceId } });
@@ -222,8 +216,8 @@ export function createBillingInvoiceService(prisma: InvoicePrismaClient): Invoic
       }
       return invoice;
     },
-    async listInvoices({ tenantId }) {
-      return prisma.invoice.findMany({ where: { tenantId } });
+    async listInvoices(args: { tenantId: string }) {
+      return prisma.invoice.findMany({ where: { tenantId: args.tenantId } });
     },
   };
 }

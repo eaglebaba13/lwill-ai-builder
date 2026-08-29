@@ -20,6 +20,7 @@ export interface StockMovementWriteInput {
   readonly referenceType?: string | null;
   readonly referenceId?: string | null;
   readonly notes?: string | null;
+  readonly adjustmentDirection?: "IN" | "OUT" | null;
 }
 
 const RESPONSE_HEADERS = { "cache-control": "no-store" };
@@ -86,7 +87,7 @@ function parseCreateInput(input: unknown): StockMovementWriteInput | null {
     return null;
   }
   const record = input as Record<string, unknown>;
-  const allowedKeys = new Set(["productId", "branchId", "movementType", "quantity", "referenceType", "referenceId", "notes"]);
+  const allowedKeys = new Set(["productId", "branchId", "movementType", "quantity", "referenceType", "referenceId", "notes", "adjustmentDirection"]);
   if (Object.keys(record).some((key) => !allowedKeys.has(key))) {
     return null;
   }
@@ -99,10 +100,13 @@ function parseCreateInput(input: unknown): StockMovementWriteInput | null {
   if (!isNonEmptyString(record.movementType)) {
     return null;
   }
+  if (!["PURCHASE", "SALE", "ADJUSTMENT"].includes(record.movementType)) {
+    return null;
+  }
   if (!isInteger(record.quantity)) {
     return null;
   }
-  if (record.quantity === 0) {
+  if (record.quantity <= 0) {
     return null;
   }
   if (!isOptionalString(record.referenceType)) {
@@ -114,6 +118,15 @@ function parseCreateInput(input: unknown): StockMovementWriteInput | null {
   if (!isOptionalString(record.notes)) {
     return null;
   }
+  if (!isOptionalAdjustmentDirection(record.adjustmentDirection)) {
+    return null;
+  }
+  if (record.movementType === "ADJUSTMENT" && record.adjustmentDirection === undefined) {
+    return null;
+  }
+  if (record.movementType !== "ADJUSTMENT" && record.adjustmentDirection !== undefined && record.adjustmentDirection !== null) {
+    return null;
+  }
   return {
     productId: record.productId,
     branchId: record.branchId,
@@ -122,11 +135,16 @@ function parseCreateInput(input: unknown): StockMovementWriteInput | null {
     referenceType: record.referenceType ?? null,
     referenceId: record.referenceId ?? null,
     notes: record.notes ?? null,
+    adjustmentDirection: record.adjustmentDirection ?? null,
   };
 }
 
 function isOptionalString(value: unknown): value is string | null | undefined {
   return value === undefined || value === null || typeof value === "string";
+}
+
+function isOptionalAdjustmentDirection(value: unknown): value is "IN" | "OUT" | null | undefined {
+  return value === undefined || value === null || value === "IN" || value === "OUT";
 }
 
 const INVALID_JSON = Symbol("invalid-json");
@@ -163,6 +181,12 @@ export async function handleCreateStockMovement(
     if (error instanceof Error) {
       if (error.message === "product must belong to the same tenant" || error.message === "branch must belong to the same tenant") {
         return response(403, { error: error.message });
+      }
+      if (error.message === "unsupported movement type" || error.message === "adjustmentDirection is required for ADJUSTMENT movements") {
+        return response(400, { error: error.message });
+      }
+      if (error.message === "insufficient stock for this operation") {
+        return response(409, { error: error.message });
       }
     }
     throw error;
