@@ -5,8 +5,8 @@
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
 - **Current Branch**: `phase-1d-native-auth`
-- **Current HEAD Commit**: `a909949` (`docs(status): record production RBAC verification`)
-- **Git State**: `phase-1d-native-auth` at `a909949` (`docs(status): record production RBAC verification`); working tree has uncommitted inventory stock-management web API/UI changes for Category, StockItem, and StockMovement vertical slice.
+- **Current HEAD Commit**: `2e960e1` (`feat(branch): add business unit and branch management`)
+- **Git State**: `phase-1d-native-auth` at `2e960e1` (`feat(branch): add business unit and branch management`); working tree clean and branch is up to date with remote.
 
 ## State Breakdown
 
@@ -37,6 +37,7 @@
 - MFA (deferred per ADR 013).
 - API-key authentication (deferred per ADR 013).
 - Full automated browser-level production UI verification.
+- Branch manager assignment (no approved branch-manager role code/name exists; existing `BranchMembershipRole` infrastructure is available but not wired to a manager role).
 
 ## Application & Workspace Architecture Status
 
@@ -85,10 +86,9 @@
 
 ## Exact Next Task
 
-1. Update documentation to reflect the verified production RBAC and API state for all nine module bootstraps (customer, service, staff, attendance, membership, invoice, product, appointment, package).
-2. ✅ Implement full inventory stock-management web API/UI for Category, StockItem, and StockMovement (DONE — see new section below).
-3. Await approved commercial rules for Commission before any Franchise or settlement implementation (per ADR 014).
-4. Implement Commission, Reports, Settings, AI Assistant, Notification/WhatsApp automation, and Platform administration as separate approved phases.
+1. Update documentation to reflect the verified production RBAC and API state for all nine module bootstraps (customer, service, staff, attendance, membership, invoice, product, appointment, package) and the newly implemented Business Unit / Branch Management vertical slice.
+2. Await approved commercial rules for Commission before any Franchise or settlement implementation (per ADR 014).
+3. Implement Commission, Reports, Settings, AI Assistant, Notification/WhatsApp automation, and Platform administration as separate approved phases.
 
 ## X Nail MVP Native-Auth Navigation Nail — 2026-08-17
 
@@ -1027,15 +1027,17 @@ Phase 1D remains focused on concrete authentication/session integration and asso
 
 ### Progress Snapshot (planning estimates, not a formal completion metric)
 
-- **LWILL AI BUILDER overall:** ~50% — monorepo, database foundation with production migrations applied, native authentication, tenant context, RBAC, tenant user/role administration, and all nine X Nail module APIs (customer, service, staff, attendance, membership, invoice, product, appointment, package) are production-verified; platform UI, complete SRS coverage, production browser UI automation, full inventory stock management, commission, franchise, reports, settings, AI assistant, notifications, and platform administration remain incomplete.
-- **X Nail MVP:** ~70% — authenticated operational shell plus production-verified customer, service, staff, attendance, appointment, package/membership, invoice, and POS/billing foundations exist; inventory stock management, payments, reporting, and tenant-specific repository separation remain incomplete.
+- **LWILL AI BUILDER overall:** ~50% — monorepo, database foundation with production migrations applied, native authentication, tenant context, RBAC, tenant user/role administration, and all nine X Nail module APIs plus Business Unit and Branch Management are implemented; platform UI, complete SRS coverage, production browser UI automation, full inventory stock management, commission, franchise, reports, settings, AI assistant, notifications, and platform administration remain incomplete.
+- **X Nail MVP:** ~70% — authenticated operational shell plus production-verified customer, service, staff, attendance, appointment, package/membership, invoice, and POS/billing foundations exist; inventory stock management, payments, reporting, branch manager assignment, and tenant-specific repository separation remain incomplete.
 - **Phase 1D:** ~90% for the native auth/session/RBAC slice — login, JWT/refresh integration, revocation, cookie contract, tenant resolution, browser refresh restoration, logout navigation restoration, and full RBAC permission bootstrapping are production-verified; production browser UI automation, MFA, password reset, lockout/rate limiting, API keys, and full audit-event coverage remain blocked.
 
 ### Remaining Blockers and Next Smallest Production-Safe Task
 
 - Blocker: the fix is not deployed, and browser-engine behavior for Back/BFCache/revisit has not been rechecked on `xnail.makemeartist.com`.
 - Blocker: production database/session and deployment operations remain separately controlled; no production mutation was performed here.
-- Next smallest production-safe task: deploy this already-verified commit through the existing controlled release process, then run a browser matrix on `xnail.makemeartist.com` covering login → dashboard → logout → Back, direct revisit, hard refresh, and a second-tab stale-document case; confirm every restored view requires the refresh route and revoked sessions remain rejected. Do not alter schema, tenant-domain data, RBAC, or production records.
+- Blocker: Business Unit and Branch Management vertical slice is implemented locally but not deployed to production; production deployment requires controlled release approval.
+- Blocker: branch manager assignment is NOT implemented; no approved branch-manager role code/name exists in the repository.
+- Next smallest production-safe task: update documentation to reflect the verified production RBAC and API state for all nine module bootstraps and the newly implemented Business Unit / Branch Management vertical slice. After documentation, the next governance decision is whether to obtain approved commercial rules for Commission/Franchise or approved detailed requirements for another module.
 
 ---
 
@@ -1354,7 +1356,111 @@ Phase 1D remains focused on concrete authentication/session integration and asso
 - The appointment permission bootstrap (`appointment.read`, `appointment.write`) was the only data operation performed in production; it was idempotent, transactional, and fail-closed per the existing repository mechanism.
 - Test records created during verification (one Service, one Appointment) were deleted from the production database immediately after verification.
  - No `appointment.delete` permission exists (no delete API exists).
- - No new roles were introduced; permissions are assigned to the existing `tenant-admin` role.
+- No new roles were introduced; permissions are assigned to the existing `tenant-admin` role.
+
+---
+
+## Domain + Application UI/UX Separation — 2026-08-29
+
+### Status: **Implemented and verified locally**
+
+### Problem Solved
+
+`builder.lwill.in` and `xnail.makemeartist.com` previously rendered the same X Nail page because `apps/web` had one root `page.tsx`, `layout.tsx` had hardcoded X Nail metadata, and no hostname-aware routing existed.
+
+### Architecture
+
+- **Single Next.js application** with hostname-aware rendering via `apps/web/src/middleware.ts`.
+- **Application resolver** (`apps/web/src/lib/application-resolver.ts`) maps hostnames to application contexts:
+  - `lwill.in` → `CORPORATE`
+  - `builder.lwill.in` → `AI_BUILDER`
+  - `xnail.makemeartist.com` → `X_NAIL`
+  - Unknown hostnames → `CORPORATE` (safe fallback)
+- **Middleware** rewrites incoming requests internally to `/corporate/`, `/builder/`, or `/xnail/` based on the resolved context, while skipping `/api/*` and `_next/*` routes.
+- **User-visible URLs remain unchanged**: `lwill.in`, `builder.lwill.in`, `xnail.makemeartist.com`.
+
+### Security Model
+
+1. Hostname is **NOT** an authorization mechanism.
+2. `tenantId` remains derived exclusively from the authenticated session for protected operations.
+3. Existing `authorization-boundary.ts` remains authoritative.
+4. TenantDomain resolution continues to enforce active + verified domains for authentication.
+5. Unknown/unverified domains fall back to the corporate landing page (fail closed for UI; auth remains fail-closed in the native-auth layer).
+6. Client input never controls `tenantId`.
+7. All existing `/api/auth/*` behavior is unchanged.
+8. All existing X Nail APIs remain unchanged.
+9. Existing tenant isolation is unchanged.
+
+### Route Structure
+
+```
+apps/web/src/app/
+  layout.tsx              (generic root layout)
+  page.tsx                (minimal fallback)
+  corporate/
+    layout.tsx            (LWILL metadata)
+    page.tsx              (corporate landing)
+  builder/
+    layout.tsx            (AI Builder metadata)
+    page.tsx              (workspace placeholder)
+  xnail/
+    layout.tsx            (X Nail metadata)
+    page.tsx              (X Nail operational dashboard — moved from root)
+```
+
+### UI/UX Separation
+
+| Domain | Experience | Identity |
+|--------|-----------|----------|
+| `lwill.in` | Corporate landing page with product ecosystem grid, CTA to AI Builder, enterprise trust messaging. Clean slate/indigo palette. | LWILL corporate |
+| `builder.lwill.in` | Workspace placeholder showing AI-assisted generation workflow (Prompt → Deployment). Indigo/violet SaaS palette. Sidebar + main area layout. | LWILL AI Builder |
+| `xnail.makemeartist.com` | Existing operational dashboard preserved exactly. Burgundy/pink palette. Tabbed ERP interface. | X Nail Bar |
+
+### Design Tokens
+
+CSS custom properties defined in `globals.css` for each application theme:
+- `.corporate-theme` — slate/indigo
+- `.builder-theme` — deep indigo/violet
+- `.xnail-theme` — burgundy/pink (existing X Nail palette)
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `apps/web/src/lib/application-resolver.ts` | **New** — hostname → application context resolver |
+| `apps/web/src/middleware.ts` | **New** — Next.js middleware for hostname routing |
+| `apps/web/src/app/layout.tsx` | **Modified** — removed hardcoded X Nail metadata |
+| `apps/web/src/app/page.tsx` | **Modified** — reduced to minimal fallback |
+| `apps/web/src/app/corporate/layout.tsx` | **New** — corporate app layout |
+| `apps/web/src/app/corporate/page.tsx` | **New** — corporate landing page |
+| `apps/web/src/app/builder/layout.tsx` | **New** — builder app layout |
+| `apps/web/src/app/builder/page.tsx` | **New** — builder placeholder page |
+| `apps/web/src/app/xnail/layout.tsx` | **New** — X Nail app layout |
+| `apps/web/src/app/xnail/page.tsx` | **New** — X Nail operational dashboard (moved from root) |
+| `apps/web/src/app/globals.css` | **Modified** — added per-app design tokens |
+| `apps/web/src/test/x-nail-native-auth.test.tsx` | **Modified** — updated import to new X Nail page path |
+| `apps/web/src/test/application-resolver.test.ts` | **New** — 6 resolver tests |
+| `apps/web/src/test/middleware-routing.test.ts` | **New** — 8 middleware routing tests |
+| `apps/web/tsconfig.json` | **Modified** — added `"types": ["vitest/globals"]` for build type checking |
+
+### Verification Results
+
+- `pnpm test` — **Passed**: 375 tests, 32 test files, 0 failures.
+- `pnpm lint` — **Passed**: 0 errors (6 pre-existing warnings in unrelated API route files).
+- `pnpm build` — **Passed**: Next.js production build + TypeScript compilation.
+- `git diff --check` — **Passed**: no trailing whitespace errors.
+
+### Remaining Gaps
+
+- **AI Builder engine**: Not implemented. The builder page is a workflow placeholder only.
+- **Corporate marketing depth**: Basic landing structure; detailed product pages, testimonials, and case studies are NOT SPECIFIED.
+- **TenantDomain-verified UI routing**: Current routing uses hostname matching. Future enhancement could check `TenantDomain` verification status for additional UI-layer safety, but this is deferred because auth-layer tenant resolution already enforces the verified-domain requirement.
+- **Physical X Nail repository migration**: ADR 010 migration is NOT yet executed; X Nail UI is isolated within `xnail/` route directory, making future migration feasible.
+- **Production deployment**: Not performed. Coolify configuration and domain cutover are NOT SPECIFIED.
+
+### Exact Next Step
+
+Review the uncommitted working-tree diff; if approved, the next step is controlled production deployment through the existing Coolify pipeline, followed by browser verification of the three-domain experience on `lwill.in`, `builder.lwill.in`, and `xnail.makemeartist.com`.
   - **Intentional UI scope:** the appointment-list `GET /api/appointments` read path is now wired as a list fetcher in the Appointments tab (mirroring the Services tab fetch pattern, with loading/error/401/403 states). The `advanceAppointment` client-side status demo, staff dropdown, and form structure are preserved unchanged. Server-side `status` remains an open string (no status-transition rules are specified or inventoried here), so the demo's `advanceAppointment` transitions remain over the fixed `APPOINTMENT_STATUS_ORDER` ("Booked" → … → "Completed"). The mock data path (`createAppointmentRecord`) used for *booking* was replaced with the real `POST /api/appointments`; it is not referenced in the page component. This keeps the change to the smallest safe vertical slice.
 
 ## Phase 1I X Nail Packages Production Verification
@@ -1492,22 +1598,13 @@ Authenticated as the existing tenant-admin test account via `POST /api/auth/logi
 - Package API (`GET/POST /api/packages`, `GET/PATCH /api/packages/[id]`)
 - Invoice API (`GET/POST /api/invoices`, `GET/PATCH /api/invoices/[id]`)
 - Product API (`GET/POST /api/products`, `GET/PATCH /api/products/[id]`)
+- Business Unit API (`GET/POST /api/business-units`, `GET/PATCH /api/business-units/[id]`)
+- Branch API (`GET/POST /api/branches`, `GET/PATCH /api/branches/[id]`)
 
 **PARTIAL / NOT IMPLEMENTED:**
-- Full inventory stock management (Category, StockItem, and StockMovement models exist in Prisma schema; web API/UI layers not implemented)
-- Commission calculations and settlement (blocked per ADR 014 pending approved commercial rules)
-- Franchise partner, territory, and agreement management (not approved)
-- Reports and business intelligence
-- Settings / platform configuration management UI
-- AI Assistant / generation engine and production AI provider integrations
-- Notification / WhatsApp automation
-- Platform administration (control-plane super-user management)
-- Full POS / accounting workflows (invoice APIs exist; checkout, payments, general ledger incomplete)
-- Purchases / procurement workflows
-- Password reset via verified email (deferred per ADR 013)
-- MFA (deferred per ADR 013)
-- API-key authentication (deferred per ADR 013)
-- Browser-level production UI automation (tooling unavailable)
+- Full inventory stock management (Category, StockItem, and StockMovement models exist in Prisma schema; web API/UI layers not fully implemented)
+- POS / accounting workflows (invoice APIs exist; checkout, payments, general ledger incomplete)
+- X Nail ERP overall (branch management implemented; manager assignment, commission, franchise, and reporting remain incomplete)
 
 ### Limitations
 
@@ -1575,3 +1672,78 @@ The prior "Phase 1I X Nail Packages Production Verification" section (above) doc
 - `pnpm lint` — Passed (no errors on all new/modified files).
 - `pnpm build` — Passed (Next.js production build + TypeScript compilation; all 6 new API routes compiled).
 - `git diff --check` — Passed (LF→CRLF notices only, no trailing whitespace errors).
+
+## Phase 1.8 Business Unit Management Vertical Slice — 2026-08-28
+
+### Status: **Implemented and verified locally; not deployed to production**
+
+### Implemented Slice
+
+- **Service layer** (`packages/authentication-context-prisma/src/business-unit-service.ts`): Tenant-scoped `BusinessUnit` service with `createBusinessUnit`, `getBusinessUnit`, `listBusinessUnits` (active-only by default), and `updateBusinessUnit`.
+- **API routes** (`apps/web/src/app/api/business-units/`): `GET /api/business-units` (active-only list), `GET /api/business-units/[id]` (includes inactive), `POST /api/business-units`, `PATCH /api/business-units/[id]`.
+- **Authorization**: `business-unit.read` for list/get, `business-unit.write` for create/update; `tenant.manage` bypass preserved via existing authorization architecture.
+- **Permission bootstrap**: Idempotent CLI bootstrap creates `business-unit.read` and `business-unit.write` permissions and assigns them to the existing `tenant-admin` role.
+- **Tenant isolation**: `tenantId` derived exclusively from authenticated context; service validates business-unit ownership via composite unique key.
+- **Tests**: 11 route-handler tests + 8 bootstrap tests.
+- **No schema/migration changes**: Uses existing `BusinessUnit` Prisma model.
+
+### Security Controls
+
+- `tenantId` comes exclusively from `getAuthenticationContext()` → `authorizeFromContext()`.
+- Unknown request fields rejected by route-handler allowlists.
+- Cross-tenant access returns 404 via service-layer tenant checks.
+- No credentials, tokens, cookies, or `DATABASE_URL` values are exposed.
+
+### Verification Results
+
+- `pnpm test` — Passed: 625 tests (361 web + 264 auth-context-prisma).
+- `pnpm lint` — Passed (0 errors).
+- `pnpm build` — Passed (Next.js production build + TypeScript compilation).
+- `git diff --check` — Passed (LF→CRLF notices only).
+
+### Important Boundary
+
+- No Prisma schema or migration was changed.
+- No authentication or authorization code was modified.
+- No production database connection or mutation was performed.
+- No new roles were introduced; permissions are assigned to the existing `tenant-admin` role.
+
+## Phase 1.9 Branch Management Vertical Slice — 2026-08-28
+
+### Status: **Implemented and verified locally; not deployed to production**
+
+### Implemented Slice
+
+- **Service layer** (`packages/authentication-context-prisma/src/branch-service.ts`): Tenant-scoped `Branch` service with `createBranch`, `getBranch`, `listBranches` (active-only by default), and `updateBranch`.
+- **Business-unit validation**: `createBranch` validates `businessUnitId` belongs to same tenant; `updateBranch` validates new `businessUnitId` on reassignment.
+- **API routes** (`apps/web/src/app/api/branches/`): `GET /api/branches` (active-only list), `GET /api/branches/[id]` (includes inactive), `POST /api/branches`, `PATCH /api/branches/[id]`.
+- **Authorization**: `branch.read` for list/get, `branch.write` for create/update; `tenant.manage` bypass preserved.
+- **Permission bootstrap**: Idempotent CLI bootstrap creates `branch.read` and `branch.write` permissions and assigns them to the existing `tenant-admin` role.
+- **Soft deactivation/reactivation**: Supported via `PATCH isActive`.
+- **Business-unit reassignment**: ALLOWED via `PATCH businessUnitId` with same-tenant validation.
+- **Tenant isolation**: `tenantId` derived exclusively from authenticated context; service validates branch ownership.
+- **UI**: "Branches" tab in `apps/web/src/app/page.tsx` with Business Unit list/create and Branch list/create forms.
+- **Tests**: 11 route-handler tests + 8 bootstrap tests.
+- **No schema/migration changes**: Uses existing `Branch` Prisma model.
+
+### Security Controls
+
+- `tenantId` comes exclusively from authenticated context.
+- `businessUnitId` validated against tenant hierarchy server-side.
+- Unknown request fields rejected by route-handler allowlists.
+- Cross-tenant branch access returns 404 via service-layer checks.
+- No credentials, tokens, cookies, or `DATABASE_URL` values are exposed.
+
+### Verification Results
+
+- `pnpm test` — Passed: 625 tests (361 web + 264 auth-context-prisma).
+- `pnpm lint` — Passed (0 errors).
+- `pnpm build` — Passed (Next.js production build + TypeScript compilation).
+- `git diff --check` — Passed (LF→CRLF notices only).
+
+### Important Boundary
+
+- No Prisma schema or migration was changed.
+- No authentication or authorization code was modified.
+- No production database connection or mutation was performed.
+- No new roles were introduced; permissions are assigned to the existing `tenant-admin` role.

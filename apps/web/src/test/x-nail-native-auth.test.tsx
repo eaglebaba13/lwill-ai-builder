@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import Home from "../app/page";
+import Home from "../app/xnail/page";
 import { invalidatePendingRefresh } from "../lib/auth/native-auth-client";
 
 describe("X Nail native authentication integration", () => {

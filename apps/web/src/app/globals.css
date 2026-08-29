@@ -19,3 +19,30 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+.corporate-theme {
+  --app-primary: #0f172a;
+  --app-secondary: #4f46e5;
+  --app-surface: #ffffff;
+  --app-muted: #64748b;
+  --app-border: #e2e8f0;
+  --app-accent: #4f46e5;
+}
+
+.builder-theme {
+  --app-primary: #1e1b4b;
+  --app-secondary: #7c3aed;
+  --app-surface: #ffffff;
+  --app-muted: #64748b;
+  --app-border: #e2e8f0;
+  --app-accent: #7c3aed;
+}
+
+.xnail-theme {
+  --app-primary: #5a1838;
+  --app-secondary: #f0dfe6;
+  --app-surface: #fdf8f6;
+  --app-muted: #736067;
+  --app-border: #f0dfe6;
+  --app-accent: #5a1838;
+}
