@@ -285,6 +285,9 @@ export default function Home() {
   const [appointmentReport, setAppointmentReport] = useState<Array<{ date: string; appointmentCount: number; statusBreakdown: Array<{ status: string; count: number }> }>>([]);
   const [isLoadingAppointmentReport, setIsLoadingAppointmentReport] = useState(false);
   const [appointmentReportError, setAppointmentReportError] = useState<string | null>(null);
+  const [membershipReport, setMembershipReport] = useState<Array<{ status: string; count: number; packageBreakdown: Array<{ packageId: string; packageName: string; count: number }> }>>([]);
+  const [isLoadingMembershipReport, setIsLoadingMembershipReport] = useState(false);
+  const [membershipReportError, setMembershipReportError] = useState<string | null>(null);
 
   const customerMap = new Map(customers.map((customer) => [customer.id, customer.name]));
   const productMap = new Map(products.map((product) => [product.id, product.name]));
@@ -1638,6 +1641,39 @@ export default function Home() {
       .finally(() => {
         if (mounted) {
           setIsLoadingAppointmentReport(false);
+        }
+      });
+
+    void fetch("/api/reports/memberships", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        if (result.status === 401) {
+          setMembershipReport([]);
+          return;
+        }
+        if (result.status === 403) {
+          setMembershipReport([]);
+          setMembershipReportError("You are not authorized to view membership reports.");
+          return;
+        }
+        if (!result.ok) {
+          throw new Error("Membership report request failed");
+        }
+        const body = await result.json() as {
+          membershipReport?: Array<{ status: string; count: number; packageBreakdown: Array<{ packageId: string; packageName: string; count: number }> }>;
+        };
+        const loadedMembershipReport = Array.isArray(body.membershipReport) ? body.membershipReport : [];
+        setMembershipReport(loadedMembershipReport);
+      })
+      .catch(() => {
+        if (mounted) {
+          setMembershipReport([]);
+          setMembershipReportError("Membership report could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setIsLoadingMembershipReport(false);
         }
       });
 
@@ -4095,6 +4131,32 @@ export default function Home() {
                             <div key={status.status} className="flex items-center justify-between text-xs text-[#736067]">
                               <span>{status.status}</span>
                               <span className="font-medium">{status.count}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            {isLoadingMembershipReport ? <div className="text-sm text-[#736067]">Loading membership report...</div> : null}
+            {!isLoadingMembershipReport && membershipReportError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{membershipReportError}</div> : null}
+            {!isLoadingMembershipReport && !membershipReportError && membershipReport.length === 0 ? <div className="text-sm text-[#736067]">No membership data yet.</div> : null}
+            {membershipReport.length > 0 ? (
+              <div className="mt-6 rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+                <h2 className="text-xl font-semibold">Membership Report</h2>
+                <div className="mt-4 space-y-3">
+                  {membershipReport.map((item) => (
+                    <div key={item.status} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                      <div>
+                        <div className="font-medium">{item.status}</div>
+                        <div className="text-sm text-[#736067]">{item.count} membership{item.count === 1 ? "" : "s"}</div>
+                        <div className="mt-1 space-y-1">
+                          {item.packageBreakdown.map((pkg) => (
+                            <div key={pkg.packageId} className="flex items-center justify-between text-xs text-[#736067]">
+                              <span>{pkg.packageName}</span>
+                              <span className="font-medium">{pkg.count}</span>
                             </div>
                           ))}
                         </div>

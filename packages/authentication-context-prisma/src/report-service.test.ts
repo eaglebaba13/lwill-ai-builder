@@ -4,6 +4,8 @@ import { createReportService } from "./report-service";
 function createPrisma(
   invoices: Array<{ totalCents: number; issuedAt: Date }>,
   appointments: Array<{ startsAt: Date; status: string }> = [],
+  memberships: Array<{ status: string; packageId: string }> = [],
+  packages: Array<{ id: string; name: string }> = [],
 ) {
   return {
     invoice: {
@@ -21,6 +23,12 @@ function createPrisma(
     },
     stockMovement: {
       count: async () => 0,
+    },
+    membership: {
+      findMany: vi.fn(async () => memberships),
+    },
+    package: {
+      findMany: vi.fn(async () => packages),
     },
   } as never;
 }
@@ -112,5 +120,60 @@ describe("report service: listAppointmentReport", () => {
 
     expect(report[0]?.date).toBe("2026-08-01");
     expect(report[1]?.date).toBe("2026-08-02");
+  });
+});
+
+describe("report service: listMembershipReport", () => {
+  it("groups memberships by status with package breakdown", async () => {
+    const prisma = createPrisma(
+      [],
+      [],
+      [
+        { status: "Active", packageId: "pkg-1" },
+        { status: "Active", packageId: "pkg-1" },
+        { status: "Active", packageId: "pkg-2" },
+        { status: "Expired", packageId: "pkg-1" },
+      ],
+      [
+        { id: "pkg-1", name: "Basic" },
+        { id: "pkg-2", name: "Premium" },
+      ],
+    );
+    const service = createReportService(prisma);
+
+    const report = await service.listMembershipReport({ tenantId: "tenant-1" });
+
+    expect(report).toHaveLength(2);
+    expect(report[0]).toMatchObject({
+      status: "Active",
+      count: 3,
+      packageBreakdown: [
+        { packageId: "Basic", packageName: "Basic", count: 2 },
+        { packageId: "Premium", packageName: "Premium", count: 1 },
+      ],
+    });
+    expect(report[1]).toMatchObject({
+      status: "Expired",
+      count: 1,
+      packageBreakdown: [{ packageId: "Basic", packageName: "Basic", count: 1 }],
+    });
+  });
+
+  it("returns empty array when no memberships exist", async () => {
+    const prisma = createPrisma([]);
+    const service = createReportService(prisma);
+
+    const report = await service.listMembershipReport({ tenantId: "tenant-1" });
+
+    expect(report).toHaveLength(0);
+  });
+
+  it("maps unknown package IDs to Unknown", async () => {
+    const prisma = createPrisma([], [], [{ status: "Active", packageId: "missing" }], []);
+    const service = createReportService(prisma);
+
+    const report = await service.listMembershipReport({ tenantId: "tenant-1" });
+
+    expect(report[0]?.packageBreakdown).toEqual([{ packageId: "Unknown", packageName: "Unknown", count: 1 }]);
   });
 });

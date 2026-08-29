@@ -35,6 +35,15 @@ export interface ReportService {
       readonly count: number;
     }>;
   }>>;
+  listMembershipReport(args: { tenantId: string }): Promise<ReadonlyArray<{
+    readonly status: string;
+    readonly count: number;
+    readonly packageBreakdown: ReadonlyArray<{
+      readonly packageId: string;
+      readonly packageName: string;
+      readonly count: number;
+    }>;
+  }>>;
 }
 
 interface ReportPrismaClient {
@@ -53,6 +62,12 @@ interface ReportPrismaClient {
   };
   readonly stockMovement: {
     count(args: { where: Record<string, unknown> }): Promise<number>;
+  };
+  readonly membership: {
+    findMany(args: { where?: Record<string, unknown>; select?: Record<string, unknown> }): Promise<ReadonlyArray<{ readonly status: string; readonly packageId: string }>>;
+  };
+  readonly package: {
+    findMany(args: { where?: Record<string, unknown>; select?: Record<string, unknown> }): Promise<ReadonlyArray<{ readonly id: string; readonly name: string }>>;
   };
 }
 
@@ -159,6 +174,41 @@ export function createReportService(prisma: ReportPrismaClient): ReportService {
         appointmentCount: entry.appointmentCount,
         statusBreakdown: Array.from(entry.statusBreakdown.entries()).map(([status, count]) => ({
           status,
+          count,
+        })),
+      }));
+    },
+
+    async listMembershipReport({ tenantId }) {
+      const [memberships, packages] = await Promise.all([
+        prisma.membership.findMany({
+          where: { tenantId },
+          select: { status: true, packageId: true },
+        }),
+        prisma.package.findMany({
+          where: { tenantId },
+          select: { id: true, name: true },
+        }),
+      ]);
+
+      const packageMap = new Map(packages.map((pkg) => [pkg.id, pkg.name]));
+
+      const statusMap = new Map<string, { count: number; packageMap: Map<string, number> }>();
+      for (const membership of memberships) {
+        const entry = statusMap.get(membership.status) ?? { count: 0, packageMap: new Map() };
+        entry.count += 1;
+        const pkgName = packageMap.get(membership.packageId) ?? "Unknown";
+        const current = entry.packageMap.get(pkgName) ?? 0;
+        entry.packageMap.set(pkgName, current + 1);
+        statusMap.set(membership.status, entry);
+      }
+
+      return Array.from(statusMap.entries()).map(([status, entry]) => ({
+        status,
+        count: entry.count,
+        packageBreakdown: Array.from(entry.packageMap.entries()).map(([packageName, count]) => ({
+          packageId: packageName,
+          packageName: packageName,
           count,
         })),
       }));
