@@ -21,6 +21,8 @@
     "bootstrap:initial-product-permissions": "tsx src/initial-product-permissions-bootstrap-cli.ts",
     "bootstrap:initial-business-unit-permissions": "tsx src/initial-business-unit-permissions-bootstrap-cli.ts",
     "bootstrap:initial-branch-permissions": "tsx src/initial-branch-permissions-bootstrap-cli.ts",
+    "bootstrap:initial-setting-permissions": "tsx src/initial-setting-permissions-bootstrap-cli.ts",
+    "bootstrap:initial-notification-permissions": "tsx src/initial-notification-permissions-bootstrap-cli.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

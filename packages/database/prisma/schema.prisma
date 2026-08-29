@@ -18,6 +18,7 @@ model Tenant {
   auditLogs         AuditLog[]
   branches          Branch[]
   tenantDomains     TenantDomain[]
+  tenantSettings    TenantSetting[]
   tenantMemberships TenantMembership[]
   roles             Role[]
   authenticationSessions AuthenticationSession[]
@@ -34,6 +35,8 @@ model Tenant {
   products         Product[]
   stockItems       StockItem[]
   stockMovements   StockMovement[]
+  notificationTemplates NotificationTemplate[]
+  notificationLogs      NotificationLog[]
 
   @@index([isActive])
 }
@@ -54,6 +57,21 @@ model TenantDomain {
   @@index([tenantId, isActive])
   @@index([domain, isActive])
   @@index([isActive, verificationStatus])
+}
+
+model TenantSetting {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @db.Uuid
+  key       String
+  value     String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, key])
+  @@index([tenantId])
 }
 
 model BusinessUnit {
@@ -581,4 +599,46 @@ model BranchMembershipRole {
   @@unique([tenantId, membershipId, roleId, businessUnitId, branchId])
   @@index([tenantId, membershipId])
   @@index([tenantId, businessUnitId, branchId])
+}
+
+model NotificationTemplate {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @db.Uuid
+  name      String
+  channel   String
+  subject   String?
+  body      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, name])
+  @@index([tenantId, channel])
+  @@index([tenantId, isActive])
+}
+
+model NotificationLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @db.Uuid
+  recipientId  String?
+  channel      String
+  subject      String?
+  body         String
+  status       String
+  errorMessage String?
+  sentAt       DateTime?
+  deliveredAt  DateTime?
+  readAt       DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, id])
+  @@index([tenantId, channel])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
 }

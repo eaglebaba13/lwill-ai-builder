@@ -34,3 +34,29 @@ export type {
 } from "./appointment-service";
 
 export { createAppointmentService } from "./appointment-service";
+
+export type {
+  SettingRecord,
+  SettingCreateInput,
+  SettingUpdateInput,
+  SettingService,
+} from "./setting-service";
+
+export { createSettingService } from "./setting-service";
+
+export type {
+  NotificationTemplateRecord,
+  NotificationTemplateCreateInput,
+  NotificationTemplateUpdateInput,
+  NotificationTemplateService,
+} from "./notification-template-service";
+
+export { createNotificationTemplateService } from "./notification-template-service";
+
+export type {
+  NotificationLogRecord,
+  NotificationLogCreateInput,
+  NotificationLogService,
+} from "./notification-log-service";
+
+export { createNotificationLogService } from "./notification-log-service";
