@@ -2504,7 +2504,7 @@ export default function Home() {
           <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
             <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Staff</div>
             <div className="mt-2 text-3xl font-semibold">{staff.length}</div>
-            <div className="mt-1 text-sm text-[#715a62]">On duty</div>
+            <div className="mt-1 text-sm text-[#715a62]">Active</div>
           </div>
         </section>
 
