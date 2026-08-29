@@ -210,6 +210,10 @@ export default function Home() {
   const [branchSlug, setBranchSlug] = useState("");
   const [branchBusinessUnitId, setBranchBusinessUnitId] = useState("");
 
+  const customerMap = new Map(customers.map((customer) => [customer.id, customer.name]));
+  const productMap = new Map(products.map((product) => [product.id, product.name]));
+  const branchMap = new Map(branches.map((branch) => [branch.id, branch.name]));
+
   useEffect(() => {
     let mounted = true;
 
@@ -2279,8 +2283,8 @@ export default function Home() {
                 {stockItems.map((item) => (
                   <div key={item.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
                     <div>
-                      <div className="font-medium">Product {item.productId}</div>
-                      <div className="text-sm text-[#736067]">Branch {item.branchId}</div>
+                      <div className="font-medium">{productMap.get(item.productId) ?? `Product ${item.productId}`}</div>
+                      <div className="text-sm text-[#736067]">{branchMap.get(item.branchId) ?? `Branch ${item.branchId}`}</div>
                     </div>
                     <div className="text-right text-sm text-[#736067]">
                       <div>Qty: {item.quantity}</div>
@@ -2330,7 +2334,7 @@ export default function Home() {
                   <div key={movement.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
                     <div>
                       <div className="font-medium">{movement.movementType}</div>
-                      <div className="text-sm text-[#736067]">Product {movement.productId}</div>
+                      <div className="text-sm text-[#736067]">{productMap.get(movement.productId) ?? `Product ${movement.productId}`}</div>
                       {movement.notes ? <div className="text-sm text-[#736067]">{movement.notes}</div> : null}
                     </div>
                     <div className="text-right text-sm text-[#736067]">
@@ -2427,7 +2431,7 @@ export default function Home() {
                 {invoices.map((invoice) => (
                   <div key={invoice.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
                     <div>
-                      <div className="font-medium">Customer {invoice.customerId}</div>
+                      <div className="font-medium">{customerMap.get(invoice.customerId) ?? `Customer ${invoice.customerId}`}</div>
                       <div className="text-sm text-[#736067]">{invoice.issuedAt}</div>
                     </div>
                     <div className="text-right text-sm text-[#736067]">
