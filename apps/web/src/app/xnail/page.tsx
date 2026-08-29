@@ -176,6 +176,26 @@ export default function Home() {
   const [stockMovementQuantity, setStockMovementQuantity] = useState("1");
   const [stockMovementNotes, setStockMovementNotes] = useState("");
   const [adjustmentDirection, setAdjustmentDirection] = useState<"IN" | "OUT">("IN");
+  const [warehouses, setWarehouses] = useState<Array<{ id: string; name: string; location: string | null; isActive: boolean }>>([]);
+  const [isLoadingWarehouses, setIsLoadingWarehouses] = useState(false);
+  const [warehouseError, setWarehouseError] = useState<string | null>(null);
+  const [warehouseName, setWarehouseName] = useState("");
+  const [warehouseLocation, setWarehouseLocation] = useState("");
+  const [suppliers, setSuppliers] = useState<Array<{ id: string; name: string; contactName: string | null; email: string | null; phone: string | null; isActive: boolean }>>([]);
+  const [isLoadingSuppliers, setIsLoadingSuppliers] = useState(false);
+  const [supplierError, setSupplierError] = useState<string | null>(null);
+  const [supplierName, setSupplierName] = useState("");
+  const [supplierContactName, setSupplierContactName] = useState("");
+  const [supplierEmail, setSupplierEmail] = useState("");
+  const [supplierPhone, setSupplierPhone] = useState("");
+  const [reorderRules, setReorderRules] = useState<Array<{ id: string; productId: string; branchId: string; warehouseId: string; minQuantity: number; reorderQuantity: number; isActive: boolean }>>([]);
+  const [isLoadingReorderRules, setIsLoadingReorderRules] = useState(false);
+  const [reorderRuleError, setReorderRuleError] = useState<string | null>(null);
+  const [reorderRuleProductId, setReorderRuleProductId] = useState("");
+  const [reorderRuleBranchId, setReorderRuleBranchId] = useState("");
+  const [reorderRuleWarehouseId, setReorderRuleWarehouseId] = useState("");
+  const [reorderRuleMinQuantity, setReorderRuleMinQuantity] = useState("10");
+  const [reorderRuleReorderQuantity, setReorderRuleReorderQuantity] = useState("50");
   const [staff, setStaff] = useState<StaffRecord[]>([]);
   const [isLoadingStaff, setIsLoadingStaff] = useState(false);
   const [staffError, setStaffError] = useState<string | null>(null);
@@ -802,6 +822,125 @@ export default function Home() {
         }
       });
 
+    void fetch("/api/warehouses", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        if (result.status === 401) {
+          setWarehouses([]);
+          return;
+        }
+        if (result.status === 403) {
+          setWarehouses([]);
+          setWarehouseError("You are not authorized to view warehouses.");
+          return;
+        }
+        if (!result.ok) {
+          throw new Error("Warehouse list request failed");
+        }
+        const body = await result.json() as {
+          warehouses?: Array<{
+            id: string;
+            name: string;
+            location: string | null;
+            isActive: boolean;
+          }>;
+        };
+        const loadedWarehouses = Array.isArray(body.warehouses) ? body.warehouses : [];
+        setWarehouses(loadedWarehouses);
+      })
+      .catch(() => {
+        if (mounted) {
+          setWarehouses([]);
+          setWarehouseError("Warehouses could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setIsLoadingWarehouses(false);
+        }
+      });
+
+    void fetch("/api/suppliers", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        if (result.status === 401) {
+          setSuppliers([]);
+          return;
+        }
+        if (result.status === 403) {
+          setSuppliers([]);
+          setSupplierError("You are not authorized to view suppliers.");
+          return;
+        }
+        if (!result.ok) {
+          throw new Error("Supplier list request failed");
+        }
+        const body = await result.json() as {
+          suppliers?: Array<{
+            id: string;
+            name: string;
+            contactName: string | null;
+            email: string | null;
+            phone: string | null;
+            isActive: boolean;
+          }>;
+        };
+        const loadedSuppliers = Array.isArray(body.suppliers) ? body.suppliers : [];
+        setSuppliers(loadedSuppliers);
+      })
+      .catch(() => {
+        if (mounted) {
+          setSuppliers([]);
+          setSupplierError("Suppliers could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setIsLoadingSuppliers(false);
+        }
+      });
+
+    void fetch("/api/reorder-rules", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        if (result.status === 401) {
+          setReorderRules([]);
+          return;
+        }
+        if (result.status === 403) {
+          setReorderRules([]);
+          setReorderRuleError("You are not authorized to view reorder rules.");
+          return;
+        }
+        if (!result.ok) {
+          throw new Error("Reorder rule list request failed");
+        }
+        const body = await result.json() as {
+          reorderRules?: Array<{
+            id: string;
+            productId: string;
+            branchId: string;
+            warehouseId: string;
+            minQuantity: number;
+            reorderQuantity: number;
+            isActive: boolean;
+          }>;
+        };
+        const loadedReorderRules = Array.isArray(body.reorderRules) ? body.reorderRules : [];
+        setReorderRules(loadedReorderRules);
+      })
+      .catch(() => {
+        if (mounted) {
+          setReorderRules([]);
+          setReorderRuleError("Reorder rules could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setIsLoadingReorderRules(false);
+        }
+      });
+
     return () => {
       mounted = false;
       window.clearTimeout(loadingTimer);
@@ -1411,6 +1550,115 @@ export default function Home() {
     setStockMovementQuantity("1");
     setStockMovementNotes("");
     setAdjustmentDirection("IN");
+  };
+
+  const addWarehouse = async () => {
+    if (!warehouseName.trim()) return;
+    setWarehouseError(null);
+    const result = await fetch("/api/warehouses", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: warehouseName,
+        location: warehouseLocation || null,
+      }),
+    });
+    if (result.status === 401) {
+      setWarehouses([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setWarehouses([]);
+      setWarehouseError("You are not authorized to create warehouses.");
+      return;
+    }
+    if (!result.ok) {
+      const body = await result.json().catch(() => ({}));
+      setWarehouseError(body?.error ?? "Warehouse could not be saved.");
+      return;
+    }
+    const body = await result.json() as { warehouse: { id: string; name: string; location: string | null; isActive: boolean } };
+    setWarehouses((current) => [body.warehouse, ...current]);
+    setWarehouseName("");
+    setWarehouseLocation("");
+  };
+
+  const addSupplier = async () => {
+    if (!supplierName.trim()) return;
+    setSupplierError(null);
+    const result = await fetch("/api/suppliers", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: supplierName,
+        contactName: supplierContactName || null,
+        email: supplierEmail || null,
+        phone: supplierPhone || null,
+      }),
+    });
+    if (result.status === 401) {
+      setSuppliers([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setSuppliers([]);
+      setSupplierError("You are not authorized to create suppliers.");
+      return;
+    }
+    if (!result.ok) {
+      const body = await result.json().catch(() => ({}));
+      setSupplierError(body?.error ?? "Supplier could not be saved.");
+      return;
+    }
+    const body = await result.json() as { supplier: { id: string; name: string; contactName: string | null; email: string | null; phone: string | null; isActive: boolean } };
+    setSuppliers((current) => [body.supplier, ...current]);
+    setSupplierName("");
+    setSupplierContactName("");
+    setSupplierEmail("");
+    setSupplierPhone("");
+  };
+
+  const addReorderRule = async () => {
+    if (!reorderRuleProductId.trim() || !reorderRuleBranchId.trim() || !reorderRuleWarehouseId.trim()) return;
+    setReorderRuleError(null);
+    const result = await fetch("/api/reorder-rules", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        productId: reorderRuleProductId,
+        branchId: reorderRuleBranchId,
+        warehouseId: reorderRuleWarehouseId,
+        minQuantity: Number(reorderRuleMinQuantity) || 0,
+        reorderQuantity: Number(reorderRuleReorderQuantity) || 0,
+      }),
+    });
+    if (result.status === 401) {
+      setReorderRules([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setReorderRules([]);
+      setReorderRuleError("You are not authorized to create reorder rules.");
+      return;
+    }
+    if (!result.ok) {
+      const body = await result.json().catch(() => ({}));
+      setReorderRuleError(body?.error ?? "Reorder rule could not be saved.");
+      return;
+    }
+    const body = await result.json() as { reorderRule: { id: string; productId: string; branchId: string; warehouseId: string; minQuantity: number; reorderQuantity: number; isActive: boolean } };
+    setReorderRules((current) => [body.reorderRule, ...current]);
+    setReorderRuleProductId("");
+    setReorderRuleBranchId("");
+    setReorderRuleWarehouseId("");
+    setReorderRuleMinQuantity("10");
+    setReorderRuleReorderQuantity("50");
   };
 
   const addStaff = async () => {
@@ -2415,6 +2663,178 @@ export default function Home() {
                 >
                   Record movement
                 </button>
+              </div>
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+              <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+                <h2 className="text-xl font-semibold">Warehouses</h2>
+                <div className="mt-4 space-y-3">
+                  {isLoadingWarehouses ? <div className="text-sm text-[#736067]">Loading warehouses...</div> : null}
+                  {!isLoadingWarehouses && warehouseError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{warehouseError}</div> : null}
+                  {!isLoadingWarehouses && !warehouseError && warehouses.length === 0 ? <div className="text-sm text-[#736067]">No warehouses yet.</div> : null}
+                  {warehouses.map((warehouse) => (
+                    <div key={warehouse.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                      <div>
+                        <div className="font-medium">{warehouse.name}</div>
+                        <div className="text-sm text-[#736067]">{warehouse.location ?? "No location"}</div>
+                      </div>
+                      <div className="text-right text-sm text-[#736067]">
+                        <div>{warehouse.isActive ? "Active" : "Inactive"}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+                <h2 className="text-xl font-semibold">Add warehouse</h2>
+                <div className="mt-4 space-y-3">
+                  <input
+                    value={warehouseName}
+                    onChange={(event) => setWarehouseName(event.target.value)}
+                    placeholder="Warehouse name"
+                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  />
+                  <input
+                    value={warehouseLocation}
+                    onChange={(event) => setWarehouseLocation(event.target.value)}
+                    placeholder="Location (optional)"
+                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  />
+                  <button
+                    onClick={addWarehouse}
+                    className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                  >
+                    Save warehouse
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+              <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+                <h2 className="text-xl font-semibold">Suppliers</h2>
+                <div className="mt-4 space-y-3">
+                  {isLoadingSuppliers ? <div className="text-sm text-[#736067]">Loading suppliers...</div> : null}
+                  {!isLoadingSuppliers && supplierError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{supplierError}</div> : null}
+                  {!isLoadingSuppliers && !supplierError && suppliers.length === 0 ? <div className="text-sm text-[#736067]">No suppliers yet.</div> : null}
+                  {suppliers.map((supplier) => (
+                    <div key={supplier.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                      <div>
+                        <div className="font-medium">{supplier.name}</div>
+                        <div className="text-sm text-[#736067]">{supplier.contactName ?? "No contact"}</div>
+                        <div className="text-sm text-[#736067]">{supplier.phone ?? supplier.email ?? "No contact info"}</div>
+                      </div>
+                      <div className="text-right text-sm text-[#736067]">
+                        <div>{supplier.isActive ? "Active" : "Inactive"}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+                <h2 className="text-xl font-semibold">Add supplier</h2>
+                <div className="mt-4 space-y-3">
+                  <input
+                    value={supplierName}
+                    onChange={(event) => setSupplierName(event.target.value)}
+                    placeholder="Supplier name"
+                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  />
+                  <input
+                    value={supplierContactName}
+                    onChange={(event) => setSupplierContactName(event.target.value)}
+                    placeholder="Contact name (optional)"
+                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  />
+                  <input
+                    value={supplierEmail}
+                    onChange={(event) => setSupplierEmail(event.target.value)}
+                    placeholder="Email (optional)"
+                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  />
+                  <input
+                    value={supplierPhone}
+                    onChange={(event) => setSupplierPhone(event.target.value)}
+                    placeholder="Phone (optional)"
+                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  />
+                  <button
+                    onClick={addSupplier}
+                    className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                  >
+                    Save supplier
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+              <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+                <h2 className="text-xl font-semibold">Reorder Rules</h2>
+                <div className="mt-4 space-y-3">
+                  {isLoadingReorderRules ? <div className="text-sm text-[#736067]">Loading reorder rules...</div> : null}
+                  {!isLoadingReorderRules && reorderRuleError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{reorderRuleError}</div> : null}
+                  {!isLoadingReorderRules && !reorderRuleError && reorderRules.length === 0 ? <div className="text-sm text-[#736067]">No reorder rules yet.</div> : null}
+                  {reorderRules.map((rule) => (
+                    <div key={rule.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                      <div>
+                        <div className="font-medium">Product {rule.productId}</div>
+                        <div className="text-sm text-[#736067]">Branch {rule.branchId} / Warehouse {rule.warehouseId}</div>
+                        <div className="text-sm text-[#736067]">Min: {rule.minQuantity} | Reorder: {rule.reorderQuantity}</div>
+                      </div>
+                      <div className="text-right text-sm text-[#736067]">
+                        <div>{rule.isActive ? "Active" : "Inactive"}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+                <h2 className="text-xl font-semibold">Add reorder rule</h2>
+                <div className="mt-4 space-y-3">
+                  <input
+                    value={reorderRuleProductId}
+                    onChange={(event) => setReorderRuleProductId(event.target.value)}
+                    placeholder="Product ID"
+                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  />
+                  <input
+                    value={reorderRuleBranchId}
+                    onChange={(event) => setReorderRuleBranchId(event.target.value)}
+                    placeholder="Branch ID"
+                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  />
+                  <input
+                    value={reorderRuleWarehouseId}
+                    onChange={(event) => setReorderRuleWarehouseId(event.target.value)}
+                    placeholder="Warehouse ID"
+                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  />
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      value={reorderRuleMinQuantity}
+                      onChange={(event) => setReorderRuleMinQuantity(event.target.value)}
+                      placeholder="Min qty"
+                      className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                    />
+                    <input
+                      value={reorderRuleReorderQuantity}
+                      onChange={(event) => setReorderRuleReorderQuantity(event.target.value)}
+                      placeholder="Reorder qty"
+                      className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                    />
+                  </div>
+                  <button
+                    onClick={addReorderRule}
+                    className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                  >
+                    Save reorder rule
+                  </button>
+                </div>
               </div>
             </div>
           </section>
