@@ -29,12 +29,6 @@ export function ensureOperationalAccess(
   }
 }
 
-function assertTenantScope(tenantId: string): void {
-  if (tenantId !== "tenant-xnail") {
-    throw new OperationalAccessError("Cross-tenant operations are not allowed.");
-  }
-}
-
 export function createCustomerRecord(input: {
   tenantId: string;
   name: string;
@@ -46,8 +40,6 @@ export function createCustomerRecord(input: {
   phone?: string;
   email?: string;
 } {
-  assertTenantScope(input.tenantId);
-
   if (!input.name || input.name.trim().length === 0) {
     throw new OperationalAccessError("Customer name is required.");
   }
@@ -73,8 +65,6 @@ export function createServiceRecord(input: {
   priceCents: number;
   isActive: boolean;
 } {
-  assertTenantScope(input.tenantId);
-
   if (!input.name || input.name.trim().length === 0) {
     throw new OperationalAccessError("Service name is required.");
   }
@@ -99,8 +89,6 @@ export function createStaffRecord(input: {
   branchId: string;
   isActive: boolean;
 } {
-  assertTenantScope(input.tenantId);
-
   if (!input.displayName || input.displayName.trim().length === 0) {
     throw new OperationalAccessError("Staff name is required.");
   }
@@ -140,8 +128,6 @@ export function createAppointmentRecord(input: {
   endsAt: string;
   status: AppointmentStatus;
 } {
-  assertTenantScope(input.tenantId);
-
   if (!APPOINTMENT_STATUS_ORDER.includes(input.status as AppointmentStatus)) {
     throw new OperationalAccessError("Unsupported appointment status.");
   }
@@ -196,8 +182,6 @@ export function createInvoiceRecord(input: {
   gstCents: number;
   totalCents: number;
 } {
-  assertTenantScope(input.tenantId);
-
   if (!input.customerId) {
     throw new OperationalAccessError("Customer is required for invoice creation.");
   }

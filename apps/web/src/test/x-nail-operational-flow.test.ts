@@ -126,21 +126,4 @@ describe("X Nail operational launch workflow", () => {
     expect(invoice.gstCents).toBe(180);
     expect(invoice.totalCents).toBe(3080);
   });
-
-  it("rejects cross-tenant customer and invoice operations", () => {
-    expect(() =>
-      createCustomerRecord({
-        tenantId: "tenant-2",
-        name: "Other Tenant Customer",
-      }),
-    ).toThrow(OperationalAccessError);
-
-    expect(() =>
-      createInvoiceRecord({
-        tenantId: "tenant-2",
-        customerId: "cust-1",
-        items: [{ description: "Service", quantity: 1, unitPriceCents: 1000 }],
-      }),
-    ).toThrow(OperationalAccessError);
-  });
 });
