@@ -270,6 +270,14 @@ export default function Home() {
   const [notificationLogs, setNotificationLogs] = useState<Array<{ id: string; channel: string; subject: string | null; body: string; status: string; sentAt: string | null }>>([]);
   const [isLoadingNotificationLogs, setIsLoadingNotificationLogs] = useState(false);
   const [notificationLogError, setNotificationLogError] = useState<string | null>(null);
+  const [report, setReport] = useState<{
+    sales: { invoiceCount: number; totalRevenueCents: number };
+    appointments: { total: number; statusBreakdown: Array<{ status: string; count: number }> };
+    customers: { total: number };
+    inventory: { stockItemCount: number; totalQuantity: number; movementCount: number };
+  } | null>(null);
+  const [isLoadingReport, setIsLoadingReport] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
 
   const customerMap = new Map(customers.map((customer) => [customer.id, customer.name]));
   const productMap = new Map(products.map((product) => [product.id, product.name]));
@@ -1467,6 +1475,63 @@ export default function Home() {
       .finally(() => {
         if (mounted) {
           setIsLoadingNotificationLogs(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+      window.clearTimeout(loadingTimer);
+    };
+  }, [authenticated, activeTab]);
+
+  useEffect(() => {
+    if (authenticated !== true || activeTab !== "Reports") {
+      return;
+    }
+
+    let mounted = true;
+    const loadingTimer = window.setTimeout(() => {
+      if (mounted) {
+        setIsLoadingReport(true);
+        setReportError(null);
+      }
+    }, 0);
+    void fetch("/api/reports", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        if (result.status === 401) {
+          setReport(null);
+          setAuthenticated(false);
+          return;
+        }
+        if (result.status === 403) {
+          setReport(null);
+          setReportError("You are not authorized to view reports.");
+          return;
+        }
+        if (!result.ok) {
+          throw new Error("Report summary request failed");
+        }
+        const body = await result.json() as {
+          report?: {
+            sales: { invoiceCount: number; totalRevenueCents: number };
+            appointments: { total: number; statusBreakdown: Array<{ status: string; count: number }> };
+            customers: { total: number };
+            inventory: { stockItemCount: number; totalQuantity: number; movementCount: number };
+          };
+        };
+        setReport(body.report ?? null);
+      })
+      .catch(() => {
+        if (mounted) {
+          setReport(null);
+          setReportError("Reports could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          window.clearTimeout(loadingTimer);
+          setIsLoadingReport(false);
         }
       });
 
@@ -3768,62 +3833,46 @@ export default function Home() {
 
         {activeTab === "Reports" ? (
           <section className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
-              <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Customers</div>
-              <div className="mt-2 text-3xl font-semibold">{customers.length}</div>
-            </div>
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
-              <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Services</div>
-              <div className="mt-2 text-3xl font-semibold">{services.length}</div>
-            </div>
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
-              <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Appointments</div>
-              <div className="mt-2 text-3xl font-semibold">{appointments.length}</div>
-            </div>
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
-              <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Invoices</div>
-              <div className="mt-2 text-3xl font-semibold">{invoices.length}</div>
-            </div>
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
-              <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Revenue</div>
-              <div className="mt-2 text-3xl font-semibold">₹{invoices.reduce((sum, invoice) => sum + invoice.totalCents, 0) / 100}</div>
-            </div>
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
-              <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Products</div>
-              <div className="mt-2 text-3xl font-semibold">{products.length}</div>
-            </div>
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
-              <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Staff</div>
-              <div className="mt-2 text-3xl font-semibold">{staff.length}</div>
-            </div>
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
-              <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Packages</div>
-              <div className="mt-2 text-3xl font-semibold">{packages.length}</div>
-            </div>
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
-              <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Memberships</div>
-              <div className="mt-2 text-3xl font-semibold">{memberships.length}</div>
-            </div>
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
-              <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Stock Items</div>
-              <div className="mt-2 text-3xl font-semibold">{stockItems.length}</div>
-            </div>
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
-              <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Movements</div>
-              <div className="mt-2 text-3xl font-semibold">{stockMovements.length}</div>
-            </div>
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
-              <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Business Units</div>
-              <div className="mt-2 text-3xl font-semibold">{businessUnits.length}</div>
-            </div>
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
-              <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Branches</div>
-              <div className="mt-2 text-3xl font-semibold">{branches.length}</div>
-            </div>
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
-              <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Categories</div>
-              <div className="mt-2 text-3xl font-semibold">{categories.length}</div>
-            </div>
+            {isLoadingReport ? <div className="text-sm text-[#736067]">Loading reports...</div> : null}
+            {!isLoadingReport && reportError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{reportError}</div> : null}
+            {!isLoadingReport && !reportError && report === null ? <div className="text-sm text-[#736067]">No report data yet.</div> : null}
+            {report !== null ? (
+              <>
+                <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
+                  <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Invoices</div>
+                  <div className="mt-2 text-3xl font-semibold">{report.sales.invoiceCount}</div>
+                </div>
+                <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
+                  <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Revenue</div>
+                  <div className="mt-2 text-3xl font-semibold">₹{report.sales.totalRevenueCents / 100}</div>
+                </div>
+                <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
+                  <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Appointments</div>
+                  <div className="mt-2 text-3xl font-semibold">{report.appointments.total}</div>
+                  <div className="mt-2 space-y-1">
+                    {report.appointments.statusBreakdown.map((item) => (
+                      <div key={item.status} className="flex items-center justify-between text-xs text-[#736067]">
+                        <span>{item.status}</span>
+                        <span className="font-medium">{item.count}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
+                  <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Customers</div>
+                  <div className="mt-2 text-3xl font-semibold">{report.customers.total}</div>
+                </div>
+                <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
+                  <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Stock Items</div>
+                  <div className="mt-2 text-3xl font-semibold">{report.inventory.stockItemCount}</div>
+                  <div className="mt-1 text-sm text-[#715a62]">Total qty: {report.inventory.totalQuantity}</div>
+                </div>
+                <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
+                  <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Movements</div>
+                  <div className="mt-2 text-3xl font-semibold">{report.inventory.movementCount}</div>
+                </div>
+              </>
+            ) : null}
           </section>
         ) : null}
 
