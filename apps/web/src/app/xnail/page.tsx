@@ -90,7 +90,7 @@ function toLocalAppointment(apiRecord: {
   };
 }
 
-const tabs = ["Overview", "Customers", "Services", "Packages", "Memberships", "Inventory", "Staff", "Attendance", "Appointments", "Billing", "Branches", "Reports"] as const;
+const tabs = ["Overview", "Customers", "Services", "Packages", "Memberships", "Inventory", "Staff", "Attendance", "Appointments", "Billing", "Branches", "Reports", "Settings", "Notifications"] as const;
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<(typeof tabs)[number]>("Overview");
@@ -255,6 +255,21 @@ export default function Home() {
   const [branchName, setBranchName] = useState("");
   const [branchSlug, setBranchSlug] = useState("");
   const [branchBusinessUnitId, setBranchBusinessUnitId] = useState("");
+  const [settings, setSettings] = useState<Array<{ id: string; key: string; value: string; isActive: boolean }>>([]);
+  const [isLoadingSettings, setIsLoadingSettings] = useState(false);
+  const [settingError, setSettingError] = useState<string | null>(null);
+  const [settingKey, setSettingKey] = useState("");
+  const [settingValue, setSettingValue] = useState("");
+  const [notificationTemplates, setNotificationTemplates] = useState<Array<{ id: string; name: string; channel: string; subject: string | null; body: string; isActive: boolean }>>([]);
+  const [isLoadingNotificationTemplates, setIsLoadingNotificationTemplates] = useState(false);
+  const [notificationTemplateError, setNotificationTemplateError] = useState<string | null>(null);
+  const [templateName, setTemplateName] = useState("");
+  const [templateChannel, setTemplateChannel] = useState("");
+  const [templateSubject, setTemplateSubject] = useState("");
+  const [templateBody, setTemplateBody] = useState("");
+  const [notificationLogs, setNotificationLogs] = useState<Array<{ id: string; channel: string; subject: string | null; body: string; status: string; sentAt: string | null }>>([]);
+  const [isLoadingNotificationLogs, setIsLoadingNotificationLogs] = useState(false);
+  const [notificationLogError, setNotificationLogError] = useState<string | null>(null);
 
   const customerMap = new Map(customers.map((customer) => [customer.id, customer.name]));
   const productMap = new Map(products.map((product) => [product.id, product.name]));
@@ -1319,6 +1334,203 @@ export default function Home() {
       window.clearTimeout(loadingTimer);
     };
   }, [authenticated, activeTab]);
+
+  useEffect(() => {
+    if (authenticated !== true || activeTab !== "Settings") {
+      return;
+    }
+
+    let mounted = true;
+    let completed = false;
+    const loadingTimer = window.setTimeout(() => {
+      if (mounted && !completed) {
+        setIsLoadingSettings(true);
+        setSettingError(null);
+      }
+    }, 0);
+    void fetch("/api/settings", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        completed = true;
+        if (result.status === 401) {
+          setSettings([]);
+          setAuthenticated(false);
+          return;
+        }
+        if (result.status === 403) {
+          setSettings([]);
+          setSettingError("You are not authorized to view settings.");
+          return;
+        }
+        if (!result.ok) {
+          throw new Error("Settings list request failed");
+        }
+        const body = await result.json() as { settings?: Array<{ id: string; key: string; value: string; isActive: boolean }> };
+        const loaded = Array.isArray(body.settings) ? body.settings : [];
+        setSettings(loaded);
+      })
+      .catch(() => {
+        completed = true;
+        if (mounted) {
+          setSettings([]);
+          setSettingError("Settings could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          window.clearTimeout(loadingTimer);
+          setIsLoadingSettings(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+      window.clearTimeout(loadingTimer);
+    };
+  }, [authenticated, activeTab]);
+
+  useEffect(() => {
+    if (authenticated !== true || activeTab !== "Notifications") {
+      return;
+    }
+
+    let mounted = true;
+    const loadingTimer = window.setTimeout(() => {
+      if (mounted) {
+        setIsLoadingNotificationTemplates(true);
+        setNotificationTemplateError(null);
+        setIsLoadingNotificationLogs(true);
+        setNotificationLogError(null);
+      }
+    }, 0);
+    void fetch("/api/notification-templates", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        if (result.status === 401) {
+          setNotificationTemplates([]);
+          setAuthenticated(false);
+          return;
+        }
+        if (result.status === 403) {
+          setNotificationTemplates([]);
+          setNotificationTemplateError("You are not authorized to view notification templates.");
+          return;
+        }
+        if (!result.ok) {
+          throw new Error("Notification templates request failed");
+        }
+        const body = await result.json() as { notificationTemplates?: Array<{ id: string; name: string; channel: string; subject: string | null; body: string; isActive: boolean }> };
+        const loaded = Array.isArray(body.notificationTemplates) ? body.notificationTemplates : [];
+        setNotificationTemplates(loaded);
+      })
+      .catch(() => {
+        if (mounted) {
+          setNotificationTemplates([]);
+          setNotificationTemplateError("Notification templates could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setIsLoadingNotificationTemplates(false);
+        }
+      });
+    void fetch("/api/notification-logs", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        if (result.status === 401) {
+          setNotificationLogs([]);
+          setAuthenticated(false);
+          return;
+        }
+        if (result.status === 403) {
+          setNotificationLogs([]);
+          setNotificationLogError("You are not authorized to view notification logs.");
+          return;
+        }
+        if (!result.ok) {
+          throw new Error("Notification logs request failed");
+        }
+        const body = await result.json() as { notificationLogs?: Array<{ id: string; channel: string; subject: string | null; body: string; status: string; sentAt: string | null }> };
+        const loaded = Array.isArray(body.notificationLogs) ? body.notificationLogs : [];
+        setNotificationLogs(loaded);
+      })
+      .catch(() => {
+        if (mounted) {
+          setNotificationLogs([]);
+          setNotificationLogError("Notification logs could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setIsLoadingNotificationLogs(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+      window.clearTimeout(loadingTimer);
+    };
+  }, [authenticated, activeTab]);
+
+  const addSetting = async () => {
+    if (!settingKey.trim()) return;
+    setSettingError(null);
+    const result = await fetch("/api/settings", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ key: settingKey, value: settingValue }),
+    });
+    if (result.status === 401) {
+      setSettings([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setSettings([]);
+      setSettingError("You are not authorized to create settings.");
+      return;
+    }
+    if (!result.ok) {
+      setSettingError("Setting could not be saved.");
+      return;
+    }
+    const body = await result.json() as { setting: { id: string; key: string; value: string; isActive: boolean } };
+    setSettings((current) => [body.setting, ...current]);
+    setSettingKey("");
+    setSettingValue("");
+  };
+
+  const addNotificationTemplate = async () => {
+    if (!templateName.trim() || !templateChannel.trim() || !templateBody.trim()) return;
+    setNotificationTemplateError(null);
+    const result = await fetch("/api/notification-templates", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: templateName, channel: templateChannel, subject: templateSubject || null, body: templateBody }),
+    });
+    if (result.status === 401) {
+      setNotificationTemplates([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setNotificationTemplates([]);
+      setNotificationTemplateError("You are not authorized to create notification templates.");
+      return;
+    }
+    if (!result.ok) {
+      setNotificationTemplateError("Notification template could not be saved.");
+      return;
+    }
+    const body = await result.json() as { notificationTemplate: { id: string; name: string; channel: string; subject: string | null; body: string; isActive: boolean } };
+    setNotificationTemplates((current) => [body.notificationTemplate, ...current]);
+    setTemplateName("");
+    setTemplateChannel("");
+    setTemplateSubject("");
+    setTemplateBody("");
+  };
 
   const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -3600,6 +3812,139 @@ export default function Home() {
               <div className="mt-2 text-3xl font-semibold">{categories.length}</div>
             </div>
           </section>
+        ) : null}
+
+        {activeTab === "Settings" ? (
+          <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <h2 className="text-xl font-semibold">Settings</h2>
+              <div className="mt-4 space-y-3">
+                {isLoadingSettings ? <div className="text-sm text-[#736067]">Loading settings...</div> : null}
+                {!isLoadingSettings && settingError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{settingError}</div> : null}
+                {!isLoadingSettings && !settingError && settings.length === 0 ? <div className="text-sm text-[#736067]">No settings yet.</div> : null}
+                {settings.map((setting) => (
+                  <div key={setting.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    <div>
+                      <div className="font-medium">{setting.key}</div>
+                      <div className="text-sm text-[#736067]">{setting.value}</div>
+                    </div>
+                    <div className="text-right text-sm text-[#736067]">
+                      <div>{setting.isActive ? "Active" : "Inactive"}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <h2 className="text-xl font-semibold">Add setting</h2>
+              <div className="mt-4 space-y-3">
+                <input
+                  value={settingKey}
+                  onChange={(event) => setSettingKey(event.target.value)}
+                  placeholder="Setting key"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <input
+                  value={settingValue}
+                  onChange={(event) => setSettingValue(event.target.value)}
+                  placeholder="Setting value"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <button
+                  onClick={addSetting}
+                  className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                >
+                  Save setting
+                </button>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {activeTab === "Notifications" ? (
+          <>
+            <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+              <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+                <h2 className="text-xl font-semibold">Notification Templates</h2>
+              <div className="mt-4 space-y-3">
+                {isLoadingNotificationTemplates ? <div className="text-sm text-[#736067]">Loading notification templates...</div> : null}
+                {!isLoadingNotificationTemplates && notificationTemplateError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{notificationTemplateError}</div> : null}
+                {!isLoadingNotificationTemplates && !notificationTemplateError && notificationTemplates.length === 0 ? <div className="text-sm text-[#736067]">No notification templates yet.</div> : null}
+                {notificationTemplates.map((template) => (
+                  <div key={template.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    <div>
+                      <div className="font-medium">{template.name}</div>
+                      <div className="text-sm text-[#736067]">Channel: {template.channel}</div>
+                      <div className="text-sm text-[#736067]">{template.subject ?? "No subject"}</div>
+                    </div>
+                    <div className="text-right text-sm text-[#736067]">
+                      <div>{template.isActive ? "Active" : "Inactive"}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <h2 className="text-xl font-semibold">Add notification template</h2>
+              <div className="mt-4 space-y-3">
+                <input
+                  value={templateName}
+                  onChange={(event) => setTemplateName(event.target.value)}
+                  placeholder="Template name"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <input
+                  value={templateChannel}
+                  onChange={(event) => setTemplateChannel(event.target.value)}
+                  placeholder="Channel (e.g. email, sms)"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <input
+                  value={templateSubject}
+                  onChange={(event) => setTemplateSubject(event.target.value)}
+                  placeholder="Subject (optional)"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <textarea
+                  value={templateBody}
+                  onChange={(event) => setTemplateBody(event.target.value)}
+                  placeholder="Body"
+                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                />
+                <button
+                  onClick={addNotificationTemplate}
+                  className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                >
+                  Save template
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section className="mt-6 rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+            <h2 className="text-xl font-semibold">Notification Logs</h2>
+            <div className="mt-4 space-y-3">
+              {isLoadingNotificationLogs ? <div className="text-sm text-[#736067]">Loading notification logs...</div> : null}
+              {!isLoadingNotificationLogs && notificationLogError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{notificationLogError}</div> : null}
+              {!isLoadingNotificationLogs && !notificationLogError && notificationLogs.length === 0 ? <div className="text-sm text-[#736067]">No notification logs yet.</div> : null}
+              {notificationLogs.map((log) => (
+                <div key={log.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                  <div>
+                    <div className="font-medium">{log.channel}</div>
+                    <div className="text-sm text-[#736067]">{log.subject ?? "No subject"}</div>
+                    <div className="text-sm text-[#736067]">{log.body}</div>
+                  </div>
+                  <div className="text-right text-sm text-[#736067]">
+                    <div>{log.status}</div>
+                    <div>{log.sentAt ? new Date(log.sentAt).toLocaleString() : "Not sent"}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+          </>
         ) : null}
       </div>
     </main>

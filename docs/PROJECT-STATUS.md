@@ -1729,7 +1729,7 @@ The prior "Phase 1I X Nail Packages Production Verification" section (above) doc
 - No production database connection or mutation was performed.
 - No new roles were introduced; permissions are assigned to the existing `tenant-admin` role.
 
-## Phase 1.9 Branch Management Vertical Slice — 2026-08-28
+ ## Phase 1.9 Branch Management Vertical Slice — 2026-08-28
 
 ### Status: **Implemented and verified locally; not deployed to production**
 
@@ -1768,3 +1768,30 @@ The prior "Phase 1I X Nail Packages Production Verification" section (above) doc
 - No authentication or authorization code was modified.
 - No production database connection or mutation was performed.
 - No new roles were introduced; permissions are assigned to the existing `tenant-admin` role.
+
+## X Nail Inventory UI Integration — 2026-08-29
+
+### Status: **Implemented and verified locally; committed as `e0c7f52`**
+
+### Implemented Slice
+
+- **Purchase Receipts UI** (`apps/web/src/app/xnail/page.tsx`): Added list and record form for purchase receipts. Fetches `GET /api/purchase-receipts` on mount; `POST /api/purchase-receipts` creates receipts with supplier, warehouse, branch, received-by, product, quantity, and notes.
+- **Stock Transfers UI** (`apps/web/src/app/xnail/page.tsx`): Added list and create form for stock transfers. Fetches `GET /api/stock-transfers` on mount; `POST /api/stock-transfers` creates transfers with from/to warehouse, from/to branch, product, quantity, and notes.
+- **Stock Adjustments UI** (`apps/web/src/app/xnail/page.tsx`): Added list and record form for stock adjustments. Fetches `GET /api/stock-adjustments` on mount; `POST /api/stock-adjustments` creates adjustments with branch, direction (IN/OUT), product, quantity, and notes.
+- **State and handlers**: Added `stockTransfers`, `stockAdjustments`, loading, error, and form-field state; wired `addStockTransfer` and `addStockAdjustment` handlers with 401/403/error handling matching the existing pattern.
+- **JSX structure fix**: Removed an extra `</section>` tag and added a missing `</div>` closing tag in the Purchase Receipts form container that broke lint and build parsing.
+
+### Verification Results
+
+- `pnpm lint` — Passed (0 errors; 14 pre-existing unused-import warnings in unrelated API route files).
+- `pnpm build` — Passed (Next.js production build + TypeScript compilation).
+- `pnpm test` — Passed: 441 web tests, 398 authentication-context-prisma tests.
+- `git diff --check` — Passed (LF→CRLF notices only).
+- Prisma schema validation — Skipped locally because `DATABASE_URL` is not configured in this Windows environment; schema loaded without syntax errors.
+
+### Important Boundary
+
+- No Prisma schema or migration was changed.
+- No authentication or authorization code was modified.
+- No production database connection or mutation was performed.
+- No new roles were introduced.
