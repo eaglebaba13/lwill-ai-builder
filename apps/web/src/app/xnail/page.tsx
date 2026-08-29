@@ -2486,22 +2486,24 @@ export default function Home() {
         <section className="grid gap-4 md:grid-cols-4">
           <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
             <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Today</div>
-            <div className="mt-2 text-3xl font-semibold">—</div>
+            <div className="mt-2 text-3xl font-semibold">
+              {appointments.filter((appointment) => appointment.startsAt.startsWith(new Date().toISOString().split("T")[0])).length}
+            </div>
             <div className="mt-1 text-sm text-[#715a62]">Appointments</div>
           </div>
           <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
             <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Revenue</div>
-            <div className="mt-2 text-3xl font-semibold">—</div>
+            <div className="mt-2 text-3xl font-semibold">₹{invoices.reduce((sum, invoice) => sum + invoice.totalCents, 0) / 100}</div>
             <div className="mt-1 text-sm text-[#715a62]">Gross sales</div>
           </div>
           <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
             <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Members</div>
-            <div className="mt-2 text-3xl font-semibold">—</div>
+            <div className="mt-2 text-3xl font-semibold">{memberships.length}</div>
             <div className="mt-1 text-sm text-[#715a62]">Loyalty</div>
           </div>
           <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
             <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Staff</div>
-            <div className="mt-2 text-3xl font-semibold">—</div>
+            <div className="mt-2 text-3xl font-semibold">{staff.length}</div>
             <div className="mt-1 text-sm text-[#715a62]">On duty</div>
           </div>
         </section>
