@@ -291,6 +291,9 @@ export default function Home() {
   const [packageUtilizationReport, setPackageUtilizationReport] = useState<Array<{ packageId: string; packageName: string; totalMemberships: number; activeMemberships: number }>>([]);
   const [isLoadingPackageUtilizationReport, setIsLoadingPackageUtilizationReport] = useState(false);
   const [packageUtilizationReportError, setPackageUtilizationReportError] = useState<string | null>(null);
+  const [gstSummary, setGstSummary] = useState<{ totalGstCents: number; totalTaxableCents: number; invoiceCount: number } | null>(null);
+  const [isLoadingGstSummary, setIsLoadingGstSummary] = useState(false);
+  const [gstSummaryError, setGstSummaryError] = useState<string | null>(null);
 
   const customerMap = new Map(customers.map((customer) => [customer.id, customer.name]));
   const productMap = new Map(products.map((product) => [product.id, product.name]));
@@ -1710,6 +1713,38 @@ export default function Home() {
       .finally(() => {
         if (mounted) {
           setIsLoadingPackageUtilizationReport(false);
+        }
+      });
+
+    void fetch("/api/reports/gst-summary", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        if (result.status === 401) {
+          setGstSummary(null);
+          return;
+        }
+        if (result.status === 403) {
+          setGstSummary(null);
+          setGstSummaryError("You are not authorized to view GST summary.");
+          return;
+        }
+        if (!result.ok) {
+          throw new Error("GST summary request failed");
+        }
+        const body = await result.json() as {
+          gstSummary?: { totalGstCents: number; totalTaxableCents: number; invoiceCount: number };
+        };
+        setGstSummary(body.gstSummary ?? null);
+      })
+      .catch(() => {
+        if (mounted) {
+          setGstSummary(null);
+          setGstSummaryError("GST summary could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setIsLoadingGstSummary(false);
         }
       });
 
@@ -4217,6 +4252,28 @@ export default function Home() {
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+            ) : null}
+            {isLoadingGstSummary ? <div className="text-sm text-[#736067]">Loading GST summary...</div> : null}
+            {!isLoadingGstSummary && gstSummaryError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{gstSummaryError}</div> : null}
+            {!isLoadingGstSummary && !gstSummaryError && gstSummary === null ? <div className="text-sm text-[#736067]">No GST data yet.</div> : null}
+            {gstSummary !== null ? (
+              <div className="mt-6 rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+                <h2 className="text-xl font-semibold">GST Summary</h2>
+                <div className="mt-4 grid gap-4 md:grid-cols-3">
+                  <div className="rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Total GST</div>
+                    <div className="mt-2 text-2xl font-semibold">₹{gstSummary.totalGstCents / 100}</div>
+                  </div>
+                  <div className="rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Taxable Amount</div>
+                    <div className="mt-2 text-2xl font-semibold">₹{gstSummary.totalTaxableCents / 100}</div>
+                  </div>
+                  <div className="rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Invoices</div>
+                    <div className="mt-2 text-2xl font-semibold">{gstSummary.invoiceCount}</div>
+                  </div>
                 </div>
               </div>
             ) : null}

@@ -50,11 +50,16 @@ export interface ReportService {
     readonly totalMemberships: number;
     readonly activeMemberships: number;
   }>>;
+  getGstSummary(args: { tenantId: string }): Promise<{
+    readonly totalGstCents: number;
+    readonly totalTaxableCents: number;
+    readonly invoiceCount: number;
+  }>;
 }
 
 interface ReportPrismaClient {
   readonly invoice: {
-    findMany(args: { where?: Record<string, unknown>; select?: Record<string, unknown>; orderBy?: Record<string, unknown> }): Promise<ReadonlyArray<{ readonly totalCents: number; readonly issuedAt: Date }>>;
+    findMany(args: { where?: Record<string, unknown>; select?: Record<string, unknown>; orderBy?: Record<string, unknown> }): Promise<ReadonlyArray<{ readonly totalCents: number; readonly issuedAt: Date; readonly gstCents: number; readonly subtotalCents: number }>>;
   };
   readonly appointment: {
     findMany(args: { where?: Record<string, unknown>; select?: Record<string, unknown>; orderBy?: Record<string, unknown> }): Promise<ReadonlyArray<{ readonly status: string; readonly startsAt: Date }>>;
@@ -82,7 +87,7 @@ export function createReportService(prisma: ReportPrismaClient): ReportService {
     async getReportSummary({ tenantId }) {
       const invoices = await prisma.invoice.findMany({
         where: { tenantId },
-        select: { totalCents: true, issuedAt: true },
+        select: { totalCents: true, issuedAt: true, gstCents: true, subtotalCents: true },
       });
 
       const appointments = await prisma.appointment.findMany({
@@ -250,6 +255,22 @@ export function createReportService(prisma: ReportPrismaClient): ReportService {
         totalMemberships: entry.total,
         activeMemberships: entry.active,
       }));
+    },
+
+    async getGstSummary({ tenantId }) {
+      const invoices = await prisma.invoice.findMany({
+        where: { tenantId },
+        select: { gstCents: true, subtotalCents: true },
+      });
+
+      const totalGstCents = invoices.reduce((sum, invoice) => sum + invoice.gstCents, 0);
+      const totalTaxableCents = invoices.reduce((sum, invoice) => sum + invoice.subtotalCents, 0);
+
+      return {
+        totalGstCents,
+        totalTaxableCents,
+        invoiceCount: invoices.length,
+      };
     },
   };
 }
