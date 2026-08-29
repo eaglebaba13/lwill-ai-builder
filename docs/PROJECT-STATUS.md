@@ -5,8 +5,8 @@
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
 - **Current Branch**: `phase-1d-native-auth`
-- **Current HEAD Commit**: `199e57f` (`feat(inventory): add stock item and movement write APIs`)
-- **Git State**: `phase-1d-native-auth` at `199e57f`; working tree contains uncommitted attendance check-out implementation and untracked SRS extracts.
+- **Current HEAD Commit**: `6c298e3` (`feat(attendance): add check-out update endpoint and UI control`)
+- **Git State**: `phase-1d-native-auth` at `6c298e3`; working tree clean (attendance check-out committed and pushed; untracked SRS extracts and scripts/ remain).
 
 ## State Breakdown
 
@@ -254,28 +254,26 @@
 - This slice remains intentionally small and reusable for the X Nail MVP: staff records and attendance entries with tenant isolation.
 - No payroll, HRMS, commission, biometric attendance, or advanced scheduling functionality was introduced.
 
-## Attendance Check-Out Vertical Slice — Uncommitted
+## Attendance Check-Out Vertical Slice — Finalized
 
-### Status: **Implemented locally — verification in progress (not committed)**
+### Status: **Complete — committed and pushed to origin/phase-1d-native-auth**
 
 ### Implemented Slice
 
 - Added `updateAttendance` to the attendance service (`packages/authentication-context-prisma/src/attendance-service.ts`): updates `checkOutAt`, `status`, and `notes` for an existing attendance record, scoped to the requesting tenant. Returns `null` when the record is missing or cross-tenant. Validates the referenced staff member belongs to the same tenant. `checkInAt` is never modified through this operation.
-- Added `handleUpdateAttendance` to the attendance route handlers (`apps/web/src/lib/crm/attendance-route-handlers.ts`): `PATCH` semantics, `attendance.write` authorization, input validation (only `checkOutAt`/`status`/`notes` allowed; unknown keys rejected), 401/403/400/404/200 responses.
+- Added `handleUpdateAttendance` to the attendance route handlers (`apps/web/src/lib/crm/attendance-route-handlers.ts`): `PATCH` semantics, `attendance.write` authorization, input validation (only `checkOutAt`/`status`/`notes` allowed; unknown keys rejected), 401/403/400/404/200 responses. Explicit `null` values for `status` and `notes` are preserved correctly; `undefined` values remain unchanged.
 - Wired `updateAttendance` through the attendance runtime (`apps/web/src/lib/crm/attendance-runtime.ts`).
 - Added `PATCH /api/attendance/[id]` API route (`apps/web/src/app/api/attendance/[id]/route.ts`).
 - Added a "Check out" control to the Attendance tab of the X Nail page (`apps/web/src/app/xnail/page.tsx`) for records with no `checkOutAt`.
-- Focused Vitest coverage for service-layer update (success, cross-tenant, missing, staff validation, checkInAt unchanged, partial update) and route-handler update (401, 403, 400 for invalid/unknown/empty input, 200, 404, 403 staff validation, permission forwarding, tenantId from context only).
-
-### Boundaries Preserved
-
-- No Prisma schema or migration was changed. The existing nullable `checkOutAt` column is used.
-- No authentication, authorization boundary, tenant-domain logic, or unrelated module was modified.
-- No business rule invented: the operation is strictly a `checkOutAt`/`status`/`notes` timestamp update.
+- Focused Vitest coverage for service-layer update (success, cross-tenant, missing, staff validation, checkInAt unchanged, partial update, explicit null status/notes) and route-handler update (401, 403, 400 for invalid/unknown/empty input, 200, 404, 403 staff validation, permission forwarding, tenantId from context only).
 
 ### Verification Results
 
-- Pending: `pnpm test`, `pnpm lint`, `pnpm build`, `git diff --check`.
+- `pnpm test` — Passed: 401 web tests + 299 authentication-context-prisma tests + 33 authorization tests = 733 total, 0 failures.
+- `pnpm lint` — Passed (0 errors; 6 pre-existing unused-import warnings in unrelated API route files).
+- `pnpm build` — Passed (Next.js 16 production build + TypeScript compilation).
+- `pnpm --filter @lwill/database exec prisma validate` — Passed.
+- Committed as `6c298e3` and pushed to `origin/phase-1d-native-auth`.
 
 ## Phase 1G Packages + Memberships Slice Verification
 
