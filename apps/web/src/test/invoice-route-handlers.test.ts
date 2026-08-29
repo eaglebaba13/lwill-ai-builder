@@ -3,6 +3,7 @@ import {
   handleCreateInvoice,
   handleGetInvoice,
   handleListInvoices,
+  handleUpdateInvoice,
   type InvoiceAuthorization,
   type InvoiceRouteServices,
 } from "../lib/crm/invoice-route-handlers";
@@ -30,6 +31,7 @@ function createServices(authorization: InvoiceAuthorization): InvoiceRouteServic
     listInvoices: vi.fn().mockResolvedValue([{ id: "invoice-1" }]),
     getInvoice: vi.fn().mockResolvedValue({ id: "invoice-1" }),
     createInvoice: vi.fn().mockResolvedValue({ id: "invoice-1" }),
+    updateInvoice: vi.fn().mockResolvedValue({ id: "invoice-1" }),
   };
 }
 
@@ -39,6 +41,7 @@ describe("invoice route handlers: authentication/authorization gating", () => {
     expect((await handleListInvoices(request(), services)).status).toBe(401);
     expect((await handleCreateInvoice(request({ customerId: "cust-1", issuedAt: "2026-08-12T10:00:00.000Z", items: [{ description: "X", quantity: 1, unitPriceCents: 1000 }] }), services)).status).toBe(401);
     expect((await handleGetInvoice(request(), services, "i1")).status).toBe(401);
+    expect((await handleUpdateInvoice(request({ discountCents: 500 }), services, "i1")).status).toBe(401);
     expect(services.listInvoices).not.toHaveBeenCalled();
   });
 
@@ -46,6 +49,7 @@ describe("invoice route handlers: authentication/authorization gating", () => {
     const services = createServices({ outcome: "forbidden" });
     expect((await handleListInvoices(request(), services)).status).toBe(403);
     expect((await handleCreateInvoice(request({ customerId: "cust-1", issuedAt: "2026-08-12T10:00:00.000Z", items: [{ description: "X", quantity: 1, unitPriceCents: 1000 }] }), services)).status).toBe(403);
+    expect((await handleUpdateInvoice(request({ discountCents: 500 }), services, "i1")).status).toBe(403);
     expect(services.createInvoice).not.toHaveBeenCalled();
   });
 });
@@ -60,9 +64,12 @@ describe("invoice route handlers: permission code forwarding", () => {
     expect(services.authorize).toHaveBeenCalledWith("invoice.read");
   });
 
-  it("passes 'invoice.write' to authorize for create operations", async () => {
+  it("passes 'invoice.write' to authorize for create and update operations", async () => {
     const services = createServices({ outcome: "authorized", tenantId: "tenant-1", branchId: "branch-1" });
     await handleCreateInvoice(request({ customerId: "cust-1", issuedAt: "2026-08-12T10:00:00.000Z", items: [{ description: "X", quantity: 1, unitPriceCents: 1000 }] }), services);
+    expect(services.authorize).toHaveBeenCalledWith("invoice.write");
+
+    await handleUpdateInvoice(request({ discountCents: 500 }), services, "i1");
     expect(services.authorize).toHaveBeenCalledWith("invoice.write");
   });
 });
@@ -212,6 +219,8 @@ describe("invoice route handlers: authorized operations", () => {
     expect(services.authorize).toHaveBeenCalledWith("invoice.read");
     await handleCreateInvoice(request({ customerId: "cust-1", issuedAt: "2026-08-12T10:00:00.000Z", items: [{ description: "X", quantity: 1, unitPriceCents: 1000 }] }), services);
     expect(services.authorize).toHaveBeenCalledWith("invoice.write");
+    await handleUpdateInvoice(request({ discountCents: 500 }), services, "i1");
+    expect(services.authorize).toHaveBeenCalledWith("invoice.write");
   });
 
   it("lists invoices scoped to the authorized tenant", async () => {
@@ -334,5 +343,39 @@ describe("invoice route handlers: authorized operations", () => {
     const services = createServices(authorized);
     vi.mocked(services.getInvoice).mockResolvedValue(null);
     expect((await handleGetInvoice(request(), services, "missing")).status).toBe(404);
+    vi.mocked(services.updateInvoice).mockResolvedValue(null);
+    expect((await handleUpdateInvoice(request({ discountCents: 500 }), services, "missing")).status).toBe(404);
+  });
+
+  it("updates an invoice using only the server-derived tenantId", async () => {
+    const services = createServices(authorized);
+    const result = await handleUpdateInvoice(request({ discountCents: 500 }), services, "i1");
+    expect(result.status).toBe(200);
+    expect(services.updateInvoice).toHaveBeenCalledWith("tenant-1", "i1", { discountCents: 500, notes: undefined });
+  });
+
+  it("rejects update with invalid discountCents", async () => {
+    const services = createServices(authorized);
+    expect((await handleUpdateInvoice(request({ discountCents: -1 }), services, "i1")).status).toBe(400);
+    expect((await handleUpdateInvoice(request({ discountCents: 1.5 }), services, "i1")).status).toBe(400);
+  });
+
+  it("rejects unknown keys in update input", async () => {
+    const services = createServices(authorized);
+    expect((await handleUpdateInvoice(request({ discountCents: 500, customerId: "cust-1" }), services, "i1")).status).toBe(400);
+  });
+
+  it("accepts update with valid optional fields", async () => {
+    const services = createServices(authorized);
+    const result = await handleUpdateInvoice(request({ discountCents: 500, notes: "Updated" }), services, "i1");
+    expect(result.status).toBe(200);
+    expect(services.updateInvoice).toHaveBeenCalledWith("tenant-1", "i1", { discountCents: 500, notes: "Updated" });
+  });
+
+  it("accepts update with only notes", async () => {
+    const services = createServices(authorized);
+    const result = await handleUpdateInvoice(request({ notes: "VIP customer" }), services, "i1");
+    expect(result.status).toBe(200);
+    expect(services.updateInvoice).toHaveBeenCalledWith("tenant-1", "i1", { discountCents: undefined, notes: "VIP customer" });
   });
 });

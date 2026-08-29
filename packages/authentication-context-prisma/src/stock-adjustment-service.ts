@@ -1,3 +1,5 @@
+import { createStockService, type StockPrismaClient } from "./stock-service";
+
 export interface StockAdjustmentLineItemRecord {
   readonly id: string;
   readonly tenantId: string;
@@ -52,12 +54,22 @@ interface StockAdjustmentPrismaClient {
   readonly product: {
     findUnique: (args: { where: { id: string } }) => Promise<{ id: string; tenantId: string } | null>;
   };
+  readonly stockItem: {
+    findFirst: (args: { where: Record<string, unknown> }) => Promise<{ id: string; quantity: number } | null>;
+    create: (args: { data: Record<string, unknown> }) => Promise<{ id: string }>;
+    update: (args: { data: Record<string, unknown>; where: { id: string } }) => Promise<{ id: string }>;
+  };
+  readonly stockMovement: {
+    create: (args: { data: Record<string, unknown> }) => Promise<unknown>;
+  };
   $transaction: {
     <T>(callback: (client: StockAdjustmentPrismaClient) => Promise<T>): Promise<T>;
   };
 }
 
 export function createStockAdjustmentService(prisma: StockAdjustmentPrismaClient): StockAdjustmentService {
+  const stockService = createStockService(prisma as never);
+
   return {
     async createStockAdjustment(input) {
       return prisma.$transaction(async (tx) => {
@@ -100,6 +112,21 @@ export function createStockAdjustmentService(prisma: StockAdjustmentPrismaClient
               quantity: item.quantity,
             },
           });
+
+          await stockService.recordStockMovement(
+            {
+              tenantId: input.tenantId,
+              productId: item.productId,
+              branchId: input.branchId,
+              movementType: "ADJUSTMENT",
+              quantity: item.quantity,
+              referenceType: "STOCK_ADJUSTMENT",
+              referenceId: adjustment.id,
+              notes: `Stock ${input.direction.toLowerCase()} for adjustment ${adjustment.id}`,
+              adjustmentDirection: input.direction,
+            },
+            tx as unknown as StockPrismaClient,
+          );
         }
 
         return adjustment;

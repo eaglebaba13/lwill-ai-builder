@@ -23,11 +23,17 @@ export interface InvoiceWriteInput {
   readonly notes?: string | null;
 }
 
+export interface InvoiceUpdateInput {
+  readonly discountCents?: number;
+  readonly notes?: string | null;
+}
+
 export interface InvoiceRouteServices {
   readonly authorize: (permissionCode: string) => Promise<InvoiceAuthorization>;
   readonly listInvoices: (tenantId: string) => Promise<readonly unknown[]>;
   readonly getInvoice: (tenantId: string, invoiceId: string) => Promise<unknown | null>;
   readonly createInvoice: (tenantId: string, branchId: string | null, input: InvoiceWriteInput) => Promise<unknown>;
+  readonly updateInvoice: (tenantId: string, invoiceId: string, input: InvoiceUpdateInput) => Promise<unknown | null>;
 }
 
 const RESPONSE_HEADERS = { "cache-control": "no-store" };
@@ -153,6 +159,27 @@ function parseCreateInput(input: unknown): InvoiceWriteInput | null {
   };
 }
 
+function parseUpdateInput(input: unknown): InvoiceUpdateInput | null {
+  if (typeof input !== "object" || input === null) {
+    return null;
+  }
+  const record = input as Record<string, unknown>;
+  const allowedKeys = new Set(["discountCents", "notes"]);
+  if (Object.keys(record).some((key) => !allowedKeys.has(key))) {
+    return null;
+  }
+  if (record.discountCents !== undefined && !isNonNegativeInteger(record.discountCents)) {
+    return null;
+  }
+  if (!isOptionalString(record.notes)) {
+    return null;
+  }
+  return {
+    discountCents: record.discountCents as number | undefined,
+    notes: record.notes as string | null | undefined,
+  };
+}
+
 const INVALID_JSON = Symbol("invalid-json");
 
 async function readJsonBody(request: Request): Promise<unknown | typeof INVALID_JSON> {
@@ -208,6 +235,31 @@ export async function handleGetInvoice(
     return authResult.response;
   }
   const invoice = await services.getInvoice(authResult.tenantId, invoiceId);
+  if (invoice === null) {
+    return response(404);
+  }
+  return response(200, { invoice });
+}
+
+export async function handleUpdateInvoice(
+  request: Request,
+  services: InvoiceRouteServices,
+  invoiceId: string,
+): Promise<Response> {
+  const authorization = await services.authorize("invoice.write");
+  const authResult = authorizationOutcome(authorization);
+  if (!authResult.ok) {
+    return authResult.response;
+  }
+  const body = await readJsonBody(request);
+  if (body === INVALID_JSON) {
+    return response(400);
+  }
+  const input = parseUpdateInput(body);
+  if (input === null) {
+    return response(400);
+  }
+  const invoice = await services.updateInvoice(authResult.tenantId, invoiceId, input);
   if (invoice === null) {
     return response(404);
   }

@@ -392,4 +392,191 @@ describe("billing invoice service", () => {
     expect(invoice.subtotalCents).toBe(5000);
     expect(invoice.totalCents).toBe(5000);
   });
+
+  it("updates an invoice discount and recalculates total", async () => {
+    const invoiceService = createBillingInvoiceService({
+      invoice: {
+        create: async () => ({ id: "invoice-1" }),
+        findUnique: async ({ where }: { where: { id: string } }) => {
+          if (where.id === "invoice-1") {
+            return { id: "invoice-1", tenantId: "tenant-1", subtotalCents: 1000, gstCents: 100, discountCents: 0, totalCents: 1100 };
+          }
+          return null;
+        },
+        findMany: async () => [],
+        update: async ({ data }: { data: Record<string, unknown>; where: { id: string } }) => ({
+          id: "invoice-1",
+          ...data,
+        }),
+      },
+      invoiceLineItem: {
+        create: async () => ({ id: "line-1" }),
+        findMany: async () => [],
+      },
+      customer: {
+        findUnique: async () => null,
+      },
+      service: {
+        findUnique: async () => null,
+      },
+      package: {
+        findUnique: async () => null,
+      },
+      product: {
+        findUnique: async () => null,
+      },
+      stockItem: {
+        findFirst: async () => null,
+        create: async () => ({ id: "stock-item-1" }),
+        update: async () => ({ id: "stock-item-1" }),
+      },
+      stockMovement: {
+        create: async () => ({ id: "movement-1" }),
+      },
+      branch: {
+        findUnique: async () => null,
+      },
+      $transaction: async (callback: (client: unknown) => Promise<unknown>) => callback({} as unknown),
+    } as never);
+
+    const invoice = await invoiceService.updateInvoice({ tenantId: "tenant-1", invoiceId: "invoice-1", input: { discountCents: 200 } });
+    expect(invoice).not.toBeNull();
+    expect(invoice?.discountCents).toBe(200);
+    expect(invoice?.totalCents).toBe(900);
+  });
+
+  it("updates an invoice notes", async () => {
+    const invoiceService = createBillingInvoiceService({
+      invoice: {
+        create: async () => ({ id: "invoice-1" }),
+        findUnique: async ({ where }: { where: { id: string } }) => {
+          if (where.id === "invoice-1") {
+            return { id: "invoice-1", tenantId: "tenant-1", subtotalCents: 1000, gstCents: 100, discountCents: 0, totalCents: 1100 };
+          }
+          return null;
+        },
+        findMany: async () => [],
+        update: async ({ data }: { data: Record<string, unknown>; where: { id: string } }) => ({
+          id: "invoice-1",
+          ...data,
+        }),
+      },
+      invoiceLineItem: {
+        create: async () => ({ id: "line-1" }),
+        findMany: async () => [],
+      },
+      customer: {
+        findUnique: async () => null,
+      },
+      service: {
+        findUnique: async () => null,
+      },
+      package: {
+        findUnique: async () => null,
+      },
+      product: {
+        findUnique: async () => null,
+      },
+      stockItem: {
+        findFirst: async () => null,
+        create: async () => ({ id: "stock-item-1" }),
+        update: async () => ({ id: "stock-item-1" }),
+      },
+      stockMovement: {
+        create: async () => ({ id: "movement-1" }),
+      },
+      branch: {
+        findUnique: async () => null,
+      },
+      $transaction: async (callback: (client: unknown) => Promise<unknown>) => callback({} as unknown),
+    } as never);
+
+    const invoice = await invoiceService.updateInvoice({ tenantId: "tenant-1", invoiceId: "invoice-1", input: { notes: "VIP" } });
+    expect(invoice).not.toBeNull();
+    expect(invoice?.notes).toBe("VIP");
+  });
+
+  it("returns null when the invoice does not exist", async () => {
+    const invoiceService = createBillingInvoiceService({
+      invoice: {
+        create: async () => ({ id: "invoice-1" }),
+        findUnique: async () => null,
+        findMany: async () => [],
+        update: async () => ({ id: "invoice-1" }),
+      },
+      invoiceLineItem: {
+        create: async () => ({ id: "line-1" }),
+        findMany: async () => [],
+      },
+      customer: {
+        findUnique: async () => null,
+      },
+      service: {
+        findUnique: async () => null,
+      },
+      package: {
+        findUnique: async () => null,
+      },
+      product: {
+        findUnique: async () => null,
+      },
+      stockItem: {
+        findFirst: async () => null,
+        create: async () => ({ id: "stock-item-1" }),
+        update: async () => ({ id: "stock-item-1" }),
+      },
+      stockMovement: {
+        create: async () => ({ id: "movement-1" }),
+      },
+      branch: {
+        findUnique: async () => null,
+      },
+      $transaction: async (callback: (client: unknown) => Promise<unknown>) => callback({} as unknown),
+    } as never);
+
+    const invoice = await invoiceService.updateInvoice({ tenantId: "tenant-1", invoiceId: "missing", input: { discountCents: 500 } });
+    expect(invoice).toBeNull();
+  });
+
+  it("returns null when the invoice belongs to another tenant", async () => {
+    const invoiceService = createBillingInvoiceService({
+      invoice: {
+        create: async () => ({ id: "invoice-1" }),
+        findUnique: async () => ({ id: "invoice-1", tenantId: "tenant-2", subtotalCents: 1000, gstCents: 100, discountCents: 0, totalCents: 1100 }),
+        findMany: async () => [],
+        update: async () => ({ id: "invoice-1" }),
+      },
+      invoiceLineItem: {
+        create: async () => ({ id: "line-1" }),
+        findMany: async () => [],
+      },
+      customer: {
+        findUnique: async () => null,
+      },
+      service: {
+        findUnique: async () => null,
+      },
+      package: {
+        findUnique: async () => null,
+      },
+      product: {
+        findUnique: async () => null,
+      },
+      stockItem: {
+        findFirst: async () => null,
+        create: async () => ({ id: "stock-item-1" }),
+        update: async () => ({ id: "stock-item-1" }),
+      },
+      stockMovement: {
+        create: async () => ({ id: "movement-1" }),
+      },
+      branch: {
+        findUnique: async () => null,
+      },
+      $transaction: async (callback: (client: unknown) => Promise<unknown>) => callback({} as unknown),
+    } as never);
+
+    const invoice = await invoiceService.updateInvoice({ tenantId: "tenant-1", invoiceId: "invoice-1", input: { discountCents: 500 } });
+    expect(invoice).toBeNull();
+  });
 });

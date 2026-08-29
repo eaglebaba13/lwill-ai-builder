@@ -44,5 +44,6 @@ export function createInvoiceRouteServices(): InvoiceRouteServices {
     listInvoices: (tenantId) => invoiceService.listInvoices({ tenantId }),
     getInvoice: (tenantId, invoiceId) => invoiceService.getInvoice({ tenantId, invoiceId }),
     createInvoice: (tenantId, branchId, input) => invoiceService.createInvoice({ tenantId, branchId, ...input }),
+    updateInvoice: (tenantId, invoiceId, input) => invoiceService.updateInvoice({ tenantId, invoiceId, input }),
   };
 }

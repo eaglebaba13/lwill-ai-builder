@@ -8,6 +8,9 @@ describe("stock adjustment service", () => {
     lineItems: [] as never,
   } as never);
 
+  const stockItem = { findFirst: async () => null, create: async () => ({ id: "stock-item-1" }), update: async () => ({ id: "stock-item-1" }) };
+  const stockMovement = { create: async () => ({ id: "movement-1" }) };
+
   const stockAdjustmentService = createStockAdjustmentService({
     stockAdjustment: {
       create: createStockAdjustment,
@@ -24,6 +27,8 @@ describe("stock adjustment service", () => {
     product: {
       findUnique: async () => ({ id: "product-1", tenantId: "tenant-1" }),
     },
+    stockItem,
+    stockMovement,
     $transaction: async (callback: (client: never) => Promise<unknown>) => callback({
       stockAdjustment: {
         create: createStockAdjustment,
@@ -40,6 +45,8 @@ describe("stock adjustment service", () => {
       product: {
         findUnique: async () => ({ id: "product-1", tenantId: "tenant-1" }),
       },
+      stockItem,
+      stockMovement,
     } as never),
   } as never);
 
@@ -59,6 +66,82 @@ describe("stock adjustment service", () => {
     expect(adjustment.direction).toBe("IN");
   });
 
+  it("records stock movements for adjustment line items", async () => {
+    const movementCreate = vi.fn(async () => ({ id: "movement-1" }));
+    const stockItemCreate = vi.fn(async () => ({ id: "stock-item-1" }));
+    const service = createStockAdjustmentService({
+      stockAdjustment: {
+        create: async ({ data }: { data: Record<string, unknown> }) => ({ id: "adjustment-1", ...data, lineItems: [] }),
+        findUnique: async () => null,
+        findMany: async () => [],
+      },
+      stockAdjustmentLineItem: {
+        create: async () => ({ id: "line-1", tenantId: "tenant-1", stockAdjustmentId: "adjustment-1", productId: "product-1", quantity: 10 }),
+        findMany: async () => [],
+      },
+      branch: {
+        findUnique: async () => ({ id: "branch-1", tenantId: "tenant-1" }),
+      },
+      product: {
+        findUnique: async () => ({ id: "product-1", tenantId: "tenant-1" }),
+      },
+      stockItem: {
+        findFirst: async () => null,
+        create: stockItemCreate,
+        update: async () => ({ id: "stock-item-1" }),
+      },
+      stockMovement: {
+        create: movementCreate,
+      },
+      $transaction: async (callback: (client: never) => Promise<unknown>) => callback({
+        stockAdjustment: {
+          create: async ({ data }: { data: Record<string, unknown> }) => ({ id: "adjustment-1", ...data, lineItems: [] }),
+          findUnique: async () => null,
+          findMany: async () => [],
+        },
+        stockAdjustmentLineItem: {
+          create: async () => ({ id: "line-1", tenantId: "tenant-1", stockAdjustmentId: "adjustment-1", productId: "product-1", quantity: 10 }),
+          findMany: async () => [],
+        },
+        branch: {
+          findUnique: async () => ({ id: "branch-1", tenantId: "tenant-1" }),
+        },
+        product: {
+          findUnique: async () => ({ id: "product-1", tenantId: "tenant-1" }),
+        },
+        stockItem: {
+          findFirst: async () => null,
+          create: stockItemCreate,
+          update: async () => ({ id: "stock-item-1" }),
+        },
+        stockMovement: {
+          create: movementCreate,
+        },
+      } as never),
+    } as never);
+
+    await service.createStockAdjustment({
+      tenantId: "tenant-1",
+      branchId: "branch-1",
+      direction: "OUT",
+      items: [{ productId: "product-1", quantity: 5 }],
+    });
+
+    expect(movementCreate).toHaveBeenCalledTimes(1);
+    expect(movementCreate).toHaveBeenCalledWith({
+      data: {
+        tenantId: "tenant-1",
+        productId: "product-1",
+        branchId: "branch-1",
+        movementType: "ADJUSTMENT",
+        quantity: -5,
+        referenceType: "STOCK_ADJUSTMENT",
+        referenceId: "adjustment-1",
+        notes: "Stock out for adjustment adjustment-1",
+      },
+    });
+  });
+
   it("rejects cross-tenant branch lookup", async () => {
     const service = createStockAdjustmentService({
       stockAdjustment: {
@@ -76,6 +159,8 @@ describe("stock adjustment service", () => {
       product: {
         findUnique: async () => ({ id: "product-1", tenantId: "tenant-1" }),
       },
+      stockItem,
+      stockMovement,
       $transaction: async (callback: (client: never) => Promise<unknown>) => callback({
         stockAdjustment: {
           create: async () => ({ id: "adjustment-1", tenantId: "tenant-1", branchId: "branch-1", direction: "IN", notes: null, createdAt: new Date(), updatedAt: new Date(), lineItems: [] }),
@@ -92,6 +177,8 @@ describe("stock adjustment service", () => {
         product: {
           findUnique: async () => ({ id: "product-1", tenantId: "tenant-1" }),
         },
+        stockItem,
+        stockMovement,
       } as never),
     } as never);
 
@@ -120,6 +207,8 @@ describe("stock adjustment service", () => {
       product: {
         findUnique: async () => ({ id: "product-1", tenantId: "tenant-1" }),
       },
+      stockItem,
+      stockMovement,
       $transaction: async (callback: (client: never) => Promise<unknown>) => callback({
         stockAdjustment: {
           create: async () => ({ id: "adjustment-1", tenantId: "tenant-1", branchId: "branch-1", direction: "IN", notes: null, createdAt: new Date(), updatedAt: new Date(), lineItems: [] }),
@@ -136,6 +225,8 @@ describe("stock adjustment service", () => {
         product: {
           findUnique: async () => ({ id: "product-1", tenantId: "tenant-1" }),
         },
+        stockItem,
+        stockMovement,
       } as never),
     } as never);
 
@@ -164,6 +255,8 @@ describe("stock adjustment service", () => {
       product: {
         findUnique: async () => ({ id: "product-1", tenantId: "tenant-1" }),
       },
+      stockItem,
+      stockMovement,
       $transaction: async (callback: (client: never) => Promise<unknown>) => callback({
         stockAdjustment: {
           create: async () => ({ id: "adjustment-1", tenantId: "tenant-1", branchId: "branch-1", direction: "IN", notes: null, createdAt: new Date(), updatedAt: new Date(), lineItems: [] }),
@@ -180,6 +273,8 @@ describe("stock adjustment service", () => {
         product: {
           findUnique: async () => ({ id: "product-1", tenantId: "tenant-1" }),
         },
+        stockItem,
+        stockMovement,
       } as never),
     } as never);
 
@@ -204,6 +299,8 @@ describe("stock adjustment service", () => {
       product: {
         findUnique: async () => ({ id: "product-1", tenantId: "tenant-1" }),
       },
+      stockItem,
+      stockMovement,
       $transaction: async (callback: (client: never) => Promise<unknown>) => callback({
         stockAdjustment: {
           create: async () => ({ id: "adjustment-1", tenantId: "tenant-1", branchId: "branch-1", direction: "IN", notes: null, createdAt: new Date(), updatedAt: new Date(), lineItems: [] }),
@@ -220,6 +317,8 @@ describe("stock adjustment service", () => {
         product: {
           findUnique: async () => ({ id: "product-1", tenantId: "tenant-1" }),
         },
+        stockItem,
+        stockMovement,
       } as never),
     } as never);
 

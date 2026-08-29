@@ -49,10 +49,16 @@ export interface InvoiceCreateInput {
   readonly items: readonly InvoiceLineItemInput[];
 }
 
+export interface InvoiceUpdateInput {
+  readonly discountCents?: number;
+  readonly notes?: string | null;
+}
+
 export interface InvoiceService {
   createInvoice(input: InvoiceCreateInput): Promise<InvoiceRecord>;
   getInvoice(args: { tenantId: string; invoiceId: string }): Promise<InvoiceRecord | null>;
   listInvoices(args: { tenantId: string }): Promise<InvoiceRecord[]>;
+  updateInvoice(args: { tenantId: string; invoiceId: string; input: InvoiceUpdateInput }): Promise<InvoiceRecord | null>;
 }
 
 interface InvoicePrismaClient {
@@ -60,6 +66,7 @@ interface InvoicePrismaClient {
     create: (args: { data: Record<string, unknown> }) => Promise<InvoiceRecord>;
     findUnique: (args: { where: { id: string } }) => Promise<InvoiceRecord | null>;
     findMany: (args: { where?: Record<string, unknown> }) => Promise<InvoiceRecord[]>;
+    update: (args: { data: Record<string, unknown>; where: { id: string } }) => Promise<InvoiceRecord>;
   };
   readonly invoiceLineItem: {
     create: (args: { data: Record<string, unknown> }) => Promise<InvoiceLineItemRecord>;
@@ -218,6 +225,25 @@ export function createBillingInvoiceService(prisma: InvoicePrismaClient): Invoic
     },
     async listInvoices(args: { tenantId: string }) {
       return prisma.invoice.findMany({ where: { tenantId: args.tenantId } });
+    },
+
+    async updateInvoice({ tenantId, invoiceId, input }) {
+      const existing = await prisma.invoice.findUnique({ where: { id: invoiceId } });
+      if (existing === null || existing.tenantId !== tenantId) {
+        return null;
+      }
+
+      const record = existing as InvoiceRecord;
+      const data: Record<string, unknown> = {};
+      if (input.discountCents !== undefined) {
+        data.discountCents = Math.max(0, input.discountCents);
+        data.totalCents = record.subtotalCents - (data.discountCents as number) + record.gstCents;
+      }
+      if (input.notes !== undefined) {
+        data.notes = input.notes;
+      }
+
+      return prisma.invoice.update({ where: { id: invoiceId }, data });
     },
   };
 }

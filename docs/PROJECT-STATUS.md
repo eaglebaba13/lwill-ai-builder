@@ -4,9 +4,9 @@
 
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
-- **Current Branch**: `phase-1d-native-auth`
-- **Current HEAD Commit**: `0afe1c8` (`feat(reports): add daily-sales and low-stock reporting endpoints and UI`)
-- **Git State**: `phase-1d-native-auth` at `6c298e3`; working tree clean (attendance check-out committed and pushed; untracked SRS extracts and scripts/ remain).
+ - **Current Branch**: `phase-1d-native-auth`
+ - **Current HEAD Commit**: `3234348` (`feat(reports): add GST summary report`)
+ - **Git State**: `phase-1d-native-auth` at `3234348`; working tree has uncommitted invoice update and stock adjustment auto-update changes.
 
 ## State Breakdown
 
@@ -1818,10 +1818,51 @@ The prior "Phase 1I X Nail Packages Production Verification" section (above) doc
 
 ### Important Boundary
 
+ - No Prisma schema or migration was changed.
+ - No authentication or authorization architecture was modified.
+ - No production database connection or mutation was performed.
+ - No new roles were introduced; reuses existing `attendance.read` permission.
+
+## Invoice Update Vertical Slice — 2026-08-29
+
+### Status: **Implemented and verified locally**
+
+### Implemented Slice
+
+- Added `updateInvoice` service method in `packages/authentication-context-prisma/src/invoice-service.ts`: updates `discountCents` (clamped ≥0, recalculates `totalCents` from existing subtotal and GST) and `notes` for an existing invoice, scoped to the requesting tenant. Returns `null` when the record is missing or cross-tenant.
+- Added `handleUpdateInvoice` in `apps/web/src/lib/crm/invoice-route-handlers.ts`: `PATCH` semantics, `invoice.write` authorization, input validation (only `discountCents`/`notes` allowed; unknown keys rejected), 401/403/400/404/200 responses.
+- Wired `updateInvoice` through the invoice runtime (`apps/web/src/lib/crm/invoice-runtime.ts`).
+- Added `PATCH /api/invoices/[id]` API route (`apps/web/src/app/api/invoices/[id]/route.ts`).
+- Added handler tests (11 tests) and service tests (4 tests) covering auth gating, input validation, tenant isolation, 404 handling, discount recalculation, and notes update.
+
+### Verification Results
+
+- `pnpm test` — Passed.
+- `pnpm lint` — Passed.
+- `pnpm build` — Passed.
+- No Prisma schema or migration changes.
+
+## Stock Adjustment Auto-Update Vertical Slice — 2026-08-29
+
+### Status: **Implemented and verified locally**
+
+### Implemented Slice
+
+- Modified `packages/authentication-context-prisma/src/stock-adjustment-service.ts`: `createStockAdjustment` now automatically records stock movements via the centralized `stockService.recordStockMovement` for each line item inside the existing Prisma `$transaction`. IN direction increments stock; OUT direction decrements stock. The movement type is `ADJUSTMENT`, with `referenceType = STOCK_ADJUSTMENT` and `referenceId = adjustment.id`.
+- Negative stock protection is preserved because `recordStockMovement` rejects operations that would drive stock below zero.
+- Stock transfers remain intentionally unchanged per the repository inventory rules ("execution remains deferred unless approved rules exist").
+- Added service test verifying that adjustment line items produce the expected `stockMovement.create` call with correct signed quantity, direction-derived notes, and reference metadata.
+
+### Verification Results
+
+- `pnpm test` — Passed: 6 successful monorepo tasks; 440 authentication-context-prisma tests + 511 web tests.
+- `pnpm lint` — Passed (0 errors; 14 pre-existing unused-import warnings in unrelated API route files).
+- `pnpm build` — Passed (Next.js production build + TypeScript compilation).
+- `git diff --check` — Passed (LF→CRLF notices only).
 - No Prisma schema or migration was changed.
 - No authentication or authorization architecture was modified.
 - No production database connection or mutation was performed.
-- No new roles were introduced; reuses existing `attendance.read` permission.
+- No new roles were introduced.
 
 ## X Nail Daily Sales Reporting — 2026-08-29
 
