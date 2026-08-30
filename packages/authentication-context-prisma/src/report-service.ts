@@ -55,6 +55,12 @@ export interface ReportService {
     readonly totalTaxableCents: number;
     readonly invoiceCount: number;
   }>;
+  listBranchPerformance(args: { tenantId: string }): Promise<ReadonlyArray<{
+    readonly branchId: string;
+    readonly branchName: string;
+    readonly staffCount: number;
+    readonly attendanceCount: number;
+  }>>;
 }
 
 interface ReportPrismaClient {
@@ -79,6 +85,15 @@ interface ReportPrismaClient {
   };
   readonly membership: {
     findMany(args: { where?: Record<string, unknown>; select?: Record<string, unknown> }): Promise<ReadonlyArray<{ readonly status: string; readonly packageId: string }>>;
+  };
+  readonly branch: {
+    findMany(args: { where?: Record<string, unknown>; select?: Record<string, unknown> }): Promise<ReadonlyArray<{ readonly id: string; readonly name: string }>>;
+  };
+  readonly staff: {
+    count(args: { where: Record<string, unknown> }): Promise<number>;
+  };
+  readonly attendance: {
+    count(args: { where: Record<string, unknown> }): Promise<number>;
   };
 }
 
@@ -271,6 +286,36 @@ export function createReportService(prisma: ReportPrismaClient): ReportService {
         totalTaxableCents,
         invoiceCount: invoices.length,
       };
+    },
+
+    async listBranchPerformance({ tenantId }) {
+      const branches = await prisma.branch.findMany({
+        where: { tenantId },
+        select: { id: true, name: true },
+      });
+
+      const results = await Promise.all(
+        branches.map(async (branch) => {
+          const [staffCount, attendanceCount] = await Promise.all([
+            prisma.staff.count({ where: { tenantId, branchId: branch.id } }),
+            prisma.attendance.count({
+              where: {
+                tenantId,
+                staff: { branchId: branch.id },
+              },
+            }),
+          ]);
+
+          return {
+            branchId: branch.id,
+            branchName: branch.name,
+            staffCount,
+            attendanceCount,
+          };
+        }),
+      );
+
+      return results;
     },
   };
 }

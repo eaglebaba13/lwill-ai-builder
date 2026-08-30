@@ -294,6 +294,9 @@ export default function Home() {
   const [gstSummary, setGstSummary] = useState<{ totalGstCents: number; totalTaxableCents: number; invoiceCount: number } | null>(null);
   const [isLoadingGstSummary, setIsLoadingGstSummary] = useState(false);
   const [gstSummaryError, setGstSummaryError] = useState<string | null>(null);
+  const [branchPerformance, setBranchPerformance] = useState<Array<{ branchId: string; branchName: string; staffCount: number; attendanceCount: number }>>([]);
+  const [isLoadingBranchPerformance, setIsLoadingBranchPerformance] = useState(false);
+  const [branchPerformanceError, setBranchPerformanceError] = useState<string | null>(null);
 
   const customerMap = new Map(customers.map((customer) => [customer.id, customer.name]));
   const productMap = new Map(products.map((product) => [product.id, product.name]));
@@ -1745,6 +1748,39 @@ export default function Home() {
       .finally(() => {
         if (mounted) {
           setIsLoadingGstSummary(false);
+        }
+      });
+
+    void fetch("/api/reports/branch-performance", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        if (result.status === 401) {
+          setBranchPerformance([]);
+          return;
+        }
+        if (result.status === 403) {
+          setBranchPerformance([]);
+          setBranchPerformanceError("You are not authorized to view branch performance reports.");
+          return;
+        }
+        if (!result.ok) {
+          throw new Error("Branch performance request failed");
+        }
+        const body = await result.json() as {
+          branchPerformance?: Array<{ branchId: string; branchName: string; staffCount: number; attendanceCount: number }>;
+        };
+        const loadedBranchPerformance = Array.isArray(body.branchPerformance) ? body.branchPerformance : [];
+        setBranchPerformance(loadedBranchPerformance);
+      })
+      .catch(() => {
+        if (mounted) {
+          setBranchPerformance([]);
+          setBranchPerformanceError("Branch performance could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setIsLoadingBranchPerformance(false);
         }
       });
 
@@ -4274,6 +4310,27 @@ export default function Home() {
                     <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Invoices</div>
                     <div className="mt-2 text-2xl font-semibold">{gstSummary.invoiceCount}</div>
                   </div>
+                </div>
+              </div>
+            ) : null}
+            {isLoadingBranchPerformance ? <div className="text-sm text-[#736067]">Loading branch performance...</div> : null}
+            {!isLoadingBranchPerformance && branchPerformanceError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{branchPerformanceError}</div> : null}
+            {!isLoadingBranchPerformance && !branchPerformanceError && branchPerformance.length === 0 ? <div className="text-sm text-[#736067]">No branch performance data yet.</div> : null}
+            {branchPerformance.length > 0 ? (
+              <div className="mt-6 rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+                <h2 className="text-xl font-semibold">Branch Performance</h2>
+                <div className="mt-4 grid gap-4 md:grid-cols-2">
+                  {branchPerformance.map((branch) => (
+                    <div key={branch.branchId} className="rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                      <div className="font-medium">{branch.branchName}</div>
+                      <div className="mt-2 text-sm text-[#736067]">
+                        Staff: {branch.staffCount}
+                      </div>
+                      <div className="text-sm text-[#736067]">
+                        Attendance records: {branch.attendanceCount}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             ) : null}

@@ -6,6 +6,7 @@ function createPrisma(
   appointments: Array<{ startsAt: Date; status: string }> = [],
   memberships: Array<{ status: string; packageId: string }> = [],
   packages: Array<{ id: string; name: string }> = [],
+  branches: Array<{ id: string; name: string }> = [],
 ) {
   return {
     invoice: {
@@ -29,6 +30,15 @@ function createPrisma(
     },
     package: {
       findMany: vi.fn(async () => packages),
+    },
+    branch: {
+      findMany: vi.fn(async () => branches),
+    },
+    staff: {
+      count: vi.fn(async () => 0),
+    },
+    attendance: {
+      count: vi.fn(async () => 0),
     },
   } as never;
 }
@@ -328,6 +338,81 @@ describe("report service: listPackageUtilizationReport", () => {
       packageName: "Unknown",
       totalMemberships: 1,
       activeMemberships: 1,
+    });
+  });
+});
+
+describe("report service: listBranchPerformance", () => {
+  it("returns branch performance with staff and attendance counts", async () => {
+    const prisma = createPrisma(
+      [],
+      [],
+      [],
+      [],
+      [
+        { id: "branch-1", name: "Main" },
+        { id: "branch-2", name: "North" },
+      ],
+    );
+    vi.mocked(prisma.branch.findMany).mockResolvedValue([
+      { id: "branch-1", name: "Main" },
+      { id: "branch-2", name: "North" },
+    ] as never);
+    vi.mocked(prisma.staff.count).mockImplementation(async ({ where }) => {
+      if (where.branchId === "branch-1") return 5;
+      if (where.branchId === "branch-2") return 3;
+      return 0;
+    });
+    vi.mocked(prisma.attendance.count).mockImplementation(async ({ where }) => {
+      if (where.staff?.branchId === "branch-1") return 12;
+      if (where.staff?.branchId === "branch-2") return 7;
+      return 0;
+    });
+
+    const service = createReportService(prisma);
+
+    const report = await service.listBranchPerformance({ tenantId: "tenant-1" });
+
+    expect(report).toHaveLength(2);
+    expect(report[0]).toMatchObject({
+      branchId: "branch-1",
+      branchName: "Main",
+      staffCount: 5,
+      attendanceCount: 12,
+    });
+    expect(report[1]).toMatchObject({
+      branchId: "branch-2",
+      branchName: "North",
+      staffCount: 3,
+      attendanceCount: 7,
+    });
+  });
+
+  it("returns empty array when no branches exist", async () => {
+    const prisma = createPrisma([], [], [], [], []);
+    vi.mocked(prisma.branch.findMany).mockResolvedValue([] as never);
+    const service = createReportService(prisma);
+
+    const report = await service.listBranchPerformance({ tenantId: "tenant-1" });
+
+    expect(report).toHaveLength(0);
+  });
+
+  it("returns zero counts for branches with no staff or attendance", async () => {
+    const prisma = createPrisma([], [], [], [], [{ id: "branch-1", name: "Empty" }]);
+    vi.mocked(prisma.branch.findMany).mockResolvedValue([{ id: "branch-1", name: "Empty" }] as never);
+    vi.mocked(prisma.staff.count).mockResolvedValue(0);
+    vi.mocked(prisma.attendance.count).mockResolvedValue(0);
+    const service = createReportService(prisma);
+
+    const report = await service.listBranchPerformance({ tenantId: "tenant-1" });
+
+    expect(report).toHaveLength(1);
+    expect(report[0]).toMatchObject({
+      branchId: "branch-1",
+      branchName: "Empty",
+      staffCount: 0,
+      attendanceCount: 0,
     });
   });
 });
