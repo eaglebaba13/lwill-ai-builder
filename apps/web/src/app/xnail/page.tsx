@@ -310,6 +310,11 @@ export default function Home() {
   const [templateChannel, setTemplateChannel] = useState("");
   const [templateSubject, setTemplateSubject] = useState("");
   const [templateBody, setTemplateBody] = useState("");
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+  const [editingTemplateName, setEditingTemplateName] = useState("");
+  const [editingTemplateChannel, setEditingTemplateChannel] = useState("");
+  const [editingTemplateSubject, setEditingTemplateSubject] = useState("");
+  const [editingTemplateBody, setEditingTemplateBody] = useState("");
   const [notificationLogs, setNotificationLogs] = useState<Array<{ id: string; channel: string; subject: string | null; body: string; status: string; sentAt: string | null }>>([]);
   const [isLoadingNotificationLogs, setIsLoadingNotificationLogs] = useState(false);
   const [notificationLogError, setNotificationLogError] = useState<string | null>(null);
@@ -1918,6 +1923,31 @@ export default function Home() {
     setTemplateChannel("");
     setTemplateSubject("");
     setTemplateBody("");
+  };
+
+  const updateNotificationTemplate = async (id: string, name: string, channel: string, subject: string, templateBody: string) => {
+    setNotificationTemplateError(null);
+    const result = await fetch(`/api/notification-templates/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name, channel, subject: subject || null, body: templateBody }),
+    });
+    if (result.status === 401) {
+      setNotificationTemplates([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setNotificationTemplateError("You are not authorized to manage notification templates.");
+      return;
+    }
+    if (!result.ok) {
+      setNotificationTemplateError("Notification template could not be updated.");
+      return;
+    }
+    const body = await result.json() as { notificationTemplate: { id: string; name: string; channel: string; subject: string | null; body: string; isActive: boolean } };
+    setNotificationTemplates((current) => current.map((item) => (item.id === body.notificationTemplate.id ? body.notificationTemplate : item)));
   };
 
   const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -5560,18 +5590,81 @@ export default function Home() {
                 {isLoadingNotificationTemplates ? <div className="text-sm text-[#736067]">Loading notification templates...</div> : null}
                 {!isLoadingNotificationTemplates && notificationTemplateError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{notificationTemplateError}</div> : null}
                 {!isLoadingNotificationTemplates && !notificationTemplateError && notificationTemplates.length === 0 ? <div className="text-sm text-[#736067]">No notification templates yet.</div> : null}
-                {notificationTemplates.map((template) => (
-                  <div key={template.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
-                    <div>
-                      <div className="font-medium">{template.name}</div>
-                      <div className="text-sm text-[#736067]">Channel: {template.channel}</div>
-                      <div className="text-sm text-[#736067]">{template.subject ?? "No subject"}</div>
+                  {notificationTemplates.map((template) => (
+                    <div key={template.id} className="flex flex-col gap-2 rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                      {editingTemplateId !== template.id ? (
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium">{template.name}</div>
+                            <div className="text-sm text-[#736067]">Channel: {template.channel}</div>
+                            <div className="text-sm text-[#736067]">{template.subject ?? "No subject"}</div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="text-right text-sm text-[#736067]">
+                              <div>{template.isActive ? "Active" : "Inactive"}</div>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setEditingTemplateId(template.id);
+                                setEditingTemplateName(template.name);
+                                setEditingTemplateChannel(template.channel);
+                                setEditingTemplateSubject(template.subject ?? "");
+                                setEditingTemplateBody(template.body);
+                              }}
+                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                            >
+                              Edit
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <input
+                            value={editingTemplateName}
+                            onChange={(event) => setEditingTemplateName(event.target.value)}
+                            placeholder="Template name"
+                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                          />
+                          <input
+                            value={editingTemplateChannel}
+                            onChange={(event) => setEditingTemplateChannel(event.target.value)}
+                            placeholder="Channel"
+                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                          />
+                          <input
+                            value={editingTemplateSubject}
+                            onChange={(event) => setEditingTemplateSubject(event.target.value)}
+                            placeholder="Subject"
+                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                          />
+                          <textarea
+                            value={editingTemplateBody}
+                            onChange={(event) => setEditingTemplateBody(event.target.value)}
+                            placeholder="Body"
+                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                          />
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={async () => {
+                                if (!template.id) return;
+                                await updateNotificationTemplate(template.id, editingTemplateName, editingTemplateChannel, editingTemplateSubject, editingTemplateBody);
+                                setEditingTemplateId(null);
+                              }}
+                              className="rounded-xl bg-[#5a1838] px-3 py-1.5 text-xs font-semibold text-white"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => setEditingTemplateId(null)}
+                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div className="text-right text-sm text-[#736067]">
-                      <div>{template.isActive ? "Active" : "Inactive"}</div>
-                    </div>
-                  </div>
-                ))}
+                  ))}
               </div>
             </div>
 
