@@ -142,6 +142,9 @@ export default function Home() {
   const [invoiceError, setInvoiceError] = useState<string | null>(null);
   const [invoiceCustomerId, setInvoiceCustomerId] = useState("");
   const [invoiceNotes, setInvoiceNotes] = useState("");
+  const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
+  const [editingInvoiceDiscountCents, setEditingInvoiceDiscountCents] = useState("0");
+  const [editingInvoiceNotes, setEditingInvoiceNotes] = useState("");
   const [cartItems, setCartItems] = useState<Array<{ id: string; type: "product" | "service" | "package"; itemId: string; description: string; unitPriceCents: number; quantity: number }>>([]);
   const [cartItemType, setCartItemType] = useState<"product" | "service" | "package">("product");
   const [cartItemId, setCartItemId] = useState("");
@@ -279,12 +282,18 @@ export default function Home() {
   const [businessUnitError, setBusinessUnitError] = useState<string | null>(null);
   const [businessUnitName, setBusinessUnitName] = useState("");
   const [businessUnitSlug, setBusinessUnitSlug] = useState("");
+  const [editingBusinessUnitId, setEditingBusinessUnitId] = useState<string | null>(null);
+  const [editingBusinessUnitName, setEditingBusinessUnitName] = useState("");
+  const [editingBusinessUnitSlug, setEditingBusinessUnitSlug] = useState("");
   const [branches, setBranches] = useState<Array<{ id: string; businessUnitId: string; name: string; slug: string; isActive: boolean }>>([]);
   const [isLoadingBranches, setIsLoadingBranches] = useState(false);
   const [branchError, setBranchError] = useState<string | null>(null);
   const [branchName, setBranchName] = useState("");
   const [branchSlug, setBranchSlug] = useState("");
   const [branchBusinessUnitId, setBranchBusinessUnitId] = useState("");
+  const [editingBranchId, setEditingBranchId] = useState<string | null>(null);
+  const [editingBranchName, setEditingBranchName] = useState("");
+  const [editingBranchSlug, setEditingBranchSlug] = useState("");
   const [settings, setSettings] = useState<Array<{ id: string; key: string; value: string; isActive: boolean }>>([]);
   const [isLoadingSettings, setIsLoadingSettings] = useState(false);
   const [settingError, setSettingError] = useState<string | null>(null);
@@ -2509,6 +2518,81 @@ export default function Home() {
     }
     const body = await result.json() as { stockItem: { id: string; productId: string; branchId: string; quantity: number } };
     setStockItems((current) => current.map((item) => (item.id === body.stockItem.id ? body.stockItem : item)));
+  };
+
+  const updateInvoice = async (id: string, discountCents: number, notes: string) => {
+    setInvoiceError(null);
+    const result = await fetch(`/api/invoices/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ discountCents, notes: notes || null }),
+    });
+    if (result.status === 401) {
+      setInvoices([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setInvoiceError("You are not authorized to manage invoices.");
+      return;
+    }
+    if (!result.ok) {
+      setInvoiceError("Invoice could not be updated.");
+      return;
+    }
+    const body = await result.json() as { invoice: { id: string; customerId: string; issuedAt: string; subtotalCents: number; discountCents: number; gstCents: number; totalCents: number; notes: string | null } };
+    setInvoices((current) => current.map((item) => (item.id === body.invoice.id ? { ...item, ...body.invoice } : item)));
+  };
+
+  const updateBusinessUnit = async (id: string, name: string, slug: string) => {
+    setBusinessUnitError(null);
+    const result = await fetch(`/api/business-units/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name, slug }),
+    });
+    if (result.status === 401) {
+      setBusinessUnits([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setBusinessUnitError("You are not authorized to manage business units.");
+      return;
+    }
+    if (!result.ok) {
+      setBusinessUnitError("Business unit could not be updated.");
+      return;
+    }
+    const body = await result.json() as { businessUnit: { id: string; name: string; slug: string; isActive: boolean } };
+    setBusinessUnits((current) => current.map((item) => (item.id === body.businessUnit.id ? body.businessUnit : item)));
+  };
+
+  const updateBranch = async (id: string, name: string, slug: string) => {
+    setBranchError(null);
+    const result = await fetch(`/api/branches/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name, slug }),
+    });
+    if (result.status === 401) {
+      setBranches([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setBranchError("You are not authorized to manage branches.");
+      return;
+    }
+    if (!result.ok) {
+      setBranchError("Branch could not be updated.");
+      return;
+    }
+    const body = await result.json() as { branch: { id: string; businessUnitId: string; name: string; slug: string; isActive: boolean } };
+    setBranches((current) => current.map((item) => (item.id === body.branch.id ? body.branch : item)));
   };
 
   const addWarehouse = async () => {
@@ -4808,18 +4892,67 @@ export default function Home() {
                 {isLoadingInvoices ? <div className="text-sm text-[#736067]">Loading invoices...</div> : null}
                 {!isLoadingInvoices && invoiceError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{invoiceError}</div> : null}
                 {!isLoadingInvoices && !invoiceError && invoices.length === 0 ? <div className="text-sm text-[#736067]">No invoices yet.</div> : null}
-                {invoices.map((invoice) => (
-                  <div key={invoice.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
-                    <div>
-                      <div className="font-medium">{customerMap.get(invoice.customerId) ?? `Customer ${invoice.customerId}`}</div>
-                      <div className="text-sm text-[#736067]">{invoice.issuedAt}</div>
+                  {invoices.map((invoice) => (
+                    <div key={invoice.id} className="flex flex-col gap-2 rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                      {editingInvoiceId !== invoice.id ? (
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium">{customerMap.get(invoice.customerId) ?? `Customer ${invoice.customerId}`}</div>
+                            <div className="text-sm text-[#736067]">{invoice.issuedAt}</div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="text-right text-sm text-[#736067]">
+                              <div>Total ₹{invoice.totalCents / 100}</div>
+                              <div>{invoice.notes ?? "—"}</div>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setEditingInvoiceId(invoice.id);
+                                setEditingInvoiceDiscountCents(String(invoice.discountCents));
+                                setEditingInvoiceNotes(invoice.notes ?? "");
+                              }}
+                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                            >
+                              Edit
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <input
+                            value={editingInvoiceDiscountCents}
+                            onChange={(event) => setEditingInvoiceDiscountCents(event.target.value)}
+                            placeholder="Discount (cents)"
+                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                          />
+                          <input
+                            value={editingInvoiceNotes}
+                            onChange={(event) => setEditingInvoiceNotes(event.target.value)}
+                            placeholder="Notes"
+                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                          />
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={async () => {
+                                if (!invoice.id) return;
+                                await updateInvoice(invoice.id, Number(editingInvoiceDiscountCents), editingInvoiceNotes);
+                                setEditingInvoiceId(null);
+                              }}
+                              className="rounded-xl bg-[#5a1838] px-3 py-1.5 text-xs font-semibold text-white"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => setEditingInvoiceId(null)}
+                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div className="text-right text-sm text-[#736067]">
-                      <div>Total ₹{invoice.totalCents / 100}</div>
-                      <div>{invoice.notes ?? "—"}</div>
-                    </div>
-                  </div>
-                ))}
+                  ))}
               </div>
             </div>
 
@@ -4931,15 +5064,64 @@ export default function Home() {
                 {isLoadingBusinessUnits ? <div className="text-sm text-[#736067]">Loading business units...</div> : null}
                 {!isLoadingBusinessUnits && businessUnitError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{businessUnitError}</div> : null}
                 {!isLoadingBusinessUnits && !businessUnitError && businessUnits.length === 0 ? <div className="text-sm text-[#736067]">No business units yet.</div> : null}
-                {businessUnits.map((bu) => (
-                  <div key={bu.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
-                    <div>
-                      <div className="font-medium">{bu.name}</div>
-                      <div className="text-sm text-[#736067]">{bu.slug}</div>
+                  {businessUnits.map((bu) => (
+                    <div key={bu.id} className="flex flex-col gap-2 rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                      {editingBusinessUnitId !== bu.id ? (
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium">{bu.name}</div>
+                            <div className="text-sm text-[#736067]">{bu.slug}</div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`rounded-full px-2.5 py-1 text-xs ${bu.isActive ? "bg-[#e6f4ea] text-[#1e7e34]" : "bg-[#fceff4] text-[#6a2f4a]"}`}>{bu.isActive ? "Active" : "Inactive"}</span>
+                            <button
+                              onClick={() => {
+                                setEditingBusinessUnitId(bu.id);
+                                setEditingBusinessUnitName(bu.name);
+                                setEditingBusinessUnitSlug(bu.slug);
+                              }}
+                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                            >
+                              Edit
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <input
+                            value={editingBusinessUnitName}
+                            onChange={(event) => setEditingBusinessUnitName(event.target.value)}
+                            placeholder="Business unit name"
+                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                          />
+                          <input
+                            value={editingBusinessUnitSlug}
+                            onChange={(event) => setEditingBusinessUnitSlug(event.target.value)}
+                            placeholder="Slug"
+                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                          />
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={async () => {
+                                if (!bu.id) return;
+                                await updateBusinessUnit(bu.id, editingBusinessUnitName, editingBusinessUnitSlug);
+                                setEditingBusinessUnitId(null);
+                              }}
+                              className="rounded-xl bg-[#5a1838] px-3 py-1.5 text-xs font-semibold text-white"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => setEditingBusinessUnitId(null)}
+                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <span className={`rounded-full px-2.5 py-1 text-xs ${bu.isActive ? "bg-[#e6f4ea] text-[#1e7e34]" : "bg-[#fceff4] text-[#6a2f4a]"}`}>{bu.isActive ? "Active" : "Inactive"}</span>
-                  </div>
-                ))}
+                  ))}
               </div>
             </div>
 
@@ -4973,15 +5155,64 @@ export default function Home() {
                 {isLoadingBranches ? <div className="text-sm text-[#736067]">Loading branches...</div> : null}
                 {!isLoadingBranches && branchError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{branchError}</div> : null}
                 {!isLoadingBranches && !branchError && branches.length === 0 ? <div className="text-sm text-[#736067]">No branches yet.</div> : null}
-                {branches.map((branch) => (
-                  <div key={branch.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
-                    <div>
-                      <div className="font-medium">{branch.name}</div>
-                      <div className="text-sm text-[#736067]">{branch.slug} · BU {branch.businessUnitId}</div>
+                  {branches.map((branch) => (
+                    <div key={branch.id} className="flex flex-col gap-2 rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                      {editingBranchId !== branch.id ? (
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium">{branch.name}</div>
+                            <div className="text-sm text-[#736067]">{branch.slug} · BU {branch.businessUnitId}</div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`rounded-full px-2.5 py-1 text-xs ${branch.isActive ? "bg-[#e6f4ea] text-[#1e7e34]" : "bg-[#fceff4] text-[#6a2f4a]"}`}>{branch.isActive ? "Active" : "Inactive"}</span>
+                            <button
+                              onClick={() => {
+                                setEditingBranchId(branch.id);
+                                setEditingBranchName(branch.name);
+                                setEditingBranchSlug(branch.slug);
+                              }}
+                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                            >
+                              Edit
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <input
+                            value={editingBranchName}
+                            onChange={(event) => setEditingBranchName(event.target.value)}
+                            placeholder="Branch name"
+                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                          />
+                          <input
+                            value={editingBranchSlug}
+                            onChange={(event) => setEditingBranchSlug(event.target.value)}
+                            placeholder="Slug"
+                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                          />
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={async () => {
+                                if (!branch.id) return;
+                                await updateBranch(branch.id, editingBranchName, editingBranchSlug);
+                                setEditingBranchId(null);
+                              }}
+                              className="rounded-xl bg-[#5a1838] px-3 py-1.5 text-xs font-semibold text-white"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => setEditingBranchId(null)}
+                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <span className={`rounded-full px-2.5 py-1 text-xs ${branch.isActive ? "bg-[#e6f4ea] text-[#1e7e34]" : "bg-[#fceff4] text-[#6a2f4a]"}`}>{branch.isActive ? "Active" : "Inactive"}</span>
-                  </div>
-                ))}
+                  ))}
               </div>
             </div>
 
