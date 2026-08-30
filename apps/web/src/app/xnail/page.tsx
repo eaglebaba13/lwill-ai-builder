@@ -208,6 +208,11 @@ export default function Home() {
   const [supplierContactName, setSupplierContactName] = useState("");
   const [supplierEmail, setSupplierEmail] = useState("");
   const [supplierPhone, setSupplierPhone] = useState("");
+  const [editingSupplierId, setEditingSupplierId] = useState<string | null>(null);
+  const [editingSupplierName, setEditingSupplierName] = useState("");
+  const [editingSupplierContactName, setEditingSupplierContactName] = useState("");
+  const [editingSupplierEmail, setEditingSupplierEmail] = useState("");
+  const [editingSupplierPhone, setEditingSupplierPhone] = useState("");
   const [reorderRules, setReorderRules] = useState<Array<{ id: string; productId: string; branchId: string; warehouseId: string; minQuantity: number; reorderQuantity: number; isActive: boolean }>>([]);
   const [isLoadingReorderRules, setIsLoadingReorderRules] = useState(false);
   const [reorderRuleError, setReorderRuleError] = useState<string | null>(null);
@@ -2723,6 +2728,31 @@ export default function Home() {
     setSupplierPhone("");
   };
 
+  const updateSupplier = async (id: string, name: string, contactName: string, email: string, phone: string) => {
+    setSupplierError(null);
+    const result = await fetch(`/api/suppliers/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name, contactName: contactName || null, email: email || null, phone: phone || null }),
+    });
+    if (result.status === 401) {
+      setSuppliers([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setSupplierError("You are not authorized to manage suppliers.");
+      return;
+    }
+    if (!result.ok) {
+      setSupplierError("Supplier could not be updated.");
+      return;
+    }
+    const body = await result.json() as { supplier: { id: string; name: string; contactName: string | null; email: string | null; phone: string | null; isActive: boolean } };
+    setSuppliers((current) => current.map((item) => (item.id === body.supplier.id ? body.supplier : item)));
+  };
+
   const addReorderRule = async () => {
     if (!reorderRuleProductId.trim() || !reorderRuleBranchId.trim() || !reorderRuleWarehouseId.trim()) return;
     setReorderRuleError(null);
@@ -4638,15 +4668,78 @@ export default function Home() {
                   {!isLoadingSuppliers && supplierError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{supplierError}</div> : null}
                   {!isLoadingSuppliers && !supplierError && suppliers.length === 0 ? <div className="text-sm text-[#736067]">No suppliers yet.</div> : null}
                   {suppliers.map((supplier) => (
-                    <div key={supplier.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
-                      <div>
-                        <div className="font-medium">{supplier.name}</div>
-                        <div className="text-sm text-[#736067]">{supplier.contactName ?? "No contact"}</div>
-                        <div className="text-sm text-[#736067]">{supplier.phone ?? supplier.email ?? "No contact info"}</div>
-                      </div>
-                      <div className="text-right text-sm text-[#736067]">
-                        <div>{supplier.isActive ? "Active" : "Inactive"}</div>
-                      </div>
+                    <div key={supplier.id} className="flex flex-col gap-2 rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                      {editingSupplierId !== supplier.id ? (
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium">{supplier.name}</div>
+                            <div className="text-sm text-[#736067]">{supplier.contactName ?? "No contact"}</div>
+                            <div className="text-sm text-[#736067]">{supplier.phone ?? supplier.email ?? "No contact info"}</div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="text-right text-sm text-[#736067]">
+                              <div>{supplier.isActive ? "Active" : "Inactive"}</div>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setEditingSupplierId(supplier.id);
+                                setEditingSupplierName(supplier.name);
+                                setEditingSupplierContactName(supplier.contactName ?? "");
+                                setEditingSupplierEmail(supplier.email ?? "");
+                                setEditingSupplierPhone(supplier.phone ?? "");
+                              }}
+                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                            >
+                              Edit
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <input
+                            value={editingSupplierName}
+                            onChange={(event) => setEditingSupplierName(event.target.value)}
+                            placeholder="Supplier name"
+                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                          />
+                          <input
+                            value={editingSupplierContactName}
+                            onChange={(event) => setEditingSupplierContactName(event.target.value)}
+                            placeholder="Contact name"
+                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                          />
+                          <input
+                            value={editingSupplierEmail}
+                            onChange={(event) => setEditingSupplierEmail(event.target.value)}
+                            placeholder="Email"
+                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                          />
+                          <input
+                            value={editingSupplierPhone}
+                            onChange={(event) => setEditingSupplierPhone(event.target.value)}
+                            placeholder="Phone"
+                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                          />
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={async () => {
+                                if (!supplier.id) return;
+                                await updateSupplier(supplier.id, editingSupplierName, editingSupplierContactName, editingSupplierEmail, editingSupplierPhone);
+                                setEditingSupplierId(null);
+                              }}
+                              className="rounded-xl bg-[#5a1838] px-3 py-1.5 text-xs font-semibold text-white"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => setEditingSupplierId(null)}
+                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
