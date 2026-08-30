@@ -239,6 +239,9 @@ export default function Home() {
   const [isLoadingAppointments, setIsLoadingAppointments] = useState(false);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
+  const [editingCustomerName, setEditingCustomerName] = useState("");
+  const [editingCustomerPhone, setEditingCustomerPhone] = useState("");
   const [serviceName, setServiceName] = useState("");
   const [servicePrice, setServicePrice] = useState("1500");
   const [appointmentCustomer, setAppointmentCustomer] = useState("");
@@ -1952,6 +1955,33 @@ export default function Home() {
     setCustomerPhone("");
   };
 
+  const updateCustomer = async (customerId: string) => {
+    if (!editingCustomerName.trim()) return;
+    setCustomerError(null);
+    const result = await fetch(`/api/customers/${customerId}`, {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: editingCustomerName, phone: editingCustomerPhone || null }),
+    });
+    if (result.status === 401) {
+      setCustomers([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setCustomerError("You are not authorized to update customers.");
+      return;
+    }
+    if (!result.ok) {
+      setCustomerError("Customer could not be updated.");
+      return;
+    }
+    const body = await result.json() as { customer: CustomerRecord };
+    setCustomers((current) => current.map((item) => (item.id === customerId ? body.customer : item)));
+    setEditingCustomerId(null);
+  };
+
   const addService = async () => {
     if (!serviceName.trim()) return;
     setServiceError(null);
@@ -2885,12 +2915,59 @@ export default function Home() {
                 {!isLoadingCustomers && customerError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{customerError}</div> : null}
                 {!isLoadingCustomers && !customerError && customers.length === 0 ? <div className="text-sm text-[#736067]">No customers yet.</div> : null}
                 {customers.map((customer) => (
-                  <div key={customer.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
-                    <div>
-                      <div className="font-medium">{customer.name}</div>
-                      <div className="text-sm text-[#736067]">{customer.phone}</div>
-                    </div>
-                    <span className="rounded-full bg-[#f5edf1] px-2.5 py-1 text-xs">Active</span>
+                  <div key={customer.id} className="rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    {editingCustomerId === customer.id ? (
+                      <div className="space-y-2">
+                        <input
+                          value={editingCustomerName}
+                          onChange={(event) => setEditingCustomerName(event.target.value)}
+                          placeholder="Customer name"
+                          className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                        />
+                        <input
+                          value={editingCustomerPhone}
+                          onChange={(event) => setEditingCustomerPhone(event.target.value)}
+                          placeholder="Phone"
+                          className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => updateCustomer(customer.id)}
+                            className="rounded-xl bg-[#5a1838] px-3 py-2 text-sm font-semibold text-white"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => setEditingCustomerId(null)}
+                            className="rounded-xl bg-[#f0dfe6] px-3 py-2 text-sm font-semibold text-[#5a1838]"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium">{customer.name}</div>
+                            <div className="text-sm text-[#736067]">{customer.phone}</div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="rounded-full bg-[#f5edf1] px-2.5 py-1 text-xs">Active</span>
+                            <button
+                              onClick={() => {
+                                setEditingCustomerId(customer.id);
+                                setEditingCustomerName(customer.name);
+                                setEditingCustomerPhone(customer.phone || "");
+                              }}
+                              className="rounded-xl bg-[#f0dfe6] px-3 py-1.5 text-sm font-semibold text-[#5a1838]"
+                            >
+                              Edit
+                            </button>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>
