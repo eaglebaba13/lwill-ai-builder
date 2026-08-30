@@ -123,6 +123,8 @@ export default function Home() {
   );
   const [membershipEndsAt, setMembershipEndsAt] = useState("");
   const [membershipStatus, setMembershipStatus] = useState("");
+  const [editingMembershipId, setEditingMembershipId] = useState<string | null>(null);
+  const [editingMembershipStatus, setEditingMembershipStatus] = useState("");
   const [invoices, setInvoices] = useState<Array<{
     id: string;
     customerId: string;
@@ -2150,6 +2152,34 @@ export default function Home() {
     setMembershipStatus("");
   };
 
+  const updateMembership = async (membershipId: string) => {
+    setMembershipError(null);
+    const result = await fetch(`/api/memberships/${membershipId}`, {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        status: editingMembershipStatus || null,
+      }),
+    });
+    if (result.status === 401) {
+      setMemberships([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setMembershipError("You are not authorized to update memberships.");
+      return;
+    }
+    if (!result.ok) {
+      setMembershipError("Membership could not be updated.");
+      return;
+    }
+    const body = await result.json() as { membership: MembershipRecord };
+    setMemberships((current) => current.map((item) => (item.id === membershipId ? body.membership : item)));
+    setEditingMembershipId(null);
+  };
+
   const addToCart = () => {
     if (!cartItemId) return;
     const item = cartItemType === "product"
@@ -3243,15 +3273,53 @@ export default function Home() {
                 {!isLoadingMemberships && membershipError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{membershipError}</div> : null}
                 {!isLoadingMemberships && !membershipError && memberships.length === 0 ? <div className="text-sm text-[#736067]">No memberships yet.</div> : null}
                 {memberships.map((membership) => (
-                  <div key={membership.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
-                    <div>
-                      <div className="font-medium">{customerMap.get(membership.customerId) ?? `Customer ${membership.customerId}`}</div>
-                      <div className="text-sm text-[#736067]">{packageMap.get(membership.packageId) ?? `Package ${membership.packageId}`}</div>
-                    </div>
-                    <div className="text-right text-sm text-[#736067]">
-                      <div>{membership.startedAt}</div>
-                      <div>{membership.endsAt ?? "—"}</div>
-                    </div>
+                  <div key={membership.id} className="rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    {editingMembershipId === membership.id ? (
+                      <div className="space-y-2">
+                        <input
+                          value={editingMembershipStatus}
+                          onChange={(event) => setEditingMembershipStatus(event.target.value)}
+                          placeholder="Status"
+                          className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => updateMembership(membership.id)}
+                            className="rounded-xl bg-[#5a1838] px-3 py-2 text-sm font-semibold text-white"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => setEditingMembershipId(null)}
+                            className="rounded-xl bg-[#f0dfe6] px-3 py-2 text-sm font-semibold text-[#5a1838]"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-medium">{customerMap.get(membership.customerId) ?? `Customer ${membership.customerId}`}</div>
+                          <div className="text-sm text-[#736067]">{packageMap.get(membership.packageId) ?? `Package ${membership.packageId}`}</div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="text-right text-sm text-[#736067]">
+                            <div>{membership.startedAt}</div>
+                            <div>{membership.endsAt ?? "—"}</div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setEditingMembershipId(membership.id);
+                              setEditingMembershipStatus(membership.status || "");
+                            }}
+                            className="rounded-xl bg-[#f0dfe6] px-3 py-1.5 text-sm font-semibold text-[#5a1838]"
+                          >
+                            Edit
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
