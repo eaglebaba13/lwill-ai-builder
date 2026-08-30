@@ -221,6 +221,12 @@ export default function Home() {
   const [reorderRuleWarehouseId, setReorderRuleWarehouseId] = useState("");
   const [reorderRuleMinQuantity, setReorderRuleMinQuantity] = useState("10");
   const [reorderRuleReorderQuantity, setReorderRuleReorderQuantity] = useState("50");
+  const [editingReorderRuleId, setEditingReorderRuleId] = useState<string | null>(null);
+  const [editingReorderRuleProductId, setEditingReorderRuleProductId] = useState("");
+  const [editingReorderRuleBranchId, setEditingReorderRuleBranchId] = useState("");
+  const [editingReorderRuleWarehouseId, setEditingReorderRuleWarehouseId] = useState("");
+  const [editingReorderRuleMinQuantity, setEditingReorderRuleMinQuantity] = useState("10");
+  const [editingReorderRuleReorderQuantity, setEditingReorderRuleReorderQuantity] = useState("50");
   const [lowStockItems, setLowStockItems] = useState<Array<{ stockItemId: string; productId: string; branchId: string; quantity: number; minQuantity: number; reorderQuantity: number }>>([]);
   const [isLoadingLowStockItems, setIsLoadingLowStockItems] = useState(false);
   const [lowStockItemError, setLowStockItemError] = useState<string | null>(null);
@@ -2792,6 +2798,31 @@ export default function Home() {
     setReorderRuleReorderQuantity("50");
   };
 
+  const updateReorderRule = async (id: string, productId: string, branchId: string, warehouseId: string, minQuantity: number, reorderQuantity: number) => {
+    setReorderRuleError(null);
+    const result = await fetch(`/api/reorder-rules/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ productId, branchId, warehouseId, minQuantity, reorderQuantity }),
+    });
+    if (result.status === 401) {
+      setReorderRules([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setReorderRuleError("You are not authorized to manage reorder rules.");
+      return;
+    }
+    if (!result.ok) {
+      setReorderRuleError("Reorder rule could not be updated.");
+      return;
+    }
+    const body = await result.json() as { reorderRule: { id: string; productId: string; branchId: string; warehouseId: string; minQuantity: number; reorderQuantity: number; isActive: boolean } };
+    setReorderRules((current) => current.map((item) => (item.id === body.reorderRule.id ? body.reorderRule : item)));
+  };
+
   const addPurchaseReceipt = async () => {
     if (!purchaseReceiptWarehouseId.trim() || !purchaseReceiptBranchId.trim() || !purchaseReceiptProductId.trim()) return;
     setPurchaseReceiptError(null);
@@ -4790,15 +4821,87 @@ export default function Home() {
                   {!isLoadingReorderRules && reorderRuleError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{reorderRuleError}</div> : null}
                   {!isLoadingReorderRules && !reorderRuleError && reorderRules.length === 0 ? <div className="text-sm text-[#736067]">No reorder rules yet.</div> : null}
                   {reorderRules.map((rule) => (
-                    <div key={rule.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
-                      <div>
-                         <div className="font-medium">{productMap.get(rule.productId) ?? `Product ${rule.productId}`}</div>
-                         <div className="text-sm text-[#736067]">{branchMap.get(rule.branchId) ?? `Branch ${rule.branchId}`} / {warehouseMap.get(rule.warehouseId) ?? `Warehouse ${rule.warehouseId}`}</div>
-                        <div className="text-sm text-[#736067]">Min: {rule.minQuantity} | Reorder: {rule.reorderQuantity}</div>
-                      </div>
-                      <div className="text-right text-sm text-[#736067]">
-                        <div>{rule.isActive ? "Active" : "Inactive"}</div>
-                      </div>
+                    <div key={rule.id} className="flex flex-col gap-2 rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                      {editingReorderRuleId !== rule.id ? (
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium">{productMap.get(rule.productId) ?? `Product ${rule.productId}`}</div>
+                            <div className="text-sm text-[#736067]">{branchMap.get(rule.branchId) ?? `Branch ${rule.branchId}`} / {warehouseMap.get(rule.warehouseId) ?? `Warehouse ${rule.warehouseId}`}</div>
+                            <div className="text-sm text-[#736067]">Min: {rule.minQuantity} | Reorder: {rule.reorderQuantity}</div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="text-right text-sm text-[#736067]">
+                              <div>{rule.isActive ? "Active" : "Inactive"}</div>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setEditingReorderRuleId(rule.id);
+                                setEditingReorderRuleProductId(rule.productId);
+                                setEditingReorderRuleBranchId(rule.branchId);
+                                setEditingReorderRuleWarehouseId(rule.warehouseId);
+                                setEditingReorderRuleMinQuantity(String(rule.minQuantity));
+                                setEditingReorderRuleReorderQuantity(String(rule.reorderQuantity));
+                              }}
+                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                            >
+                              Edit
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <input
+                            value={editingReorderRuleProductId}
+                            onChange={(event) => setEditingReorderRuleProductId(event.target.value)}
+                            placeholder="Product ID"
+                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                          />
+                          <input
+                            value={editingReorderRuleBranchId}
+                            onChange={(event) => setEditingReorderRuleBranchId(event.target.value)}
+                            placeholder="Branch ID"
+                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                          />
+                          <input
+                            value={editingReorderRuleWarehouseId}
+                            onChange={(event) => setEditingReorderRuleWarehouseId(event.target.value)}
+                            placeholder="Warehouse ID"
+                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                          />
+                          <div className="grid grid-cols-2 gap-3">
+                            <input
+                              value={editingReorderRuleMinQuantity}
+                              onChange={(event) => setEditingReorderRuleMinQuantity(event.target.value)}
+                              placeholder="Min qty"
+                              className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                            />
+                            <input
+                              value={editingReorderRuleReorderQuantity}
+                              onChange={(event) => setEditingReorderRuleReorderQuantity(event.target.value)}
+                              placeholder="Reorder qty"
+                              className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={async () => {
+                                if (!rule.id) return;
+                                await updateReorderRule(rule.id, editingReorderRuleProductId, editingReorderRuleBranchId, editingReorderRuleWarehouseId, Number(editingReorderRuleMinQuantity), Number(editingReorderRuleReorderQuantity));
+                                setEditingReorderRuleId(null);
+                              }}
+                              className="rounded-xl bg-[#5a1838] px-3 py-1.5 text-xs font-semibold text-white"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => setEditingReorderRuleId(null)}
+                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
