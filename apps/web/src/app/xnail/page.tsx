@@ -34,6 +34,7 @@ type ServiceRecord = {
 };
 
 type AppointmentRecord = {
+  id: string;
   tenantId: string;
   customerId: string;
   serviceId: string;
@@ -72,6 +73,7 @@ type StaffRecord = {
 };
 
 function toLocalAppointment(apiRecord: {
+  id: string;
   tenantId: string;
   customerId: string;
   serviceId: string;
@@ -80,6 +82,7 @@ function toLocalAppointment(apiRecord: {
   status: string;
 }): AppointmentRecord {
   return {
+    id: apiRecord.id,
     tenantId: apiRecord.tenantId,
     customerId: apiRecord.customerId,
     serviceId: apiRecord.serviceId,
@@ -246,6 +249,8 @@ export default function Home() {
   const [editingAttendanceNotes, setEditingAttendanceNotes] = useState("");
   const [appointments, setAppointments] = useState<AppointmentRecord[]>([]);
   const [isLoadingAppointments, setIsLoadingAppointments] = useState(false);
+  const [editingAppointmentIndex, setEditingAppointmentIndex] = useState<number | null>(null);
+  const [editingAppointmentStartsAt, setEditingAppointmentStartsAt] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
@@ -509,6 +514,7 @@ export default function Home() {
         }
         const body = await result.json() as {
           appointments?: Array<{
+            id: string;
             tenantId: string;
             customerId: string;
             serviceId: string;
@@ -2891,6 +2897,7 @@ export default function Home() {
     }
     const body = (await result.json()) as {
       appointment: {
+        id: string;
         tenantId: string;
         customerId: string;
         serviceId: string;
@@ -2916,6 +2923,70 @@ export default function Home() {
           : appointment,
       );
     });
+  };
+
+  const updateAppointment = async (index: number, startsAt: string) => {
+    setAppointmentError(null);
+    const item = appointments[index];
+    const result = await fetch(`/api/appointments/${item.id}`, {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        startsAt,
+      }),
+    });
+    if (result.status === 401) {
+      setAppointments([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setAppointmentError("You are not authorized to update appointments.");
+      return;
+    }
+    if (!result.ok) {
+      setAppointmentError("Appointment could not be updated.");
+      return;
+    }
+    const body = (await result.json()) as {
+      appointment: {
+        id: string;
+        tenantId: string;
+        customerId: string;
+        serviceId: string;
+        startsAt: string;
+        endsAt: string;
+        status: string;
+      };
+    };
+    setAppointments((current) =>
+      current.map((appointment, appointmentIndex) =>
+        appointmentIndex === index ? toLocalAppointment(body.appointment) : appointment,
+      ),
+    );
+  };
+
+  const deleteAppointment = async (appointmentId: string) => {
+    setAppointmentError(null);
+    const result = await fetch(`/api/appointments/${appointmentId}`, {
+      method: "DELETE",
+      credentials: "same-origin",
+    });
+    if (result.status === 401) {
+      setAppointments([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setAppointmentError("You are not authorized to delete appointments.");
+      return;
+    }
+    if (!result.ok) {
+      setAppointmentError("Appointment could not be deleted.");
+      return;
+    }
+    setAppointments((current) => current.filter((appointment) => appointment.id !== appointmentId));
   };
 
   const addBusinessUnit = async () => {
@@ -3711,23 +3782,69 @@ export default function Home() {
               {!isLoadingAppointments && !appointmentError && appointments.length === 0 ? (
                 <div className="text-sm text-[#736067]">No appointments yet.</div>
               ) : null}
-              <div className="mt-4 space-y-3">
+               <div className="mt-4 space-y-3">
                 {appointments.map((appointment, index) => (
                   <div key={`${appointment.customerId}-${index}`} className="rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <div className="font-medium">{customerMap.get(appointment.customerId) ?? `Customer ${appointment.customerId}`}</div>
-                        <div className="text-sm text-[#736067]">{serviceMap.get(appointment.serviceId) ?? `Service ${appointment.serviceId}`}</div>
-                        <div className="text-sm text-[#736067]">{staffMap.get(appointment.staffId) ?? `Staff ${appointment.staffId}`}</div>
-                        <div className="text-sm text-[#736067]">{appointment.startsAt}</div>
+                    {editingAppointmentIndex !== index ? (
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <div className="font-medium">{customerMap.get(appointment.customerId) ?? `Customer ${appointment.customerId}`}</div>
+                          <div className="text-sm text-[#736067]">{serviceMap.get(appointment.serviceId) ?? `Service ${appointment.serviceId}`}</div>
+                          <div className="text-sm text-[#736067]">{staffMap.get(appointment.staffId) ?? `Staff ${appointment.staffId}`}</div>
+                          <div className="text-sm text-[#736067]">{appointment.startsAt}</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => advanceAppointment(index)}
+                            className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                          >
+                            {appointment.status}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditingAppointmentIndex(index);
+                              setEditingAppointmentStartsAt(appointment.startsAt);
+                            }}
+                            className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => deleteAppointment(appointment.id)}
+                            className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </div>
-                      <button
-                        onClick={() => advanceAppointment(index)}
-                        className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
-                      >
-                        {appointment.status}
-                      </button>
-                    </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <input
+                          value={editingAppointmentStartsAt}
+                          onChange={(event) => setEditingAppointmentStartsAt(event.target.value)}
+                          placeholder="Start time (ISO)"
+                          className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                        />
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={async () => {
+                              if (editingAppointmentIndex === null) return;
+                              await updateAppointment(editingAppointmentIndex, editingAppointmentStartsAt);
+                              setEditingAppointmentIndex(null);
+                            }}
+                            className="rounded-xl bg-[#5a1838] px-3 py-1.5 text-xs font-semibold text-white"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => setEditingAppointmentIndex(null)}
+                            className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
