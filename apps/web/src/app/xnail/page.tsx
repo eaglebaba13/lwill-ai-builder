@@ -155,6 +155,10 @@ export default function Home() {
   const [productSku, setProductSku] = useState("");
   const [productPrice, setProductPrice] = useState("1500");
   const [productCategoryId, setProductCategoryId] = useState("");
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [editingProductName, setEditingProductName] = useState("");
+  const [editingProductSku, setEditingProductSku] = useState("");
+  const [editingProductPrice, setEditingProductPrice] = useState("1500");
   const [categories, setCategories] = useState<
     Array<{ id: string; name: string; description: string | null; isActive: boolean }>
   >([]);
@@ -162,6 +166,9 @@ export default function Home() {
   const [categoryError, setCategoryError] = useState<string | null>(null);
   const [categoryName, setCategoryName] = useState("");
   const [categoryDescription, setCategoryDescription] = useState("");
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingCategoryName, setEditingCategoryName] = useState("");
+  const [editingCategoryDescription, setEditingCategoryDescription] = useState("");
   const [stockItems, setStockItems] = useState<
     Array<{ id: string; productId: string; branchId: string; quantity: number }>
   >([]);
@@ -170,6 +177,8 @@ export default function Home() {
   const [stockItemProductId, setStockItemProductId] = useState("");
   const [stockItemBranchId, setStockItemBranchId] = useState("");
   const [stockItemQuantity, setStockItemQuantity] = useState("0");
+  const [editingStockItemId, setEditingStockItemId] = useState<string | null>(null);
+  const [editingStockItemQuantity, setEditingStockItemQuantity] = useState("0");
   const [stockMovements, setStockMovements] = useState<
     Array<{ id: string; productId: string; movementType: string; quantity: number; notes: string | null; createdAt: string }>
   >([]);
@@ -2427,6 +2436,81 @@ export default function Home() {
     setAdjustmentDirection("IN");
   };
 
+  const updateCategory = async (id: string, name: string, description: string) => {
+    setCategoryError(null);
+    const result = await fetch(`/api/categories/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name, description: description || null }),
+    });
+    if (result.status === 401) {
+      setCategories([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setCategoryError("You are not authorized to manage categories.");
+      return;
+    }
+    if (!result.ok) {
+      setCategoryError("Category could not be updated.");
+      return;
+    }
+    const body = await result.json() as { category: { id: string; name: string; description: string | null; isActive: boolean } };
+    setCategories((current) => current.map((item) => (item.id === body.category.id ? body.category : item)));
+  };
+
+  const updateProduct = async (id: string, name: string, sku: string, priceCents: number) => {
+    setProductError(null);
+    const result = await fetch(`/api/products/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name, sku, priceCents }),
+    });
+    if (result.status === 401) {
+      setProducts([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setProductError("You are not authorized to manage products.");
+      return;
+    }
+    if (!result.ok) {
+      setProductError("Product could not be updated.");
+      return;
+    }
+    const body = await result.json() as { product: { id: string; name: string; sku: string; priceCents: number; isActive: boolean } };
+    setProducts((current) => current.map((item) => (item.id === body.product.id ? body.product : item)));
+  };
+
+  const updateStockItem = async (id: string, quantity: number) => {
+    setStockItemError(null);
+    const result = await fetch(`/api/stock-items/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ quantity }),
+    });
+    if (result.status === 401) {
+      setStockItems([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setStockItemError("You are not authorized to manage stock items.");
+      return;
+    }
+    if (!result.ok) {
+      setStockItemError("Stock item could not be updated.");
+      return;
+    }
+    const body = await result.json() as { stockItem: { id: string; productId: string; branchId: string; quantity: number } };
+    setStockItems((current) => current.map((item) => (item.id === body.stockItem.id ? body.stockItem : item)));
+  };
+
   const addWarehouse = async () => {
     if (!warehouseName.trim()) return;
     setWarehouseError(null);
@@ -3908,14 +3992,63 @@ export default function Home() {
                   {!isLoadingCategories && categoryError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{categoryError}</div> : null}
                   {!isLoadingCategories && !categoryError && categories.length === 0 ? <div className="text-sm text-[#736067]">No categories yet.</div> : null}
                   {categories.map((category) => (
-                    <div key={category.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
-                      <div>
-                        <div className="font-medium">{category.name}</div>
-                        {category.description ? <div className="text-sm text-[#736067]">{category.description}</div> : null}
-                      </div>
-                      <div className="text-right text-sm text-[#736067]">
-                        <div>{category.isActive ? "Active" : "Inactive"}</div>
-                      </div>
+                    <div key={category.id} className="flex flex-col gap-2 rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                      {editingCategoryId !== category.id ? (
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium">{category.name}</div>
+                            {category.description ? <div className="text-sm text-[#736067]">{category.description}</div> : null}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="text-right text-sm text-[#736067]">
+                              <div>{category.isActive ? "Active" : "Inactive"}</div>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setEditingCategoryId(category.id);
+                                setEditingCategoryName(category.name);
+                                setEditingCategoryDescription(category.description ?? "");
+                              }}
+                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                            >
+                              Edit
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <input
+                            value={editingCategoryName}
+                            onChange={(event) => setEditingCategoryName(event.target.value)}
+                            placeholder="Category name"
+                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                          />
+                          <input
+                            value={editingCategoryDescription}
+                            onChange={(event) => setEditingCategoryDescription(event.target.value)}
+                            placeholder="Description"
+                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                          />
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={async () => {
+                                if (!category.id) return;
+                                await updateCategory(category.id, editingCategoryName, editingCategoryDescription);
+                                setEditingCategoryId(null);
+                              }}
+                              className="rounded-xl bg-[#5a1838] px-3 py-1.5 text-xs font-semibold text-white"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => setEditingCategoryId(null)}
+                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -3954,15 +4087,71 @@ export default function Home() {
                   {!isLoadingProducts && productError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{productError}</div> : null}
                   {!isLoadingProducts && !productError && products.length === 0 ? <div className="text-sm text-[#736067]">No products yet.</div> : null}
                   {products.map((product) => (
-                    <div key={product.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
-                      <div>
-                        <div className="font-medium">{product.name}</div>
-                        <div className="text-sm text-[#736067]">SKU: {product.sku}</div>
-                      </div>
-                      <div className="text-right text-sm text-[#736067]">
-                        <div>₹{product.priceCents / 100}</div>
-                        <div>{product.isActive ? "Active" : "Inactive"}</div>
-                      </div>
+                    <div key={product.id} className="flex flex-col gap-2 rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                      {editingProductId !== product.id ? (
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium">{product.name}</div>
+                            <div className="text-sm text-[#736067]">SKU: {product.sku}</div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="text-right text-sm text-[#736067]">
+                              <div>₹{product.priceCents / 100}</div>
+                              <div>{product.isActive ? "Active" : "Inactive"}</div>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setEditingProductId(product.id);
+                                setEditingProductName(product.name);
+                                setEditingProductSku(product.sku);
+                                setEditingProductPrice(String(product.priceCents));
+                              }}
+                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                            >
+                              Edit
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <input
+                            value={editingProductName}
+                            onChange={(event) => setEditingProductName(event.target.value)}
+                            placeholder="Product name"
+                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                          />
+                          <input
+                            value={editingProductSku}
+                            onChange={(event) => setEditingProductSku(event.target.value)}
+                            placeholder="SKU"
+                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                          />
+                          <input
+                            value={editingProductPrice}
+                            onChange={(event) => setEditingProductPrice(event.target.value)}
+                            placeholder="Price (cents)"
+                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                          />
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={async () => {
+                                if (!product.id) return;
+                                await updateProduct(product.id, editingProductName, editingProductSku, Number(editingProductPrice));
+                                setEditingProductId(null);
+                              }}
+                              className="rounded-xl bg-[#5a1838] px-3 py-1.5 text-xs font-semibold text-white"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => setEditingProductId(null)}
+                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -4011,17 +4200,59 @@ export default function Home() {
                 {isLoadingStockItems ? <div className="text-sm text-[#736067]">Loading stock items...</div> : null}
                 {!isLoadingStockItems && stockItemError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{stockItemError}</div> : null}
                 {!isLoadingStockItems && !stockItemError && stockItems.length === 0 ? <div className="text-sm text-[#736067]">No stock items yet.</div> : null}
-                {stockItems.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
-                    <div>
-                      <div className="font-medium">{productMap.get(item.productId) ?? `Product ${item.productId}`}</div>
-                      <div className="text-sm text-[#736067]">{branchMap.get(item.branchId) ?? `Branch ${item.branchId}`}</div>
+                  {stockItems.map((item) => (
+                    <div key={item.id} className="flex flex-col gap-2 rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                      {editingStockItemId !== item.id ? (
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium">{productMap.get(item.productId) ?? `Product ${item.productId}`}</div>
+                            <div className="text-sm text-[#736067]">{branchMap.get(item.branchId) ?? `Branch ${item.branchId}`}</div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="text-right text-sm text-[#736067]">
+                              <div>Qty: {item.quantity}</div>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setEditingStockItemId(item.id);
+                                setEditingStockItemQuantity(String(item.quantity));
+                              }}
+                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                            >
+                              Edit
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <input
+                            value={editingStockItemQuantity}
+                            onChange={(event) => setEditingStockItemQuantity(event.target.value)}
+                            placeholder="Quantity"
+                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                          />
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={async () => {
+                                if (!item.id) return;
+                                await updateStockItem(item.id, Number(editingStockItemQuantity));
+                                setEditingStockItemId(null);
+                              }}
+                              className="rounded-xl bg-[#5a1838] px-3 py-1.5 text-xs font-semibold text-white"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => setEditingStockItemId(null)}
+                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div className="text-right text-sm text-[#736067]">
-                      <div>Qty: {item.quantity}</div>
-                    </div>
-                  </div>
-                ))}
+                  ))}
               </div>
             </div>
 
