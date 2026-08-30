@@ -12,6 +12,11 @@ import {
   transitionAppointmentStatus,
   type AppointmentStatus,
 } from "@/lib/x-nail/operational-workflow";
+import {
+  deriveTabsFromPermissions,
+  findRoleConfig,
+  type RoleDashboardConfig,
+} from "@/lib/x-nail/role-dashboard-config";
 
 type CustomerRecord = {
   id: string;
@@ -93,10 +98,79 @@ function toLocalAppointment(apiRecord: {
   };
 }
 
-const tabs = ["Overview", "Customers", "Services", "Packages", "Memberships", "Inventory", "Staff", "Attendance", "Appointments", "Billing", "Branches", "Reports", "Settings", "Notifications"] as const;
+type KpiContext = {
+  readonly appointments: AppointmentRecord[];
+  readonly invoices: Array<{ totalCents: number }>;
+  readonly memberships: Array<{ id: string }>;
+  readonly staff: Array<{ id: string }>;
+  readonly customers: Array<{ id: string }>;
+  readonly lowStockItems: Array<{ stockItemId: string; productId: string; branchId: string; quantity: number; minQuantity: number; reorderQuantity: number }>;
+  readonly branches: Array<{ id: string }>;
+  readonly attendance: Array<{ id: string }>;
+  readonly purchaseReceipts: Array<{ id: string }>;
+};
+
+function KpiCard({ definition, context }: { readonly definition: RoleDashboardConfig["kpis"][number]; readonly context: KpiContext }) {
+  const today = new Date().toISOString().split("T")[0];
+  let value: string | number = "";
+  let subtitle: string | undefined;
+
+  switch (definition.source.type) {
+    case "appointmentsToday":
+      value = context.appointments.filter((a) => a.startsAt.startsWith(today)).length;
+      subtitle = "Appointments";
+      break;
+    case "revenue":
+      value = `₹${context.invoices.reduce((sum, inv) => sum + inv.totalCents, 0) / 100}`;
+      subtitle = "Gross sales";
+      break;
+    case "memberships":
+      value = context.memberships.length;
+      subtitle = "Loyalty";
+      break;
+    case "staff":
+      value = context.staff.length;
+      subtitle = "Active";
+      break;
+    case "customers":
+      value = context.customers.length;
+      subtitle = "Total";
+      break;
+    case "lowStock":
+      value = context.lowStockItems.length;
+      subtitle = "Alerts";
+      break;
+    case "branches":
+      value = context.branches.length;
+      subtitle = "Outlets";
+      break;
+    case "attendance":
+      value = context.attendance.filter((a) => a.id.startsWith(today)).length;
+      subtitle = "Today";
+      break;
+    case "invoices":
+      value = context.invoices.length;
+      subtitle = "Total";
+      break;
+    case "purchaseReceipts":
+      value = context.purchaseReceipts.length;
+      subtitle = "Receipts";
+      break;
+  }
+
+  return (
+    <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
+      <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">{definition.label}</div>
+      <div className="mt-2 text-3xl font-semibold">{value}</div>
+      {subtitle ? <div className="mt-1 text-sm text-[#715a62]">{subtitle}</div> : null}
+    </div>
+  );
+}
+
+const ALL_TABS = ["Overview", "Customers", "Services", "Packages", "Memberships", "Inventory", "Staff", "Attendance", "Appointments", "Billing", "Branches", "Reports", "Settings", "Notifications"] as const;
 
 export default function Home() {
-  const [activeTab, setActiveTab] = useState<(typeof tabs)[number]>("Overview");
+  const [activeTab, setActiveTab] = useState<(typeof ALL_TABS)[number]>("Overview");
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const authenticationRequestId = useRef(0);
   const isLoginInProgress = useRef(false);
@@ -104,6 +178,17 @@ export default function Home() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [userRoles, setUserRoles] = useState<Array<{
+    id: string;
+    code: string;
+    name: string;
+    scope: { kind: string; businessUnitId?: string | null; branchId?: string | null };
+    permissions: Array<{ code: string }>;
+  }>>([]);
+  const [effectiveRole, setEffectiveRole] = useState<RoleDashboardConfig | null>(null);
+  const [userProfile, setUserProfile] = useState<{ userId: string; email: string | null; displayName: string | null } | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [visibleTabs, setVisibleTabs] = useState<(typeof ALL_TABS)[number][]>([...ALL_TABS]);
   const [customers, setCustomers] = useState<CustomerRecord[]>([]);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
   const [customerError, setCustomerError] = useState<string | null>(null);
@@ -404,6 +489,93 @@ export default function Home() {
       window.removeEventListener("popstate", handlePopState);
     };
   }, []);
+
+  useEffect(() => {
+    if (authenticated !== true) {
+      return;
+    }
+
+    let mounted = true;
+    let completed = false;
+    const loadingTimer = window.setTimeout(() => {
+      if (mounted && !completed) {
+        setProfileError(null);
+      }
+    }, 0);
+
+    void fetch("/api/auth/me", { credentials: "same-origin", cache: "no-store" })
+      .then(async (result) => {
+        if (!mounted) return;
+        completed = true;
+        if (result.status === 401) {
+          setUserRoles([]);
+          setEffectiveRole(null);
+          setUserProfile(null);
+          setVisibleTabs([...ALL_TABS]);
+          setAuthenticated(false);
+          return;
+        }
+        if (result.status === 403) {
+          setUserRoles([]);
+          setEffectiveRole(null);
+          setUserProfile(null);
+          setVisibleTabs([...ALL_TABS]);
+          setProfileError("You are not authorized to view profile.");
+          return;
+        }
+        if (!result.ok) {
+          throw new Error("Profile request failed");
+        }
+        const body = (await result.json()) as {
+          user?: { userId: string; email: string | null; displayName: string | null };
+          tenantContext?: { tenantId: string; businessUnitId: string | null; branchId: string | null } | null;
+          roles?: Array<{
+            id: string;
+            code: string;
+            name: string;
+            scope: { kind: string; businessUnitId?: string | null; branchId?: string | null };
+            permissions: Array<{ code: string }>;
+          }>;
+          permissionCodes?: string[];
+        };
+        const roles = body.roles ?? [];
+        const permissions = body.permissionCodes ?? [];
+        const profile = body.user ?? null;
+        const matchedRole = roles.find((role) => findRoleConfig(role.code));
+        const config = matchedRole ? findRoleConfig(matchedRole.code) : null;
+        const derivedTabs = config
+          ? config.tabs
+          : permissions.length > 0
+            ? deriveTabsFromPermissions(permissions)
+            : ALL_TABS;
+
+        if (!mounted) return;
+        setUserRoles(roles);
+        setEffectiveRole(config ?? null);
+        setUserProfile(profile);
+        setVisibleTabs(derivedTabs as (typeof ALL_TABS)[number][]);
+        setActiveTab((current) => (derivedTabs.includes(current) ? current : "Overview"));
+      })
+      .catch(() => {
+        if (mounted) {
+          setUserRoles([]);
+          setEffectiveRole(null);
+          setUserProfile(null);
+          setVisibleTabs([...ALL_TABS]);
+          setProfileError("Profile could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          window.clearTimeout(loadingTimer);
+        }
+      });
+
+    return () => {
+      mounted = false;
+      window.clearTimeout(loadingTimer);
+    };
+  }, [authenticated]);
 
   useEffect(() => {
     if (authenticated !== true) {
@@ -3408,12 +3580,22 @@ export default function Home() {
           <div>
             <div className="text-xl font-semibold tracking-tight">X Nail</div>
             <div className="text-[10px] font-medium uppercase tracking-[0.22em] text-[#8a606d]">
-              Operations dashboard
+              {effectiveRole ? `${effectiveRole.roleName} dashboard` : "Operations dashboard"}
             </div>
+            {userProfile?.displayName ? (
+              <div className="mt-1 text-xs text-[#736067]">{userProfile.displayName}</div>
+            ) : null}
           </div>
 
           <div className="flex items-center gap-2 text-sm">
-            <span className="rounded-full bg-[#fceff4] px-3 py-1 text-[#6a2f4a]">X Nail</span>
+            {effectiveRole ? (
+              <span className="rounded-full bg-[#e8f5e9] px-3 py-1 text-[#2e7d32]">{effectiveRole.roleName}</span>
+            ) : (
+              <span className="rounded-full bg-[#fceff4] px-3 py-1 text-[#6a2f4a]">X Nail</span>
+            )}
+            {userRoles.length > 1 ? (
+              <span className="rounded-full bg-[#fff8e1] px-3 py-1 text-[#5d4037]">{userRoles.length} roles</span>
+            ) : null}
             <button
               className="rounded-full border border-[#ead0d9] px-3 py-1.5"
               onClick={handleLogout}
@@ -3422,11 +3604,16 @@ export default function Home() {
             </button>
           </div>
         </div>
+        {profileError ? (
+          <div className="mx-auto max-w-6xl px-6 pb-4">
+            <div className="rounded-xl border border-[#f0c5c5] bg-[#fff6f6] px-3 py-2 text-sm text-[#8f3f3f]">{profileError}</div>
+          </div>
+        ) : null}
       </header>
 
       <div className="mx-auto max-w-6xl px-6 py-8">
         <div className="mb-6 flex flex-wrap gap-2">
-          {tabs.map((tab) => (
+          {visibleTabs.map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -3441,30 +3628,40 @@ export default function Home() {
           ))}
         </div>
 
-        <section className="grid gap-4 md:grid-cols-4">
-          <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
-            <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Today</div>
-            <div className="mt-2 text-3xl font-semibold">
-              {appointments.filter((appointment) => appointment.startsAt.startsWith(new Date().toISOString().split("T")[0])).length}
-            </div>
-            <div className="mt-1 text-sm text-[#715a62]">Appointments</div>
-          </div>
-          <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
-            <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Revenue</div>
-            <div className="mt-2 text-3xl font-semibold">₹{invoices.reduce((sum, invoice) => sum + invoice.totalCents, 0) / 100}</div>
-            <div className="mt-1 text-sm text-[#715a62]">Gross sales</div>
-          </div>
-          <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
-            <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Members</div>
-            <div className="mt-2 text-3xl font-semibold">{memberships.length}</div>
-            <div className="mt-1 text-sm text-[#715a62]">Loyalty</div>
-          </div>
-          <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
-            <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Staff</div>
-            <div className="mt-2 text-3xl font-semibold">{staff.length}</div>
-            <div className="mt-1 text-sm text-[#715a62]">Active</div>
-          </div>
-        </section>
+        {activeTab === "Overview" ? (
+          <section className="grid gap-4 md:grid-cols-4">
+            {effectiveRole ? (
+              effectiveRole.kpis.map((kpi) => (
+                <KpiCard key={kpi.key} definition={kpi} context={{ appointments, invoices, memberships, staff, customers, lowStockItems, branches, attendance, purchaseReceipts }} />
+              ))
+            ) : (
+              <>
+                <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
+                  <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Today</div>
+                  <div className="mt-2 text-3xl font-semibold">
+                    {appointments.filter((appointment) => appointment.startsAt.startsWith(new Date().toISOString().split("T")[0])).length}
+                  </div>
+                  <div className="mt-1 text-sm text-[#715a62]">Appointments</div>
+                </div>
+                <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
+                  <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Revenue</div>
+                  <div className="mt-2 text-3xl font-semibold">₹{invoices.reduce((sum, invoice) => sum + invoice.totalCents, 0) / 100}</div>
+                  <div className="mt-1 text-sm text-[#715a62]">Gross sales</div>
+                </div>
+                <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
+                  <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Members</div>
+                  <div className="mt-2 text-3xl font-semibold">{memberships.length}</div>
+                  <div className="mt-1 text-sm text-[#715a62]">Loyalty</div>
+                </div>
+                <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
+                  <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Staff</div>
+                  <div className="mt-2 text-3xl font-semibold">{staff.length}</div>
+                  <div className="mt-1 text-sm text-[#715a62]">Active</div>
+                </div>
+              </>
+            )}
+          </section>
+        ) : null}
 
         {activeTab === "Customers" ? (
           <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">

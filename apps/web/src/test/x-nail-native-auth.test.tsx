@@ -14,6 +14,7 @@ describe("X Nail native authentication integration", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [], permissionCodes: [] }))
       .mockResolvedValueOnce(Response.json({ customers: [] }));
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
@@ -48,6 +49,7 @@ describe("X Nail native authentication integration", () => {
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [], permissionCodes: [] }))
       .mockResolvedValueOnce(Response.json({ customers: [] }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }));
     vi.stubGlobal("fetch", fetchMock);
@@ -75,8 +77,10 @@ describe("X Nail native authentication integration", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [], permissionCodes: [] }))
       .mockResolvedValueOnce(Response.json({ customers: [] }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [], permissionCodes: [] }))
       .mockResolvedValueOnce(Response.json({ customers: [] }));
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
@@ -101,6 +105,7 @@ describe("X Nail native authentication integration", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [], permissionCodes: [] }))
       .mockResolvedValueOnce(new Response(null, { status: 403 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
       .mockResolvedValueOnce(new Response(null, { status: 401 }));
@@ -132,6 +137,7 @@ describe("X Nail native authentication integration", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [], permissionCodes: [] }))
       .mockResolvedValueOnce(new Response(null, { status: 403 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
       .mockResolvedValueOnce(new Response(null, { status: 401 }));
@@ -162,6 +168,7 @@ describe("X Nail native authentication integration", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [], permissionCodes: [] }))
       .mockResolvedValueOnce(new Response(null, { status: 403 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
       .mockResolvedValueOnce(new Response(null, { status: 401 }));
@@ -195,6 +202,7 @@ describe("X Nail native authentication integration", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [], permissionCodes: [] }))
       .mockReturnValueOnce(inFlightRefresh)
       .mockResolvedValueOnce(new Response(null, { status: 204 }));
     vi.stubGlobal("fetch", fetchMock);
@@ -225,8 +233,11 @@ describe("X Nail native authentication integration", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [], permissionCodes: [] }))
       .mockResolvedValueOnce(new Response(null, { status: 403 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [], permissionCodes: [] }))
+      .mockResolvedValueOnce(new Response(null, { status: 403 }))
       .mockResolvedValueOnce(Response.json({ customers: [] }));
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
@@ -263,6 +274,8 @@ describe("X Nail native authentication integration", () => {
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       // Login request is controllable so we can fire pageshow during login
       .mockReturnValueOnce(loginRequest)
+      // Auth/me request after successful login
+      .mockResolvedValueOnce(Response.json({ roles: [], permissionCodes: [] }))
       // Customers request is controllable
       .mockReturnValueOnce(customersRequest);
     vi.stubGlobal("fetch", fetchMock);
@@ -296,10 +309,10 @@ describe("X Nail native authentication integration", () => {
     });
 
     // The login result should be preserved — we should see the dashboard.
-    // Only 3 fetches: mount refresh + login + customers.
-    // If the guard were missing, pageshow would trigger a 4th refresh that
+    // 4 fetches: mount refresh + login + /api/auth/me + customers.
+    // If the guard were missing, pageshow would trigger a 5th refresh that
     // arrives after login and overwrites authenticated=false.
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
     expect(await screen.findByText("Operations dashboard")).toBeInTheDocument();
   });
 
@@ -307,8 +320,10 @@ describe("X Nail native authentication integration", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [], permissionCodes: [] }))
       .mockResolvedValueOnce(Response.json({ customers: [] }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [], permissionCodes: [] }))
       .mockResolvedValueOnce(Response.json({ customers: [] }));
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
@@ -330,8 +345,10 @@ describe("X Nail native authentication integration", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [], permissionCodes: [] }))
       .mockResolvedValueOnce(Response.json({ customers: [] }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [], permissionCodes: [] }))
       .mockResolvedValueOnce(Response.json({ customers: [] }));
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
@@ -353,6 +370,7 @@ describe("X Nail native authentication integration", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [], permissionCodes: [] }))
       .mockResolvedValueOnce(Response.json({ customers: [] }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }));
     vi.stubGlobal("fetch", fetchMock);
@@ -377,6 +395,7 @@ describe("X Nail native authentication integration", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [], permissionCodes: [] }))
       .mockResolvedValueOnce(new Response(null, { status: 401 }));
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
@@ -396,6 +415,7 @@ describe("X Nail native authentication integration", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [], permissionCodes: [] }))
       .mockResolvedValueOnce(new Response(null, { status: 403 }));
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
@@ -422,8 +442,10 @@ describe("X Nail native authentication integration", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [], permissionCodes: [] }))
       .mockResolvedValueOnce(Response.json({ customers: [] }))
-      .mockResolvedValueOnce(Response.json({ appointments: [] }));
+      .mockResolvedValueOnce(Response.json({ appointments: [] }))
+      .mockResolvedValueOnce(Response.json({ customers: [] }));
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
 
@@ -457,8 +479,10 @@ describe("X Nail native authentication integration", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [], permissionCodes: [] }))
       .mockResolvedValueOnce(Response.json({ customers: [] }))
-      .mockResolvedValueOnce(Response.json({ appointments: mockAppointments }));
+      .mockResolvedValueOnce(Response.json({ appointments: mockAppointments }))
+      .mockResolvedValueOnce(Response.json({ customers: [] }));
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
 
@@ -483,6 +507,7 @@ describe("X Nail native authentication integration", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [], permissionCodes: [] }))
       .mockResolvedValueOnce(Response.json({ customers: [] }))
       .mockReturnValueOnce(appointmentsRequest);
     vi.stubGlobal("fetch", fetchMock);
@@ -509,6 +534,7 @@ describe("X Nail native authentication integration", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [], permissionCodes: [] }))
       .mockResolvedValueOnce(Response.json({ customers: [] }))
       .mockImplementationOnce(() => new Promise((resolve) => setTimeout(() => resolve(new Response(null, { status: 403 })), 50)));
     vi.stubGlobal("fetch", fetchMock);
@@ -530,6 +556,7 @@ describe("X Nail native authentication integration", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [], permissionCodes: [] }))
       .mockResolvedValueOnce(Response.json({ customers: [] }))
       .mockImplementationOnce(() => new Promise((resolve) => setTimeout(() => resolve(new Response(null, { status: 500 })), 50)));
     vi.stubGlobal("fetch", fetchMock);
@@ -551,6 +578,7 @@ describe("X Nail native authentication integration", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [], permissionCodes: [] }))
       .mockResolvedValueOnce(Response.json({
         customers: [{ id: "cust-1", name: "Test Customer", tenantId: "tenant-xnail", phone: "555-0100", email: null, notes: null, isActive: true }],
       }))
@@ -601,6 +629,7 @@ describe("X Nail native authentication integration", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [], permissionCodes: [] }))
       .mockResolvedValueOnce(Response.json({ customers: [] }))
       .mockResolvedValueOnce(Response.json({ services: [] }));
     vi.stubGlobal("fetch", fetchMock);
@@ -628,6 +657,7 @@ describe("X Nail native authentication integration", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [], permissionCodes: [] }))
       .mockResolvedValueOnce(Response.json({ customers: [] }))
       .mockResolvedValueOnce(Response.json({ packages: [] }));
     vi.stubGlobal("fetch", fetchMock);
@@ -661,6 +691,7 @@ describe("X Nail native authentication integration", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [], permissionCodes: [] }))
       .mockResolvedValueOnce(Response.json({ customers: [] }))
       .mockResolvedValueOnce(Response.json({ packages: mockPackages }));
     vi.stubGlobal("fetch", fetchMock);
@@ -683,6 +714,7 @@ describe("X Nail native authentication integration", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [], permissionCodes: [] }))
       .mockResolvedValueOnce(Response.json({ customers: [] }))
       .mockResolvedValueOnce(new Response(null, { status: 403 }));
     vi.stubGlobal("fetch", fetchMock);
@@ -704,6 +736,7 @@ describe("X Nail native authentication integration", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [], permissionCodes: [] }))
       .mockResolvedValueOnce(Response.json({ customers: [] }))
       .mockResolvedValueOnce(Response.json({ packages: [] }))
       .mockResolvedValueOnce(Response.json({
