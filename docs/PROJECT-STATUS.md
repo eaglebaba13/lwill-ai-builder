@@ -5,8 +5,8 @@
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
  - **Current Branch**: `phase-1d-native-auth`
- - **Current HEAD Commit**: `3234348` (`feat(reports): add GST summary report`)
- - **Git State**: `phase-1d-native-auth` at `3234348`; working tree has uncommitted invoice update and stock adjustment auto-update changes.
+ - **Current HEAD Commit**: `14703b2` (`feat(xnail): add tenant-scoped branch performance report`)
+ - **Git State**: `phase-1d-native-auth` at `14703b2`; working tree clean (pre-existing untracked SRS extracts and scripts/ remain).
 
 ## State Breakdown
 
@@ -1822,6 +1822,35 @@ The prior "Phase 1I X Nail Packages Production Verification" section (above) doc
  - No authentication or authorization architecture was modified.
  - No production database connection or mutation was performed.
  - No new roles were introduced; reuses existing `attendance.read` permission.
+
+## X Nail Branch Performance Reporting — 2026-08-30
+
+### Status: **Implemented and verified locally; committed as `14703b2`**
+
+### Implemented Slice
+
+- **Service layer** (`packages/authentication-context-prisma/src/report-service.ts`): Added `listBranchPerformance` which returns tenant-scoped branch-level operational metrics. Because the current Prisma schema does not link `Invoice` or `Appointment` to a `Branch`, the reliably derivable metrics are:
+  - `branchId`
+  - `branchName`
+  - `staffCount` — count of `Staff` records for the branch
+  - `attendanceCount` — count of `Attendance` records for staff assigned to the branch
+  Invoice/sales/revenue and appointment counts are **NOT SPECIFIED** in the current schema because no reliable branch relationship exists for those entities.
+- **API route** (`apps/web/src/app/api/reports/branch-performance/route.ts`): `GET /api/reports/branch-performance` with `report.read` authorization. Returns tenant-scoped branch performance array or 401/403 on auth failure.
+- **UI** (`apps/web/src/app/xnail/page.tsx`): Added "Branch Performance" section in the Reports tab. Shows loading/empty/error states and renders a card grid with branch name, staff count, and attendance record count.
+- **Tests**:
+  - `apps/web/src/test/branch-performance-route-handlers.test.ts` — 8 tests covering auth gating, permission forwarding, tenant scoping, and response shape.
+  - `packages/authentication-context-prisma/src/report-service.test.ts` — 3 new tests covering branch aggregation, empty branch list, and zero-count branches.
+
+### Verification Results
+
+- `pnpm test` — Passed for all changed files (focused: 20 report-service tests, 8 branch-performance route tests). One pre-existing unrelated timeout in `auth-persistence.test.ts` (Argon2 hashing) is not caused by these changes.
+- `pnpm lint` — Passed (0 errors; 14 pre-existing unused-import warnings in unrelated API route files).
+- `pnpm build` — Passed (Next.js production build + TypeScript compilation; new route `/api/reports/branch-performance` compiled successfully).
+- `git diff --check` — Passed (LF→CRLF notices only).
+- No Prisma schema or migration was changed.
+- No authentication or authorization architecture was modified.
+- No production database connection or mutation was performed.
+- No new roles were introduced; reuses existing `report.read` permission.
 
 ## Invoice Update Vertical Slice — 2026-08-29
 
