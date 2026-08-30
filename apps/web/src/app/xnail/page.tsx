@@ -244,6 +244,9 @@ export default function Home() {
   const [editingCustomerPhone, setEditingCustomerPhone] = useState("");
   const [serviceName, setServiceName] = useState("");
   const [servicePrice, setServicePrice] = useState("1500");
+  const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
+  const [editingServiceName, setEditingServiceName] = useState("");
+  const [editingServicePrice, setEditingServicePrice] = useState("1500");
   const [appointmentCustomer, setAppointmentCustomer] = useState("");
   const [appointmentService, setAppointmentService] = useState("");
   const [appointmentStaff, setAppointmentStaff] = useState("");
@@ -2015,6 +2018,37 @@ export default function Home() {
     setServicePrice("1500");
   };
 
+  const updateService = async (serviceId: string) => {
+    if (!editingServiceName.trim()) return;
+    setServiceError(null);
+    const result = await fetch(`/api/services/${serviceId}`, {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: editingServiceName,
+        durationMinutes: 45,
+        priceCents: Number(editingServicePrice) || 1500,
+      }),
+    });
+    if (result.status === 401) {
+      setServices([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setServiceError("You are not authorized to update services.");
+      return;
+    }
+    if (!result.ok) {
+      setServiceError("Service could not be updated.");
+      return;
+    }
+    const body = await result.json() as { service: ServiceRecord };
+    setServices((current) => current.map((item) => (item.id === serviceId ? body.service : item)));
+    setEditingServiceId(null);
+  };
+
   const addPackage = async () => {
     if (!packageName.trim()) return;
     setPackageError(null);
@@ -3008,12 +3042,57 @@ export default function Home() {
                 {!isLoadingServices && serviceError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{serviceError}</div> : null}
                 {!isLoadingServices && !serviceError && services.length === 0 ? <div className="text-sm text-[#736067]">No services yet.</div> : null}
                 {services.map((service) => (
-                  <div key={service.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
-                    <div>
-                      <div className="font-medium">{service.name}</div>
-                      <div className="text-sm text-[#736067]">{service.durationMinutes} min</div>
-                    </div>
-                    <div className="font-semibold text-[#6a2f4a]">₹{service.priceCents / 100}</div>
+                  <div key={service.id} className="rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    {editingServiceId === service.id ? (
+                      <div className="space-y-2">
+                        <input
+                          value={editingServiceName}
+                          onChange={(event) => setEditingServiceName(event.target.value)}
+                          placeholder="Service name"
+                          className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                        />
+                        <input
+                          value={editingServicePrice}
+                          onChange={(event) => setEditingServicePrice(event.target.value)}
+                          placeholder="Price"
+                          className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => updateService(service.id)}
+                            className="rounded-xl bg-[#5a1838] px-3 py-2 text-sm font-semibold text-white"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => setEditingServiceId(null)}
+                            className="rounded-xl bg-[#f0dfe6] px-3 py-2 text-sm font-semibold text-[#5a1838]"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-medium">{service.name}</div>
+                          <div className="text-sm text-[#736067]">{service.durationMinutes} min</div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="font-semibold text-[#6a2f4a]">₹{service.priceCents / 100}</div>
+                          <button
+                            onClick={() => {
+                              setEditingServiceId(service.id);
+                              setEditingServiceName(service.name);
+                              setEditingServicePrice(String(service.priceCents));
+                            }}
+                            className="rounded-xl bg-[#f0dfe6] px-3 py-1.5 text-sm font-semibold text-[#5a1838]"
+                          >
+                            Edit
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
