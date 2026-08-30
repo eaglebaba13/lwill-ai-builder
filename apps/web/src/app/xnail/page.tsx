@@ -231,6 +231,8 @@ export default function Home() {
   const [isLoadingStaff, setIsLoadingStaff] = useState(false);
   const [staffError, setStaffError] = useState<string | null>(null);
   const [staffName, setStaffName] = useState("");
+  const [editingStaffId, setEditingStaffId] = useState<string | null>(null);
+  const [editingStaffName, setEditingStaffName] = useState("");
   const [attendance, setAttendance] = useState<Array<{ id: string; staffId: string; checkInAt: string; checkOutAt: string | null; status: string | null }>>([]);
   const [isLoadingAttendance, setIsLoadingAttendance] = useState(false);
   const [attendanceError, setAttendanceError] = useState<string | null>(null);
@@ -2682,6 +2684,53 @@ export default function Home() {
     setStaffName("");
   };
 
+  const updateStaff = async (id: string, displayName: string) => {
+    setStaffError(null);
+    const result = await fetch(`/api/staff/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ displayName }),
+    });
+    if (result.status === 401) {
+      setStaff([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setStaffError("You are not authorized to manage staff.");
+      return;
+    }
+    if (!result.ok) {
+      setStaffError("Staff member could not be updated.");
+      return;
+    }
+    const body = await result.json() as { staff: StaffRecord };
+    setStaff((current) => current.map((item) => (item.id === body.staff.id ? body.staff : item)));
+  };
+
+  const deleteStaff = async (id: string) => {
+    setStaffError(null);
+    const result = await fetch(`/api/staff/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      credentials: "same-origin",
+    });
+    if (result.status === 401) {
+      setStaff([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setStaffError("You are not authorized to manage staff.");
+      return;
+    }
+    if (!result.ok) {
+      setStaffError("Staff member could not be deleted.");
+      return;
+    }
+    setStaff((current) => current.filter((item) => item.id !== id));
+  };
+
   const addAttendance = async () => {
     if (!attendanceStaffId.trim() || !attendanceCheckIn.trim()) return;
     setAttendanceError(null);
@@ -3378,12 +3427,59 @@ export default function Home() {
                 {!isLoadingStaff && staffError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{staffError}</div> : null}
                 {!isLoadingStaff && !staffError && staff.length === 0 ? <div className="text-sm text-[#736067]">No staff yet.</div> : null}
                 {staff.map((member) => (
-                  <div key={member.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
-                    <div>
-                      <div className="font-medium">{member.displayName}</div>
-                      <div className="text-sm text-[#736067]">{member.branchId ?? "No branch"}</div>
-                    </div>
-                    <span className="rounded-full bg-[#edf8f3] px-2.5 py-1 text-xs text-[#2f6d47]">On duty</span>
+                  <div key={member.id} className="flex flex-col gap-2 rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    {editingStaffId !== member.id ? (
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-medium">{member.displayName}</div>
+                          <div className="text-sm text-[#736067]">{member.branchId ?? "No branch"}</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setEditingStaffId(member.id);
+                              setEditingStaffName(member.displayName);
+                            }}
+                            className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => deleteStaff(member.id)}
+                            className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <input
+                          value={editingStaffName}
+                          onChange={(event) => setEditingStaffName(event.target.value)}
+                          placeholder="Staff name"
+                          className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                        />
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={async () => {
+                              if (!member.id) return;
+                              await updateStaff(member.id, editingStaffName);
+                              setEditingStaffId(null);
+                            }}
+                            className="rounded-xl bg-[#5a1838] px-3 py-1.5 text-xs font-semibold text-white"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => setEditingStaffId(null)}
+                            className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
