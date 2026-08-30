@@ -241,6 +241,9 @@ export default function Home() {
   const [attendanceCheckOut, setAttendanceCheckOut] = useState("");
   const [attendanceStatus, setAttendanceStatus] = useState("");
   const [attendanceNotes, setAttendanceNotes] = useState("");
+  const [editingAttendanceId, setEditingAttendanceId] = useState<string | null>(null);
+  const [editingAttendanceStatus, setEditingAttendanceStatus] = useState("");
+  const [editingAttendanceNotes, setEditingAttendanceNotes] = useState("");
   const [appointments, setAppointments] = useState<AppointmentRecord[]>([]);
   const [isLoadingAppointments, setIsLoadingAppointments] = useState(false);
   const [customerName, setCustomerName] = useState("");
@@ -2799,6 +2802,60 @@ export default function Home() {
     );
   };
 
+  const updateAttendance = async (attendanceId: string, status: string, notes: string) => {
+    setAttendanceError(null);
+    const result = await fetch(`/api/attendance/${attendanceId}`, {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        status: status || null,
+        notes: notes || null,
+      }),
+    });
+    if (result.status === 401) {
+      setAttendance([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setAttendanceError("You are not authorized to update attendance.");
+      return;
+    }
+    if (!result.ok) {
+      setAttendanceError("Attendance could not be updated.");
+      return;
+    }
+    const body = (await result.json()) as {
+      attendance: { id: string; staffId: string; checkInAt: string; checkOutAt: string | null; status: string | null };
+    };
+    setAttendance((current) =>
+      current.map((record) => (record.id === attendanceId ? { ...record, status: body.attendance.status } : record)),
+    );
+  };
+
+  const deleteAttendance = async (attendanceId: string) => {
+    setAttendanceError(null);
+    const result = await fetch(`/api/attendance/${attendanceId}`, {
+      method: "DELETE",
+      credentials: "same-origin",
+    });
+    if (result.status === 401) {
+      setAttendance([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setAttendanceError("You are not authorized to delete attendance.");
+      return;
+    }
+    if (!result.ok) {
+      setAttendanceError("Attendance could not be deleted.");
+      return;
+    }
+    setAttendance((current) => current.filter((record) => record.id !== attendanceId));
+  };
+
   const addAppointment = async () => {
     if (!appointmentCustomer || !appointmentService) return;
     setAppointmentError(null);
@@ -3514,25 +3571,78 @@ export default function Home() {
                 {!isLoadingAttendance && attendanceError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{attendanceError}</div> : null}
                 {!isLoadingAttendance && !attendanceError && attendance.length === 0 ? <div className="text-sm text-[#736067]">No attendance records yet.</div> : null}
                 {attendance.map((record) => (
-                  <div key={record.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
-                    <div>
-                       <div className="font-medium">{staffMap.get(record.staffId) ?? `Staff ${record.staffId}`}</div>
-                      <div className="text-sm text-[#736067]">{record.checkInAt}</div>
-                    </div>
-                    <div className="flex items-center gap-3 text-right text-sm text-[#736067]">
-                      <div>
-                        <div>{record.status ?? "—"}</div>
-                        <div>{record.checkOutAt ?? "—"}</div>
+                  <div key={record.id} className="flex flex-col gap-2 rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    {editingAttendanceId !== record.id ? (
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-medium">{staffMap.get(record.staffId) ?? `Staff ${record.staffId}`}</div>
+                          <div className="text-sm text-[#736067]">{record.checkInAt}</div>
+                        </div>
+                        <div className="flex items-center gap-3 text-right text-sm text-[#736067]">
+                          <div>
+                            <div>{record.status ?? "—"}</div>
+                            <div>{record.checkOutAt ?? "—"}</div>
+                          </div>
+                          {record.checkOutAt === null ? (
+                            <button
+                              onClick={() => checkOutAttendance(record.id)}
+                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                            >
+                              Check out
+                            </button>
+                          ) : null}
+                          <button
+                            onClick={() => {
+                              setEditingAttendanceId(record.id);
+                              setEditingAttendanceStatus(record.status ?? "");
+                              setEditingAttendanceNotes("");
+                            }}
+                            className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => deleteAttendance(record.id)}
+                            className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </div>
-                      {record.checkOutAt === null ? (
-                        <button
-                          onClick={() => checkOutAttendance(record.id)}
-                          className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
-                        >
-                          Check out
-                        </button>
-                      ) : null}
-                    </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <input
+                          value={editingAttendanceStatus}
+                          onChange={(event) => setEditingAttendanceStatus(event.target.value)}
+                          placeholder="Status"
+                          className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                        />
+                        <input
+                          value={editingAttendanceNotes}
+                          onChange={(event) => setEditingAttendanceNotes(event.target.value)}
+                          placeholder="Notes"
+                          className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                        />
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={async () => {
+                              if (!record.id) return;
+                              await updateAttendance(record.id, editingAttendanceStatus, editingAttendanceNotes);
+                              setEditingAttendanceId(null);
+                            }}
+                            className="rounded-xl bg-[#5a1838] px-3 py-1.5 text-xs font-semibold text-white"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => setEditingAttendanceId(null)}
+                            className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
