@@ -111,6 +111,8 @@ export default function Home() {
   const [isLoadingPackages, setIsLoadingPackages] = useState(false);
   const [packageError, setPackageError] = useState<string | null>(null);
   const [packageName, setPackageName] = useState("");
+  const [editingPackageId, setEditingPackageId] = useState<string | null>(null);
+  const [editingPackageName, setEditingPackageName] = useState("");
   const [memberships, setMemberships] = useState<MembershipRecord[]>([]);
   const [isLoadingMemberships, setIsLoadingMemberships] = useState(false);
   const [membershipError, setMembershipError] = useState<string | null>(null);
@@ -2080,6 +2082,36 @@ export default function Home() {
     setPackageName("");
   };
 
+  const updatePackage = async (packageId: string) => {
+    if (!editingPackageName.trim()) return;
+    setPackageError(null);
+    const result = await fetch(`/api/packages/${packageId}`, {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: editingPackageName,
+        serviceIds: [],
+      }),
+    });
+    if (result.status === 401) {
+      setPackages([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setPackageError("You are not authorized to update packages.");
+      return;
+    }
+    if (!result.ok) {
+      setPackageError("Package could not be updated.");
+      return;
+    }
+    const body = await result.json() as { package: PackageRecord };
+    setPackages((current) => current.map((item) => (item.id === packageId ? body.package : item)));
+    setEditingPackageId(null);
+  };
+
   const addMembership = async () => {
     if (!membershipCustomerId.trim() || !membershipPackageId.trim()) return;
     setMembershipError(null);
@@ -3133,12 +3165,50 @@ export default function Home() {
                 {!isLoadingPackages && packageError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{packageError}</div> : null}
                 {!isLoadingPackages && !packageError && packages.length === 0 ? <div className="text-sm text-[#736067]">No packages yet.</div> : null}
                 {packages.map((pkg) => (
-                  <div key={pkg.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
-                    <div>
-                      <div className="font-medium">{pkg.name}</div>
-                      <div className="text-sm text-[#736067]">{pkg.serviceIds.length} service(s)</div>
-                    </div>
-                    <div className="font-semibold text-[#6a2f4a]">{pkg.priceCents === null ? "—" : `₹${pkg.priceCents / 100}`}</div>
+                  <div key={pkg.id} className="rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    {editingPackageId === pkg.id ? (
+                      <div className="space-y-2">
+                        <input
+                          value={editingPackageName}
+                          onChange={(event) => setEditingPackageName(event.target.value)}
+                          placeholder="Package name"
+                          className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => updatePackage(pkg.id)}
+                            className="rounded-xl bg-[#5a1838] px-3 py-2 text-sm font-semibold text-white"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => setEditingPackageId(null)}
+                            className="rounded-xl bg-[#f0dfe6] px-3 py-2 text-sm font-semibold text-[#5a1838]"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-medium">{pkg.name}</div>
+                          <div className="text-sm text-[#736067]">{pkg.serviceIds.length} service(s)</div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="font-semibold text-[#6a2f4a]">{pkg.priceCents === null ? "—" : `₹${pkg.priceCents / 100}`}</div>
+                          <button
+                            onClick={() => {
+                              setEditingPackageId(pkg.id);
+                              setEditingPackageName(pkg.name);
+                            }}
+                            className="rounded-xl bg-[#f0dfe6] px-3 py-1.5 text-sm font-semibold text-[#5a1838]"
+                          >
+                            Edit
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
