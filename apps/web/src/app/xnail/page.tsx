@@ -188,7 +188,9 @@ export default function Home() {
   const [effectiveRole, setEffectiveRole] = useState<RoleDashboardConfig | null>(null);
   const [userProfile, setUserProfile] = useState<{ userId: string; email: string | null; displayName: string | null } | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [permissionCodes, setPermissionCodes] = useState<string[]>([]);
   const [visibleTabs, setVisibleTabs] = useState<(typeof ALL_TABS)[number][]>([...ALL_TABS]);
+  const [profileVersion, setProfileVersion] = useState(0);
   const [customers, setCustomers] = useState<CustomerRecord[]>([]);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
   const [customerError, setCustomerError] = useState<string | null>(null);
@@ -402,6 +404,18 @@ export default function Home() {
   const [editingSettingKey, setEditingSettingKey] = useState("");
   const [editingSettingValue, setEditingSettingValue] = useState("");
   const [editingSettingIsActive, setEditingSettingIsActive] = useState(true);
+  const [roleAssignmentUsers, setRoleAssignmentUsers] = useState<Array<{ id: string; membershipId: string; email: string | null; displayName: string | null; isActive: boolean }>>([]);
+  const [isLoadingRoleAssignmentUsers, setIsLoadingRoleAssignmentUsers] = useState(false);
+  const [roleAssignmentRoles, setRoleAssignmentRoles] = useState<Array<{ id: string; code: string; name: string }>>([]);
+  const [isLoadingRoleAssignmentRoles, setIsLoadingRoleAssignmentRoles] = useState(false);
+  const [roleAssignmentUserId, setRoleAssignmentUserId] = useState("");
+  const [roleAssignmentRoleId, setRoleAssignmentRoleId] = useState("");
+  const [roleAssignmentScopeKind, setRoleAssignmentScopeKind] = useState<"tenant" | "business-unit" | "branch">("tenant");
+  const [roleAssignmentBusinessUnitId, setRoleAssignmentBusinessUnitId] = useState("");
+  const [roleAssignmentBranchId, setRoleAssignmentBranchId] = useState("");
+  const [isAssigningRole, setIsAssigningRole] = useState(false);
+  const [roleAssignmentError, setRoleAssignmentError] = useState<string | null>(null);
+  const [roleAssignmentSuccess, setRoleAssignmentSuccess] = useState<string | null>(null);
   const [notificationTemplates, setNotificationTemplates] = useState<Array<{ id: string; name: string; channel: string; subject: string | null; body: string; isActive: boolean }>>([]);
   const [isLoadingNotificationTemplates, setIsLoadingNotificationTemplates] = useState(false);
   const [notificationTemplateError, setNotificationTemplateError] = useState<string | null>(null);
@@ -553,6 +567,7 @@ export default function Home() {
         setUserRoles(roles);
         setEffectiveRole(config ?? null);
         setUserProfile(profile);
+        setPermissionCodes(permissions);
         setVisibleTabs(derivedTabs as (typeof ALL_TABS)[number][]);
         setActiveTab((current) => (derivedTabs.includes(current) ? current : "Overview"));
       })
@@ -561,6 +576,7 @@ export default function Home() {
           setUserRoles([]);
           setEffectiveRole(null);
           setUserProfile(null);
+          setPermissionCodes([]);
           setVisibleTabs([...ALL_TABS]);
           setProfileError("Profile could not be loaded.");
         }
@@ -575,7 +591,7 @@ export default function Home() {
       mounted = false;
       window.clearTimeout(loadingTimer);
     };
-  }, [authenticated]);
+  }, [authenticated, profileVersion]);
 
   useEffect(() => {
     if (authenticated !== true) {
@@ -635,7 +651,7 @@ export default function Home() {
   }, [authenticated]);
 
   useEffect(() => {
-    if (authenticated !== true || activeTab !== "Services") {
+    if (authenticated !== true || activeTab !== "Settings" || !permissionCodes.includes("tenant.manage")) {
       return;
     }
 
@@ -1688,6 +1704,84 @@ export default function Home() {
   }, [authenticated, activeTab]);
 
   useEffect(() => {
+    if (authenticated !== true || activeTab !== "Settings") {
+      return;
+    }
+
+    let mounted = true;
+    let completed = false;
+    const loadingTimer = window.setTimeout(() => {
+      if (mounted && !completed) {
+        setIsLoadingRoleAssignmentUsers(true);
+        setIsLoadingRoleAssignmentRoles(true);
+      }
+    }, 0);
+
+    void Promise.all([
+      fetch("/api/users", { credentials: "same-origin", cache: "no-store" }),
+      fetch("/api/roles", { credentials: "same-origin", cache: "no-store" }),
+    ])
+      .then(async ([usersResult, rolesResult]) => {
+        if (!mounted) return;
+        completed = true;
+
+        if (usersResult.status === 401 || rolesResult.status === 401) {
+          setRoleAssignmentUsers([]);
+          setRoleAssignmentRoles([]);
+          setAuthenticated(false);
+          return;
+        }
+        if (usersResult.status === 403 || rolesResult.status === 403) {
+          setRoleAssignmentUsers([]);
+          setRoleAssignmentRoles([]);
+          setRoleAssignmentError("You are not authorized to assign roles.");
+          return;
+        }
+
+        const usersBody = await usersResult.json().catch(() => ({}));
+        const rolesBody = await rolesResult.json().catch(() => ({}));
+
+        const loadedUsers = Array.isArray(usersBody.users) ? usersBody.users : [];
+        const loadedRoles = Array.isArray(rolesBody.roles) ? rolesBody.roles : [];
+
+        setRoleAssignmentUsers(
+          loadedUsers.map((user: { id: string; membershipId: string; email: string | null; displayName: string | null; isActive: boolean }) => ({
+            id: user.id,
+            membershipId: user.membershipId,
+            email: user.email,
+            displayName: user.displayName,
+            isActive: user.isActive,
+          })),
+        );
+        setRoleAssignmentRoles(
+          loadedRoles.map((role: { id: string; code: string; name: string }) => ({
+            id: role.id,
+            code: role.code,
+            name: role.name,
+          })),
+        );
+      })
+      .catch(() => {
+        if (mounted) {
+          setRoleAssignmentUsers([]);
+          setRoleAssignmentRoles([]);
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          window.clearTimeout(loadingTimer);
+          setIsLoadingRoleAssignmentUsers(false);
+          setIsLoadingRoleAssignmentRoles(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+      window.clearTimeout(loadingTimer);
+    };
+  }, [authenticated, activeTab]);
+
+  useEffect(() => {
     if (authenticated !== true || activeTab !== "Notifications") {
       return;
     }
@@ -2078,6 +2172,62 @@ export default function Home() {
     const body = await result.json() as { setting: { id: string; key: string; value: string; isActive: boolean } };
     setSettings((current) => current.map((item) => (item.id === settingId ? body.setting : item)));
     setEditingSettingId(null);
+  };
+
+  const assignRole = async () => {
+    if (!roleAssignmentUserId || !roleAssignmentRoleId) {
+      setRoleAssignmentError("Select a user and a role.");
+      return;
+    }
+    setRoleAssignmentError(null);
+    setRoleAssignmentSuccess(null);
+    setIsAssigningRole(true);
+
+    const scope =
+      roleAssignmentScopeKind === "tenant"
+        ? { kind: "tenant" as const }
+        : roleAssignmentScopeKind === "business-unit"
+          ? { kind: "business-unit" as const, businessUnitId: roleAssignmentBusinessUnitId }
+          : { kind: "branch" as const, businessUnitId: roleAssignmentBusinessUnitId, branchId: roleAssignmentBranchId };
+
+    const result = await fetch("/api/membership-roles", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        membershipId: roleAssignmentUsers.find((u) => u.id === roleAssignmentUserId)?.membershipId,
+        roleId: roleAssignmentRoleId,
+        scope,
+      }),
+    });
+
+    if (result.status === 401) {
+      setRoleAssignmentUsers([]);
+      setRoleAssignmentRoles([]);
+      setAuthenticated(false);
+      setIsAssigningRole(false);
+      return;
+    }
+    if (result.status === 403) {
+      setRoleAssignmentError("You are not authorized to assign roles.");
+      setIsAssigningRole(false);
+      return;
+    }
+    if (!result.ok) {
+      const body = await result.json().catch(() => ({}));
+      setRoleAssignmentError(body?.error ?? "Role could not be assigned.");
+      setIsAssigningRole(false);
+      return;
+    }
+
+    setRoleAssignmentSuccess("Role assigned successfully.");
+    setRoleAssignmentUserId("");
+    setRoleAssignmentRoleId("");
+    setRoleAssignmentScopeKind("tenant");
+    setRoleAssignmentBusinessUnitId("");
+    setRoleAssignmentBranchId("");
+    setIsAssigningRole(false);
+    setProfileVersion((version) => version + 1);
   };
 
   const addNotificationTemplate = async () => {
@@ -6061,6 +6211,107 @@ export default function Home() {
                 </button>
               </div>
             </div>
+
+            {permissionCodes.includes("tenant.manage") ? (
+              <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+                <h2 className="text-xl font-semibold">Assign role</h2>
+                <div className="mt-4 space-y-3">
+                  {isLoadingRoleAssignmentUsers || isLoadingRoleAssignmentRoles ? (
+                    <div className="text-sm text-[#736067]">Loading users and roles...</div>
+                  ) : null}
+                  {roleAssignmentError ? (
+                    <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{roleAssignmentError}</div>
+                  ) : null}
+                  {roleAssignmentSuccess ? (
+                    <div className="rounded-xl bg-[#f0fdf4] p-3 text-sm text-[#2e7d32]">{roleAssignmentSuccess}</div>
+                  ) : null}
+                  <label className="block text-sm font-medium text-[#5a3b48]" htmlFor="role-user">User</label>
+                  <select
+                    id="role-user"
+                    value={roleAssignmentUserId}
+                    onChange={(event) => setRoleAssignmentUserId(event.target.value)}
+                    className="w-full rounded-xl border border-[#ead7df] bg-[#fffafc] px-3 py-2.5 text-sm"
+                  >
+                    <option value="">Select user</option>
+                    {roleAssignmentUsers.map((user) => (
+                      <option key={user.membershipId} value={user.id}>
+                        {user.displayName ?? user.email ?? `User ${user.id}`} {!user.isActive ? "(inactive)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <label className="block text-sm font-medium text-[#5a3b48]" htmlFor="role-role">Role</label>
+                  <select
+                    id="role-role"
+                    value={roleAssignmentRoleId}
+                    onChange={(event) => setRoleAssignmentRoleId(event.target.value)}
+                    className="w-full rounded-xl border border-[#ead7df] bg-[#fffafc] px-3 py-2.5 text-sm"
+                  >
+                    <option value="">Select role</option>
+                    {roleAssignmentRoles.map((role) => (
+                      <option key={role.id} value={role.id}>
+                        {role.name} ({role.code})
+                      </option>
+                    ))}
+                  </select>
+                  <label className="block text-sm font-medium text-[#5a3b48]" htmlFor="role-scope">Scope</label>
+                  <select
+                    id="role-scope"
+                    value={roleAssignmentScopeKind}
+                    onChange={(event) => setRoleAssignmentScopeKind(event.target.value as "tenant" | "business-unit" | "branch")}
+                    className="w-full rounded-xl border border-[#ead7df] bg-[#fffafc] px-3 py-2.5 text-sm"
+                  >
+                    <option value="tenant">Tenant scope</option>
+                    <option value="business-unit">Business unit scope</option>
+                    <option value="branch">Branch scope</option>
+                  </select>
+                  {(roleAssignmentScopeKind === "business-unit" || roleAssignmentScopeKind === "branch") && (
+                    <>
+                      <label className="block text-sm font-medium text-[#5a3b48]" htmlFor="role-business-unit">Business unit</label>
+                      <select
+                        id="role-business-unit"
+                        value={roleAssignmentBusinessUnitId}
+                        onChange={(event) => setRoleAssignmentBusinessUnitId(event.target.value)}
+                        className="w-full rounded-xl border border-[#ead7df] bg-[#fffafc] px-3 py-2.5 text-sm"
+                      >
+                        <option value="">Select business unit</option>
+                        {businessUnits.map((bu) => (
+                          <option key={bu.id} value={bu.id}>
+                            {bu.name}
+                          </option>
+                        ))}
+                      </select>
+                    </>
+                  )}
+                  {roleAssignmentScopeKind === "branch" && (
+                    <>
+                      <label className="block text-sm font-medium text-[#5a3b48]" htmlFor="role-branch">Branch</label>
+                      <select
+                        id="role-branch"
+                        value={roleAssignmentBranchId}
+                        onChange={(event) => setRoleAssignmentBranchId(event.target.value)}
+                        className="w-full rounded-xl border border-[#ead7df] bg-[#fffafc] px-3 py-2.5 text-sm"
+                      >
+                        <option value="">Select branch</option>
+                        {branches
+                          .filter((branch) => roleAssignmentBusinessUnitId ? branch.businessUnitId === roleAssignmentBusinessUnitId : true)
+                          .map((branch) => (
+                            <option key={branch.id} value={branch.id}>
+                              {branch.name}
+                            </option>
+                          ))}
+                      </select>
+                    </>
+                  )}
+                  <button
+                    onClick={assignRole}
+                    disabled={isAssigningRole}
+                    className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                  >
+                    {isAssigningRole ? "Assigning..." : "Assign role"}
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </section>
         ) : null}
 

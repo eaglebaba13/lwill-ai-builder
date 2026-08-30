@@ -5,6 +5,7 @@ export interface UserRecord {
   readonly isActive: boolean;
   readonly createdAt: Date;
   readonly updatedAt: Date;
+  readonly membershipId: string;
 }
 
 export interface UserUpdateInput {
@@ -28,11 +29,11 @@ interface UserPrismaClient {
     findMany(args: {
       where: { tenantId: string };
       include: { user: { select: { id: true; email: true; displayName: true; isActive: true; createdAt: true; updatedAt: true } } };
-    }): Promise<Array<{ user: UserRecord }>>;
+    }): Promise<Array<{ id: string; user: UserRecord }>>;
     findUnique(args: {
       where: { tenantId_userId: { tenantId: string; userId: string } };
       include?: { user: { select: { id: true; email: true; displayName: true; isActive: true; createdAt: true; updatedAt: true } } };
-    }): Promise<{ user: UserRecord } | null>;
+    }): Promise<{ id: string; user: UserRecord } | null>;
   };
   readonly user: {
     findUnique(args: { where: { id: string }; select: { id: true; email: true; displayName: true; isActive: true; createdAt: true; updatedAt: true } }): Promise<UserRecord | null>;
@@ -50,14 +51,17 @@ export function createUserService(prisma: UserPrismaClient): UserService {
         where: { tenantId },
         include: { user: { select: { id: true, email: true, displayName: true, isActive: true, createdAt: true, updatedAt: true } } },
       });
-      return memberships.map((membership) => membership.user);
+      return memberships.map((membership) => ({ ...membership.user, membershipId: membership.id }));
     },
     async getUser({ tenantId, userId }) {
       const membership = await prisma.tenantMembership.findUnique({
         where: { tenantId_userId: { tenantId, userId } },
         include: { user: { select: { id: true, email: true, displayName: true, isActive: true, createdAt: true, updatedAt: true } } },
       });
-      return membership?.user ?? null;
+      if (membership === null) {
+        return null;
+      }
+      return { ...membership.user, membershipId: membership.id };
     },
     async updateUser({ tenantId, userId, input, actorUserId }) {
       const membership = await prisma.tenantMembership.findUnique({

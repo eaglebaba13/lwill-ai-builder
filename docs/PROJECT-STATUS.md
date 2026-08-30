@@ -4,9 +4,9 @@
 
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
- - **Current Branch**: `phase-1d-native-auth`
- - **Current HEAD Commit**: `14703b2` (`feat(xnail): add tenant-scoped branch performance report`)
- - **Git State**: `phase-1d-native-auth` at `14703b2`; working tree clean (pre-existing untracked SRS extracts and scripts/ remain).
+  - **Current Branch**: `phase-1d-native-auth`
+  - **Current HEAD Commit**: `8e4894e` (`feat(xnail): harden native-auth navigation, role assignment gating, and profile refresh`)
+  - **Git State**: `phase-1d-native-auth` at `8e4894e`; working tree clean (pre-existing untracked SRS extracts and scripts/ remain).
 
 ## State Breakdown
 
@@ -100,6 +100,29 @@
 - **Production status**: Not deployed and not production-browser verified. No production DB, TenantDomain data, Prisma schema/migrations, RBAC, cookie security policy, or deployment configuration was changed.
 - **Current blocker**: Controlled production deployment and browser verification require review and explicit release approval; local tests, build, lint, and diff checks are complete.
 - **Next smallest production-safe task**: Review the completed local diff and verification results; only with explicit approval, deploy through the existing controlled process and run the browser matrix for login, hard refresh, logout, Back, direct revisit, BFCache, and second-tab behavior without production DB mutation.
+
+## X Nail Role-Based Navigation + Role Assignment Gating — 2026-08-30
+
+### Status: **Complete — role-based dashboards, Settings tab gating, and profile refresh verified locally**
+
+### Implemented Slice
+
+- Role-based dashboard titles and tab visibility for 5 roles: `tenant-admin`, `branch-manager`, `staff`, `accounts`, `franchise`.
+- Settings tab role assignment UI gated by `tenant.manage` permission code.
+- Profile refresh trigger (`profileVersion`) after successful role assignment via `/api/membership-roles`.
+- Focused Vitest coverage for role-based navigation, role assignment gating, profile refresh, and branch-scoped 403 handling.
+
+### Verification Results
+
+- `pnpm --filter web test -- src/test/x-nail-native-auth.test.tsx` — 36 tests passed.
+- `pnpm lint` — Passed.
+- `pnpm build` — Passed with Next.js production build success.
+
+### Notes
+
+- Role assignment UI is hidden when the authenticated user lacks `tenant.manage`.
+- Branch-scoped roles receive 403 when attempting tenant-level API access.
+- No production DB, Prisma schema/migrations, or deployment configuration was changed.
 
 ## Verification Evidence
 

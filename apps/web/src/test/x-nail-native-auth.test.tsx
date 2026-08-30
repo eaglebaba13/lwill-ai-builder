@@ -578,13 +578,12 @@ describe("X Nail native authentication integration", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
-      .mockResolvedValueOnce(Response.json({ roles: [], permissionCodes: [] }))
-      .mockResolvedValueOnce(Response.json({
-        customers: [{ id: "cust-1", name: "Test Customer", tenantId: "tenant-xnail", phone: "555-0100", email: null, notes: null, isActive: true }],
-      }))
-      .mockResolvedValueOnce(Response.json({
-        services: [{ id: "svc-1", name: "Test Service", tenantId: "tenant-xnail", durationMinutes: 30, priceCents: 1500, description: null, isActive: true }],
-      }))
+      .mockResolvedValueOnce(Response.json({ roles: [{ id: "role-1", code: "tenant-admin", name: "Admin", scope: { kind: "tenant" }, permissions: [] }], permissionCodes: ["tenant.manage"] }))
+      .mockResolvedValueOnce(Response.json({ customers: [{ id: "cust-1", name: "Test Customer", tenantId: "tenant-xnail", phone: "555-0100", email: null, notes: null, isActive: true }] }))
+      .mockResolvedValueOnce(Response.json({ services: [{ id: "svc-1", name: "Test Service", tenantId: "tenant-xnail", durationMinutes: 30, priceCents: 1500, description: null, isActive: true }] }))
+      .mockResolvedValueOnce(Response.json({ settings: [] }))
+      .mockResolvedValueOnce(Response.json({ users: [{ id: "user-1", membershipId: "m-1", email: "admin@test.com", displayName: "Admin", isActive: true }] }))
+      .mockResolvedValueOnce(Response.json({ roles: [{ id: "role-1", code: "tenant-admin", name: "Admin" }] }))
       .mockResolvedValueOnce(Response.json({ appointments: [] }))
       .mockResolvedValueOnce(Response.json({
         appointment: {
@@ -605,9 +604,9 @@ describe("X Nail native authentication integration", () => {
     await user.type(await screen.findByLabelText("Email"), "operator@example.test");
     await user.type(await screen.findByLabelText("Password"), "test-password");
     await user.click(screen.getByRole("button", { name: "Sign in" }));
-    expect(await screen.findByText("Operations dashboard")).toBeInTheDocument();
+    expect(await screen.findByText("Admin dashboard")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Services" }));
+    await user.click(screen.getByRole("button", { name: "Settings" }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/services", expect.anything()));
 
     await user.click(screen.getByRole("button", { name: "Appointments" }));
@@ -625,13 +624,17 @@ describe("X Nail native authentication integration", () => {
     expect(screen.getByText("Booked")).toBeInTheDocument();
   });
 
-  it("Services tab fetch remains unaffected by the appointments tab fetch", async () => {
+  it("Settings tab loads services and Appointments tab does not re-trigger services fetch", async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
-      .mockResolvedValueOnce(Response.json({ roles: [], permissionCodes: [] }))
+      .mockResolvedValueOnce(Response.json({ roles: [{ id: "role-1", code: "tenant-admin", name: "Admin", scope: { kind: "tenant" }, permissions: [] }], permissionCodes: ["tenant.manage"] }))
       .mockResolvedValueOnce(Response.json({ customers: [] }))
-      .mockResolvedValueOnce(Response.json({ services: [] }));
+      .mockResolvedValueOnce(Response.json({ services: [] }))
+      .mockResolvedValueOnce(Response.json({ settings: [] }))
+      .mockResolvedValueOnce(Response.json({ users: [] }))
+      .mockResolvedValueOnce(Response.json({ roles: [] }))
+      .mockResolvedValueOnce(Response.json({ appointments: [] }));
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
 
@@ -639,18 +642,17 @@ describe("X Nail native authentication integration", () => {
     await user.type(await screen.findByLabelText("Email"), "operator@example.test");
     await user.type(await screen.findByLabelText("Password"), "test-password");
     await user.click(screen.getByRole("button", { name: "Sign in" }));
-    expect(await screen.findByText("Operations dashboard")).toBeInTheDocument();
+    expect(await screen.findByText("Admin dashboard")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Services" }));
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/services", expect.anything()));
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
-      "/api/services",
-      expect.objectContaining({ credentials: "same-origin" }),
-    ));
-    expect(fetchMock).not.toHaveBeenCalledWith(
-      "/api/appointments",
-      expect.objectContaining({ credentials: "same-origin" }),
-    );
+    await user.click(screen.getByRole("button", { name: "Appointments" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/appointments", expect.anything()));
+
+    expect(fetchMock.mock.calls.filter(([url]) => url === "/api/services").length).toBe(1);
+    expect(fetchMock.mock.calls.filter(([url]) => url === "/api/users").length).toBe(1);
+    expect(fetchMock.mock.calls.filter(([url]) => url === "/api/roles").length).toBe(1);
   });
 
   it("fetches packages when the Packages tab is activated", async () => {
@@ -771,5 +773,285 @@ describe("X Nail native authentication integration", () => {
 
     expect(await screen.findByText("Mani Pedi Combo")).toBeInTheDocument();
     expect(screen.getByText("₹80")).toBeInTheDocument();
+  });
+
+  it("shows role assignment form in Settings tab when authenticated", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [{ id: "role-1", code: "tenant-admin", name: "Admin", scope: { kind: "tenant" }, permissions: [] }], permissionCodes: ["tenant.manage"] }))
+      .mockResolvedValueOnce(Response.json({ customers: [] }))
+      .mockResolvedValueOnce(Response.json({ services: [] }))
+      .mockResolvedValueOnce(Response.json({ settings: [] }))
+      .mockResolvedValueOnce(Response.json({ users: [{ id: "user-1", membershipId: "m-1", email: "admin@test.com", displayName: "Admin", isActive: true }] }))
+      .mockResolvedValueOnce(Response.json({ roles: [{ id: "role-1", code: "branch-manager", name: "Branch Manager" }] }));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<Home />);
+    await user.type(await screen.findByLabelText("Email"), "operator@example.test");
+    await user.type(await screen.findByLabelText("Password"), "test-password");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(await screen.findByText("Admin dashboard")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    expect(screen.getByRole("heading", { name: "Assign role" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "User" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "Role" })).toBeInTheDocument();
+  });
+
+  it("assigns a role through the Settings tab form", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [{ id: "role-1", code: "tenant-admin", name: "Admin", scope: { kind: "tenant" }, permissions: [] }], permissionCodes: ["tenant.manage"] }))
+      .mockResolvedValueOnce(Response.json({ customers: [] }))
+      .mockResolvedValueOnce(Response.json({ services: [] }))
+      .mockResolvedValueOnce(Response.json({ settings: [] }))
+      .mockResolvedValueOnce(Response.json({ users: [{ id: "user-1", membershipId: "m-1", email: "admin@test.com", displayName: "Admin", isActive: true }] }))
+      .mockResolvedValueOnce(Response.json({ roles: [{ id: "role-1", code: "branch-manager", name: "Branch Manager" }] }))
+      .mockResolvedValueOnce(Response.json({ assignment: { id: "assign-1", membershipId: "m-1", roleId: "role-1", scope: { kind: "tenant" } } }))
+      .mockResolvedValueOnce(Response.json({ roles: [{ id: "role-1", code: "tenant-admin", name: "Admin", scope: { kind: "tenant" }, permissions: [] }], permissionCodes: ["tenant.manage"] }));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<Home />);
+    await user.type(await screen.findByLabelText("Email"), "operator@example.test");
+    await user.type(await screen.findByLabelText("Password"), "test-password");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(await screen.findByText("Admin dashboard")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    await user.selectOptions(screen.getByRole("combobox", { name: "User" }), "user-1");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Role" }), "role-1");
+    await user.click(screen.getByRole("button", { name: "Assign role" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/api/membership-roles",
+      expect.objectContaining({
+        method: "POST",
+        credentials: "same-origin",
+        body: JSON.stringify({ membershipId: "m-1", roleId: "role-1", scope: { kind: "tenant" } }),
+      }),
+    ));
+    expect(await screen.findByText("Role assigned successfully.")).toBeInTheDocument();
+  });
+
+  it("shows error when role assignment is unauthorized", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [{ id: "role-1", code: "tenant-admin", name: "Admin", scope: { kind: "tenant" }, permissions: [] }], permissionCodes: ["tenant.manage"] }))
+      .mockResolvedValueOnce(Response.json({ customers: [] }))
+      .mockResolvedValueOnce(Response.json({ services: [] }))
+      .mockResolvedValueOnce(Response.json({ settings: [] }))
+      .mockResolvedValueOnce(new Response(null, { status: 403 }))
+      .mockResolvedValueOnce(new Response(null, { status: 403 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<Home />);
+    await user.type(await screen.findByLabelText("Email"), "operator@example.test");
+    await user.type(await screen.findByLabelText("Password"), "test-password");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(await screen.findByText("Admin dashboard")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    expect(await screen.findByText("You are not authorized to assign roles.")).toBeInTheDocument();
+  });
+
+  it("hides role assignment form without tenant.manage permission", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [], permissionCodes: [] }))
+      .mockResolvedValueOnce(Response.json({ customers: [] }))
+      .mockResolvedValueOnce(Response.json({ settings: [] }))
+      .mockResolvedValueOnce(Response.json({ users: [] }))
+      .mockResolvedValueOnce(Response.json({ roles: [] }));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<Home />);
+    await user.type(await screen.findByLabelText("Email"), "operator@example.test");
+    await user.type(await screen.findByLabelText("Password"), "test-password");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(await screen.findByText("Operations dashboard")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    expect(screen.queryByRole("heading", { name: "Assign role" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "User" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Role" })).not.toBeInTheDocument();
+  });
+
+  it("shows admin navigation when authenticated as tenant-admin", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [{ id: "role-1", code: "tenant-admin", name: "Admin", scope: { kind: "tenant" }, permissions: [] }], permissionCodes: ["tenant.manage"] }))
+      .mockResolvedValueOnce(Response.json({ customers: [] }));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<Home />);
+    await user.type(await screen.findByLabelText("Email"), "operator@example.test");
+    await user.type(await screen.findByLabelText("Password"), "test-password");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(await screen.findByText("Admin dashboard")).toBeInTheDocument();
+
+    for (const tab of ["Overview", "Customers", "Services", "Packages", "Memberships", "Inventory", "Staff", "Attendance", "Appointments", "Billing", "Branches", "Reports", "Settings", "Notifications"]) {
+      expect(screen.getByRole("button", { name: tab })).toBeInTheDocument();
+    }
+  });
+
+  it("shows branch manager navigation when authenticated as branch-manager", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [{ id: "role-1", code: "branch-manager", name: "Branch", scope: { kind: "tenant" }, permissions: [] }], permissionCodes: [] }))
+      .mockResolvedValueOnce(Response.json({ customers: [] }));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<Home />);
+    await user.type(await screen.findByLabelText("Email"), "operator@example.test");
+    await user.type(await screen.findByLabelText("Password"), "test-password");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(await screen.findByText("Branch dashboard")).toBeInTheDocument();
+
+    for (const tab of ["Overview", "Customers", "Services", "Packages", "Memberships", "Inventory", "Staff", "Attendance", "Appointments", "Billing", "Reports"]) {
+      expect(screen.getByRole("button", { name: tab })).toBeInTheDocument();
+    }
+    expect(screen.queryByRole("button", { name: "Branches" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Settings" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Notifications" })).not.toBeInTheDocument();
+  });
+
+  it("shows staff navigation when authenticated as staff", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [{ id: "role-1", code: "staff", name: "Staff", scope: { kind: "tenant" }, permissions: [] }], permissionCodes: [] }))
+      .mockResolvedValueOnce(Response.json({ customers: [] }));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<Home />);
+    await user.type(await screen.findByLabelText("Email"), "operator@example.test");
+    await user.type(await screen.findByLabelText("Password"), "test-password");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(await screen.findByText("Staff dashboard")).toBeInTheDocument();
+
+    for (const tab of ["Overview", "Appointments", "Customers", "Services", "Memberships", "Attendance"]) {
+      expect(screen.getByRole("button", { name: tab })).toBeInTheDocument();
+    }
+    expect(screen.queryByRole("button", { name: "Billing" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Inventory" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Staff" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Branches" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reports" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Settings" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Notifications" })).not.toBeInTheDocument();
+  });
+
+  it("shows accounts navigation when authenticated as accounts", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [{ id: "role-1", code: "accounts", name: "Accounts", scope: { kind: "tenant" }, permissions: [] }], permissionCodes: [] }))
+      .mockResolvedValueOnce(Response.json({ customers: [] }));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<Home />);
+    await user.type(await screen.findByLabelText("Email"), "operator@example.test");
+    await user.type(await screen.findByLabelText("Password"), "test-password");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(await screen.findByText("Accounts dashboard")).toBeInTheDocument();
+
+    for (const tab of ["Overview", "Billing", "Reports", "Settings"]) {
+      expect(screen.getByRole("button", { name: tab })).toBeInTheDocument();
+    }
+    expect(screen.queryByRole("button", { name: "Customers" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Inventory" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Staff" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Branches" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Notifications" })).not.toBeInTheDocument();
+  });
+
+  it("shows franchise navigation when authenticated as franchise", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [{ id: "role-1", code: "franchise", name: "Franchise", scope: { kind: "tenant" }, permissions: [] }], permissionCodes: [] }))
+      .mockResolvedValueOnce(Response.json({ customers: [] }));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<Home />);
+    await user.type(await screen.findByLabelText("Email"), "operator@example.test");
+    await user.type(await screen.findByLabelText("Password"), "test-password");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(await screen.findByText("Franchise dashboard")).toBeInTheDocument();
+
+    for (const tab of ["Overview", "Branches", "Reports", "Inventory", "Appointments", "Customers"]) {
+      expect(screen.getByRole("button", { name: tab })).toBeInTheDocument();
+    }
+    expect(screen.queryByRole("button", { name: "Billing" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Staff" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Settings" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Notifications" })).not.toBeInTheDocument();
+  });
+
+  it("refreshes profile after role assignment", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [{ id: "role-1", code: "tenant-admin", name: "Admin", scope: { kind: "tenant" }, permissions: [] }], permissionCodes: ["tenant.manage"] }))
+      .mockResolvedValueOnce(Response.json({ customers: [] }))
+      .mockResolvedValueOnce(Response.json({ services: [] }))
+      .mockResolvedValueOnce(Response.json({ settings: [] }))
+      .mockResolvedValueOnce(Response.json({ users: [{ id: "user-1", membershipId: "m-1", email: "admin@test.com", displayName: "Admin", isActive: true }] }))
+      .mockResolvedValueOnce(Response.json({ roles: [{ id: "role-1", code: "branch-manager", name: "Branch Manager" }] }))
+      .mockResolvedValueOnce(Response.json({ assignment: { id: "assign-1", membershipId: "m-1", roleId: "role-1", scope: { kind: "tenant" } } }))
+      .mockResolvedValueOnce(Response.json({ roles: [{ id: "role-1", code: "branch-manager", name: "Branch Manager" }], permissionCodes: ["tenant.manage"] }));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<Home />);
+    await user.type(await screen.findByLabelText("Email"), "operator@example.test");
+    await user.type(await screen.findByLabelText("Password"), "test-password");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(await screen.findByText("Admin dashboard")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    await user.selectOptions(screen.getByRole("combobox", { name: "User" }), "user-1");
+    await user.selectOptions(screen.getByRole("combobox", { name: "Role" }), "role-1");
+    await user.click(screen.getByRole("button", { name: "Assign role" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/api/auth/me",
+      expect.objectContaining({ credentials: "same-origin", cache: "no-store" }),
+    ));
+    expect(await screen.findByText("Branch dashboard")).toBeInTheDocument();
+  });
+
+  it("denies tenant API access to branch-scoped roles", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [{ id: "role-1", code: "branch-manager", name: "Branch", scope: { kind: "branch", businessUnitId: "bu-1", branchId: "branch-1" }, permissions: [] }], permissionCodes: [] }))
+      .mockResolvedValueOnce(new Response(null, { status: 403 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<Home />);
+    await user.type(await screen.findByLabelText("Email"), "operator@example.test");
+    await user.type(await screen.findByLabelText("Password"), "test-password");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(await screen.findByText("Branch dashboard")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Customers" }));
+    expect(await screen.findByText("You are not authorized to view customers.")).toBeInTheDocument();
   });
 });

@@ -20,7 +20,7 @@ function createFixture() {
       findMany: vi.fn(async ({ where }: { where: { tenantId: string } }) =>
         [...state.memberships.values()]
           .filter((m) => m.tenantId === where.tenantId)
-          .map((m) => ({ user: state.users.get(m.userId) })),
+          .map((m) => ({ id: m.id, user: state.users.get(m.userId) })),
       ),
       findUnique: vi.fn(async ({ where }: { where: { tenantId_userId: { tenantId: string; userId: string } } }) => {
         const membership = [...state.memberships.values()].find(
@@ -29,7 +29,7 @@ function createFixture() {
         if (membership === undefined) {
           return null;
         }
-        return { user: state.users.get(membership.userId) };
+        return { id: membership.id, user: state.users.get(membership.userId) };
       }),
     },
     user: {
