@@ -3385,7 +3385,10 @@ export default function Home() {
                 {isLoadingCustomers ? <div className="text-sm text-[#736067]">Loading customers...</div> : null}
                 {!isLoadingCustomers && customerError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{customerError}</div> : null}
                 {!isLoadingCustomers && !customerError && customers.length === 0 ? <div className="text-sm text-[#736067]">No customers yet.</div> : null}
-                {customers.map((customer) => (
+                {customers.map((customer) => {
+                  const customerAppointments = appointments.filter((appointment) => appointment.customerId === customer.id);
+                  const lastVisit = customerAppointments.length > 0 ? customerAppointments.sort((a, b) => b.startsAt.localeCompare(a.startsAt))[0].startsAt : null;
+                  return (
                   <div key={customer.id} className="rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
                     {editingCustomerId === customer.id ? (
                       <div className="space-y-2">
@@ -3422,6 +3425,15 @@ export default function Home() {
                           <div>
                             <div className="font-medium">{customer.name}</div>
                             <div className="text-sm text-[#736067]">{customer.phone}</div>
+                            <div className="text-xs text-[#736067]">
+                              {customerAppointments.length > 0 ? (
+                                <>
+                                  Visits: {customerAppointments.length} · Last: {new Date(lastVisit!).toLocaleDateString()}
+                                </>
+                              ) : (
+                                <span className="text-[#736067]">No visits yet</span>
+                              )}
+                            </div>
                           </div>
                           <div className="flex items-center gap-3">
                             <span className="rounded-full bg-[#f5edf1] px-2.5 py-1 text-xs">Active</span>
@@ -3440,7 +3452,8 @@ export default function Home() {
                       </>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
