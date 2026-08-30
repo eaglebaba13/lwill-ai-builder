@@ -198,6 +198,9 @@ export default function Home() {
   const [warehouseError, setWarehouseError] = useState<string | null>(null);
   const [warehouseName, setWarehouseName] = useState("");
   const [warehouseLocation, setWarehouseLocation] = useState("");
+  const [editingWarehouseId, setEditingWarehouseId] = useState<string | null>(null);
+  const [editingWarehouseName, setEditingWarehouseName] = useState("");
+  const [editingWarehouseLocation, setEditingWarehouseLocation] = useState("");
   const [suppliers, setSuppliers] = useState<Array<{ id: string; name: string; contactName: string | null; email: string | null; phone: string | null; isActive: boolean }>>([]);
   const [isLoadingSuppliers, setIsLoadingSuppliers] = useState(false);
   const [supplierError, setSupplierError] = useState<string | null>(null);
@@ -2658,6 +2661,31 @@ export default function Home() {
     setWarehouseLocation("");
   };
 
+  const updateWarehouse = async (id: string, name: string, location: string) => {
+    setWarehouseError(null);
+    const result = await fetch(`/api/warehouses/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name, location: location || null }),
+    });
+    if (result.status === 401) {
+      setWarehouses([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setWarehouseError("You are not authorized to manage warehouses.");
+      return;
+    }
+    if (!result.ok) {
+      setWarehouseError("Warehouse could not be updated.");
+      return;
+    }
+    const body = await result.json() as { warehouse: { id: string; name: string; location: string | null; isActive: boolean } };
+    setWarehouses((current) => current.map((item) => (item.id === body.warehouse.id ? body.warehouse : item)));
+  };
+
   const addSupplier = async () => {
     if (!supplierName.trim()) return;
     setSupplierError(null);
@@ -4515,14 +4543,63 @@ export default function Home() {
                   {!isLoadingWarehouses && warehouseError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{warehouseError}</div> : null}
                   {!isLoadingWarehouses && !warehouseError && warehouses.length === 0 ? <div className="text-sm text-[#736067]">No warehouses yet.</div> : null}
                   {warehouses.map((warehouse) => (
-                    <div key={warehouse.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
-                      <div>
-                        <div className="font-medium">{warehouse.name}</div>
-                        <div className="text-sm text-[#736067]">{warehouse.location ?? "No location"}</div>
-                      </div>
-                      <div className="text-right text-sm text-[#736067]">
-                        <div>{warehouse.isActive ? "Active" : "Inactive"}</div>
-                      </div>
+                    <div key={warehouse.id} className="flex flex-col gap-2 rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                      {editingWarehouseId !== warehouse.id ? (
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium">{warehouse.name}</div>
+                            <div className="text-sm text-[#736067]">{warehouse.location ?? "No location"}</div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="text-right text-sm text-[#736067]">
+                              <div>{warehouse.isActive ? "Active" : "Inactive"}</div>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setEditingWarehouseId(warehouse.id);
+                                setEditingWarehouseName(warehouse.name);
+                                setEditingWarehouseLocation(warehouse.location ?? "");
+                              }}
+                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                            >
+                              Edit
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <input
+                            value={editingWarehouseName}
+                            onChange={(event) => setEditingWarehouseName(event.target.value)}
+                            placeholder="Warehouse name"
+                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                          />
+                          <input
+                            value={editingWarehouseLocation}
+                            onChange={(event) => setEditingWarehouseLocation(event.target.value)}
+                            placeholder="Location"
+                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                          />
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={async () => {
+                                if (!warehouse.id) return;
+                                await updateWarehouse(warehouse.id, editingWarehouseName, editingWarehouseLocation);
+                                setEditingWarehouseId(null);
+                              }}
+                              className="rounded-xl bg-[#5a1838] px-3 py-1.5 text-xs font-semibold text-white"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => setEditingWarehouseId(null)}
+                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
