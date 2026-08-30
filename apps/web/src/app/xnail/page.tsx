@@ -261,6 +261,10 @@ export default function Home() {
   const [settingError, setSettingError] = useState<string | null>(null);
   const [settingKey, setSettingKey] = useState("");
   const [settingValue, setSettingValue] = useState("");
+  const [editingSettingId, setEditingSettingId] = useState<string | null>(null);
+  const [editingSettingKey, setEditingSettingKey] = useState("");
+  const [editingSettingValue, setEditingSettingValue] = useState("");
+  const [editingSettingIsActive, setEditingSettingIsActive] = useState(true);
   const [notificationTemplates, setNotificationTemplates] = useState<Array<{ id: string; name: string; channel: string; subject: string | null; body: string; isActive: boolean }>>([]);
   const [isLoadingNotificationTemplates, setIsLoadingNotificationTemplates] = useState(false);
   const [notificationTemplateError, setNotificationTemplateError] = useState<string | null>(null);
@@ -1817,6 +1821,33 @@ export default function Home() {
     setSettings((current) => [body.setting, ...current]);
     setSettingKey("");
     setSettingValue("");
+  };
+
+  const updateSetting = async (settingId: string) => {
+    if (!editingSettingKey.trim()) return;
+    setSettingError(null);
+    const result = await fetch(`/api/settings/${settingId}`, {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ key: editingSettingKey, value: editingSettingValue, isActive: editingSettingIsActive }),
+    });
+    if (result.status === 401) {
+      setSettings([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setSettingError("You are not authorized to update settings.");
+      return;
+    }
+    if (!result.ok) {
+      setSettingError("Setting could not be updated.");
+      return;
+    }
+    const body = await result.json() as { setting: { id: string; key: string; value: string; isActive: boolean } };
+    setSettings((current) => current.map((item) => (item.id === settingId ? body.setting : item)));
+    setEditingSettingId(null);
   };
 
   const addNotificationTemplate = async () => {
@@ -4346,14 +4377,70 @@ export default function Home() {
                 {!isLoadingSettings && settingError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{settingError}</div> : null}
                 {!isLoadingSettings && !settingError && settings.length === 0 ? <div className="text-sm text-[#736067]">No settings yet.</div> : null}
                 {settings.map((setting) => (
-                  <div key={setting.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
-                    <div>
-                      <div className="font-medium">{setting.key}</div>
-                      <div className="text-sm text-[#736067]">{setting.value}</div>
-                    </div>
-                    <div className="text-right text-sm text-[#736067]">
-                      <div>{setting.isActive ? "Active" : "Inactive"}</div>
-                    </div>
+                  <div key={setting.id} className="rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    {editingSettingId === setting.id ? (
+                      <div className="space-y-2">
+                        <input
+                          value={editingSettingKey}
+                          onChange={(event) => setEditingSettingKey(event.target.value)}
+                          placeholder="Setting key"
+                          className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                        />
+                        <input
+                          value={editingSettingValue}
+                          onChange={(event) => setEditingSettingValue(event.target.value)}
+                          placeholder="Setting value"
+                          className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                        />
+                        <label className="flex items-center gap-2 text-sm text-[#736067]">
+                          <input
+                            type="checkbox"
+                            checked={editingSettingIsActive}
+                            onChange={(event) => setEditingSettingIsActive(event.target.checked)}
+                          />
+                          Active
+                        </label>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => updateSetting(setting.id)}
+                            className="rounded-xl bg-[#5a1838] px-3 py-2 text-sm font-semibold text-white"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => setEditingSettingId(null)}
+                            className="rounded-xl bg-[#f0dfe6] px-3 py-2 text-sm font-semibold text-[#5a1838]"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium">{setting.key}</div>
+                            <div className="text-sm text-[#736067]">{setting.value}</div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <div className="text-right text-sm text-[#736067]">
+                              <div>{setting.isActive ? "Active" : "Inactive"}</div>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setEditingSettingId(setting.id);
+                                setEditingSettingKey(setting.key);
+                                setEditingSettingValue(setting.value);
+                                setEditingSettingIsActive(setting.isActive);
+                              }}
+                              className="rounded-xl bg-[#f0dfe6] px-3 py-1.5 text-sm font-semibold text-[#5a1838]"
+                            >
+                              Edit
+                            </button>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 ))}
               </div>
