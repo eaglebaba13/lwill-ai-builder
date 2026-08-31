@@ -61,6 +61,16 @@ export interface ReportService {
     readonly staffCount: number;
     readonly attendanceCount: number;
   }>>;
+  getInventoryStockReport(args: { readonly tenantId: string; readonly branchId?: string }): Promise<ReadonlyArray<{
+    readonly stockItemId: string;
+    readonly productId: string;
+    readonly productName: string;
+    readonly branchId: string;
+    readonly branchName: string;
+    readonly quantity: number;
+    readonly createdAt: Date;
+    readonly updatedAt: Date;
+  }>>;
 }
 
 interface ReportPrismaClient {
@@ -75,7 +85,10 @@ interface ReportPrismaClient {
   };
   readonly stockItem: {
     count(args: { where: Record<string, unknown> }): Promise<number>;
-    findMany(args: { where?: Record<string, unknown>; select?: Record<string, unknown> }): Promise<ReadonlyArray<{ readonly quantity: number }>>;
+    findMany(args: { where?: Record<string, unknown>; select?: Record<string, unknown> }): Promise<ReadonlyArray<{ readonly id: string; readonly quantity: number; readonly productId: string; readonly branchId: string; readonly createdAt: Date; readonly updatedAt: Date }>>;
+  };
+  readonly product: {
+    findMany(args: { where?: Record<string, unknown>; select?: Record<string, unknown> }): Promise<ReadonlyArray<{ readonly id: string; readonly name: string }>>;
   };
   readonly stockMovement: {
     count(args: { where: Record<string, unknown> }): Promise<number>;
@@ -316,6 +329,46 @@ export function createReportService(prisma: ReportPrismaClient): ReportService {
       );
 
       return results;
+    },
+
+    async getInventoryStockReport({ tenantId, branchId }) {
+      const where: Record<string, unknown> = { tenantId };
+      if (branchId) {
+        where.branchId = branchId;
+      }
+
+      const stockItems = await prisma.stockItem.findMany({
+        where,
+        select: { id: true, quantity: true, createdAt: true, updatedAt: true, productId: true, branchId: true },
+      });
+
+      const productIds = Array.from(new Set(stockItems.map((item) => item.productId)));
+      const branchIds = Array.from(new Set(stockItems.map((item) => item.branchId)));
+
+      const [products, branches] = await Promise.all([
+        prisma.product.findMany({
+          where: { id: { in: productIds }, tenantId },
+          select: { id: true, name: true },
+        }),
+        prisma.branch.findMany({
+          where: { id: { in: branchIds }, tenantId },
+          select: { id: true, name: true },
+        }),
+      ]);
+
+      const productMap = new Map(products.map((product) => [product.id, product.name]));
+      const branchMap = new Map(branches.map((branch) => [branch.id, branch.name]));
+
+      return stockItems.map((item) => ({
+        stockItemId: item.id,
+        productId: item.productId,
+        productName: productMap.get(item.productId) ?? "Unknown",
+        branchId: item.branchId,
+        branchName: branchMap.get(item.branchId) ?? "Unknown",
+        quantity: item.quantity,
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+      }));
     },
   };
 }
