@@ -106,7 +106,7 @@ export interface StockPrismaClient {
   };
 }
 
-const APPROVED_MOVEMENT_TYPES = new Set(["PURCHASE", "SALE", "ADJUSTMENT"]);
+const APPROVED_MOVEMENT_TYPES = new Set(["PURCHASE", "SALE", "ADJUSTMENT", "TRANSFER_IN", "TRANSFER_OUT"]);
 
 export function createStockService(prisma: StockPrismaClient): StockService {
   return {
@@ -209,9 +209,11 @@ export function createStockService(prisma: StockPrismaClient): StockService {
         let delta: number;
         switch (input.movementType) {
           case "PURCHASE":
+          case "TRANSFER_IN":
             delta = input.quantity;
             break;
           case "SALE":
+          case "TRANSFER_OUT":
             delta = -input.quantity;
             break;
           case "ADJUSTMENT":

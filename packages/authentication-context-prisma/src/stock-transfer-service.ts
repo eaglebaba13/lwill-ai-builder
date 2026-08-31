@@ -1,3 +1,5 @@
+import { createStockService, type StockPrismaClient } from "./stock-service";
+
 export interface StockTransferLineItemRecord {
   readonly id: string;
   readonly tenantId: string;
@@ -60,12 +62,22 @@ interface StockTransferPrismaClient {
   readonly product: {
     findUnique: (args: { where: { id: string } }) => Promise<{ id: string; tenantId: string } | null>;
   };
+  readonly stockItem: {
+    findFirst: (args: { where: Record<string, unknown> }) => Promise<{ id: string; quantity: number } | null>;
+    create: (args: { data: Record<string, unknown> }) => Promise<{ id: string }>;
+    update: (args: { data: Record<string, unknown>; where: { id: string } }) => Promise<{ id: string }>;
+  };
+  readonly stockMovement: {
+    create: (args: { data: Record<string, unknown> }) => Promise<unknown>;
+  };
   $transaction: {
     <T>(callback: (client: StockTransferPrismaClient) => Promise<T>): Promise<T>;
   };
 }
 
 export function createStockTransferService(prisma: StockTransferPrismaClient): StockTransferService {
+  const stockService = createStockService(prisma as never);
+
   return {
     async createStockTransfer(input) {
       return prisma.$transaction(async (tx) => {
@@ -123,6 +135,34 @@ export function createStockTransferService(prisma: StockTransferPrismaClient): S
               quantity: item.quantity,
             },
           });
+
+          await stockService.recordStockMovement(
+            {
+              tenantId: input.tenantId,
+              productId: item.productId,
+              branchId: input.fromBranchId,
+              movementType: "TRANSFER_OUT",
+              quantity: item.quantity,
+              referenceType: "STOCK_TRANSFER",
+              referenceId: transfer.id,
+              notes: `Transfer out to branch ${input.toBranchId}`,
+            },
+            tx as unknown as StockPrismaClient,
+          );
+
+          await stockService.recordStockMovement(
+            {
+              tenantId: input.tenantId,
+              productId: item.productId,
+              branchId: input.toBranchId,
+              movementType: "TRANSFER_IN",
+              quantity: item.quantity,
+              referenceType: "STOCK_TRANSFER",
+              referenceId: transfer.id,
+              notes: `Transfer in from branch ${input.fromBranchId}`,
+            },
+            tx as unknown as StockPrismaClient,
+          );
         }
 
         return transfer;
