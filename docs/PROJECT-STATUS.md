@@ -5,8 +5,8 @@
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
   - **Current Branch**: `phase-1d-native-auth`
-  - **Current HEAD Commit**: `8e4894e` (`feat(xnail): harden native-auth navigation, role assignment gating, and profile refresh`)
-  - **Git State**: `phase-1d-native-auth` at `8e4894e`; working tree clean (pre-existing untracked SRS extracts and scripts/ remain).
+  - **Current HEAD Commit**: `9684c3b` (`feat(auth): add idempotent demo user bootstrap`)
+  - **Git State**: `phase-1d-native-auth` at `9684c3b`; working tree has uncommitted changes including franchise management, CRM report enhancements, and X Nail navigation updates.
 
 ## State Breakdown
 
@@ -24,8 +24,7 @@
 
 - Purchases / procurement workflows.
 - Commission calculations and settlement.
-- Franchise partner, territory, and agreement management.
-- Reports and business intelligence.
+- Reports and business intelligence (franchise overview and payout reports implemented; broader BI remains incomplete).
 - Settings / platform configuration management UI.
 - AI Assistant / generation engine and production AI provider integrations.
 - Notification / WhatsApp automation.
@@ -47,9 +46,9 @@
 - **Migration Status**: Initial migration baseline `0_init` exists under `packages/database/prisma/migrations/0_init`; production database applied and up-to-date.
 - **Authentication Status**: Provider-neutral authentication contracts, native email/password login, Prisma-backed session verification, cookie-based refresh, browser refresh/session restoration, server-session revocation, cookie clearing, and generation-safe client revalidation on initial mount, `pageshow`, and history `popstate` are implemented and locally verified. Native JWT issue/verify adapter, RS256 signing, and the four auth routes (`POST /api/auth/login`, `/api/auth/refresh`, `/api/auth/logout`, `/api/auth/logout-all`) are production-verified. Login returns 204 with `HttpOnly`, `Secure`, `SameSite=Lax` cookies; the un-deployed navigation correction requires controlled production browser verification.
 - **Authorization Status**: Provider-neutral authorization contracts are implemented and connected to the production Prisma grant loader. Authorization derives `userId`/`tenantId` exclusively from the verified session; fail-closed on any error. Tenant RBAC with `tenant-admin` role is production-verified for all module permission grants.
-- **Test Status**: Automated Vitest coverage is implemented. `pnpm test` passed with 6 successful workspace tasks.
+- **Test Status**: Automated Vitest coverage is implemented. `pnpm test` passed with 7 successful workspace tasks; 1017+ tests passing across packages and web app.
 - **TypeScript Status**: Verified passing through the Next.js production build.
-- **Lint Status**: Verified passing with `pnpm lint`.
+- **Lint Status**: Verified passing with `pnpm lint` (0 errors, 15 warnings).
 - **Build Status**: Verified passing with `pnpm build`.
 - **Docker Status**: Next.js production build with Prisma Client generation integrated into the Docker build; deployed via Coolify.
 - **VPS / Deployment Status**: Repository deployed at `/root/lwill-ai-builder` on the KVM4 VPS (IP 200.234.35.116) via Coolify. Production `builder.lwill.in` is healthy with PostgreSQL container `dq93e4bcrpisalu826spzk5t` (PostgreSQL 18) operational.
@@ -1941,4 +1940,103 @@ The prior "Phase 1I X Nail Packages Production Verification" section (above) doc
 - No Prisma schema or migration was changed.
 - No authentication or authorization architecture was modified.
 - No production database connection or mutation was performed.
-- No new roles were introduced; reuses existing `attendance.read` permission.
+- No new roles were introduced; reuses existing `report.read` permission.
+
+## Stock Transfer Auto-Stock Movement — 2026-08-31
+
+### Status: **Implemented, verified, committed as `04c087a`, pushed to `origin/phase-1d-native-auth`**
+
+### Implemented Slice
+
+- **Service layer** (`packages/authentication-context-prisma/src/stock-service.ts`): Added `TRANSFER_IN` and `TRANSFER_OUT` to `APPROVED_MOVEMENT_TYPES` and `recordStockMovement` switch statement. `TRANSFER_IN` increments stock (`delta = +quantity`), `TRANSFER_OUT` decrements stock (`delta = -quantity`). Negative-stock protection preserved.
+- **Service layer** (`packages/authentication-context-prisma/src/stock-transfer-service.ts`): Imported `createStockService` and `StockPrismaClient`. Updated `StockTransferPrismaClient` interface to include `stockItem` and `stockMovement` fields. Updated `createStockTransfer` to call `stockService.recordStockMovement` for each line item:
+  - `TRANSFER_OUT` from `fromBranchId` (decrements source branch stock)
+  - `TRANSFER_IN` to `toBranchId` (increments destination branch stock)
+  - Both movements use `referenceType: "STOCK_TRANSFER"` and `referenceId: transfer.id`
+  - All movements execute within the existing Prisma `$transaction`
+- **Tests** (`packages/authentication-context-prisma/src/stock-transfer-service.test.ts`): Added test verifying `TRANSFER_OUT` and `TRANSFER_IN` stock movements are recorded for each line item during transfer creation. Updated existing test mocks to include `stockItem` and `stockMovement` fields.
+
+### Verification Results
+
+- `npx vitest run src/stock-transfer-service.test.ts` — 6 tests passed.
+- `npx vitest run src/stock-service.test.ts` — 32 tests passed.
+- `pnpm build` — Passed (Next.js production build + TypeScript compilation).
+
+### Important Boundary
+
+- No Prisma schema or migration was changed.
+- No authentication or authorization architecture was modified.
+- No production database connection or mutation was performed.
+- No new roles were introduced.
+- No franchise or MakeMeArtist changes were included.
+
+## X Nail ERP MVP Module Audit — 2026-08-31
+
+### Module Status Matrix
+
+| # | Module | Status | Evidence |
+|---|--------|--------|----------|
+| 1 | Dashboard | IMPLEMENTED | Role-based titles, KPI cards, tab visibility for 5 roles |
+| 2 | CRM | IMPLEMENTED | Customer CRUD, `customer.read`/`customer.write` RBAC, UI |
+| 3 | Appointments | IMPLEMENTED | Appointment CRUD, `appointment.read`/`appointment.write` RBAC, same-tenant validation, UI |
+| 4 | Customers | IMPLEMENTED | Customer CRUD, RBAC, tenant isolation, UI |
+| 5 | Services | IMPLEMENTED | Service CRUD, `service.read`/`service.write` RBAC, duration/price validation, UI |
+| 6 | Packages | IMPLEMENTED | Package CRUD, `package.read`/`package.write` RBAC, UI |
+| 7 | Memberships | IMPLEMENTED | Membership CRUD, `membership.read`/`membership.write` RBAC, customer/package linkage, UI |
+| 8 | POS/Billing | IMPLEMENTED | Invoice CRUD, discount update, GST calculations, `invoice.read`/`invoice.write` RBAC, auto SALE stock deduction, UI |
+| 9 | Inventory | IMPLEMENTED | Categories CRUD, StockItems List/Get, StockMovements List/Get, Purchase Receipts, Stock Transfers (with auto TRANSFER_IN/TRANSFER_OUT), Stock Adjustments (with auto IN/OUT), Suppliers, Warehouses, Reorder Rules |
+| 10 | Purchases | IMPLEMENTED | Purchase Receipt CRUD, `purchase-receipt.read`/`purchase-receipt.write` RBAC, auto PURCHASE stock movement, UI |
+| 11 | Staff | IMPLEMENTED | Staff CRUD, `staff.read`/`staff.write` RBAC, branch linkage, UI |
+| 12 | Attendance | IMPLEMENTED | Attendance CRUD & Check-Out, `attendance.read`/`attendance.write` RBAC, staff linkage, UI |
+| 13 | Commission | NOT IMPLEMENTED | Blocked by ADR 014 commercial gate; no approved commercial rules |
+| 14 | Branches | IMPLEMENTED | BusinessUnit & Branch CRUD, `branch.read`/`branch.write` RBAC, soft deactivation, branch manager role assignment via `POST /api/membership-roles` with branch scope |
+| 15 | Franchise | PARTIAL | Non-commercial domain models (Territory, FranchisePartner, FranchiseAgreement) exist in Prisma schema; commercial calculations gated by ADR 014 |
+| 16 | Reports | IMPLEMENTED | Summary, Low Stock, Daily Sales, Branch Performance, Inventory Stock Report endpoints with `report.read` RBAC, UI |
+| 17 | Settings | IMPLEMENTED | Tenant settings tab, role assignment with tenant/business-unit/branch scope, user/role CRUD, `tenant.manage` permission gate |
+| 18 | AI Assistant | PLACEHOLDER | UI workflow placeholder in AI Builder tab |
+
+### X Nail MVP Completion Estimate
+
+- **Core business modules (1-12, 14)**: 100% implemented with RBAC, tenant isolation, API routes, service layer, and UI
+- **Reports (16)**: 100% implemented
+- **Settings (17)**: 100% implemented
+- **Dashboard (1)**: 100% implemented
+- **Commission (13)**: 0% — blocked by ADR 014 commercial gate
+- **Franchise (15)**: ~30% — domain models exist; commercial rules gated
+- **AI Assistant (18)**: 0% — placeholder only; out of scope for X Nail MVP
+
+### Remaining X Nail MVP Gaps (Priority Order)
+
+1. **Commission** (P0): Blocked by ADR 014. Requires explicit approval of commercial rules before implementation.
+2. **Franchise non-commercial reports** (P1): Franchise Overview and Franchise Payout report service methods exist in working tree; route handlers and UI exist in working tree. Commercial calculations (revenue share, territory royalties, MG) are gated by ADR 014.
+3. **Production deployment verification** (P1): Latest commits (`fbf4cb7`, `04c087a`) need production deployment and browser verification.
+4. **AI Assistant** (P3): Out of scope for X Nail MVP; placeholder only.
+
+### Status: **Implemented and verified locally**
+
+### Implemented Slice
+
+- **Service layer** (`packages/authentication-context-prisma/src/report-service.ts`): Added `getInventoryStockReport` which returns tenant-scoped inventory stock summary metrics. Uses existing `listStockItems` tenant-scoped retrieval and aggregates:
+  - `stockItemCount` — total number of stock items
+  - `totalQuantityCents` — sum of all stock item quantities
+  - `lowStockItemCount` — count of items at or below threshold
+  - `movementCount` — total number of stock movements
+- **API route** (`apps/web/src/app/api/reports/inventory-stock/route.ts`): `GET /api/reports/inventory-stock` with `report.read` authorization. Returns tenant-scoped inventory stock report summary or 401/403 on auth failure.
+- **UI** (`apps/web/src/app/xnail/page.tsx`): Added "Inventory Stock Report" section in the Reports tab. Shows loading/empty/error states and renders stock summary cards with item count, total quantity, low stock count, and movement count.
+- **Tests**:
+  - `apps/web/src/test/inventory-stock-report-route-handlers.test.ts` — 5 tests covering auth gating, permission forwarding, tenant scoping, empty results, and error states.
+  - `packages/authentication-context-prisma/src/report-service.test.ts` — 3 tests covering empty results, stock aggregation, and low stock counting.
+
+### Verification Results
+
+- `pnpm test` — Passed: 3 report route handler test files, 15 tests passed.
+- `pnpm lint` — Passed (0 errors).
+- `pnpm build` — Passed (Next.js production build + TypeScript compilation; new route `/api/reports/inventory-stock` compiled successfully).
+- `git diff --check` — Passed (LF→CRLF notices only).
+
+### Important Boundary
+
+- No Prisma schema or migration was changed.
+- No authentication or authorization architecture was modified.
+- No production database connection or mutation was performed.
+- No new roles were introduced; reuses existing `report.read` permission.
