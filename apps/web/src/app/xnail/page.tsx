@@ -167,7 +167,7 @@ function KpiCard({ definition, context }: { readonly definition: RoleDashboardCo
   );
 }
 
-const ALL_TABS = ["Overview", "Customers", "Services", "Packages", "Memberships", "Inventory", "Staff", "Attendance", "Appointments", "Billing", "Branches", "Reports", "Settings", "Notifications", "Franchise Overview", "Financials"] as const;
+const ALL_TABS = ["Overview", "Customers", "Services", "Packages", "Memberships", "Inventory", "Staff", "Attendance", "Appointments", "Billing", "Branches", "Reports", "Settings", "Notifications", "Franchise Overview", "Financials", "Territories", "Partners", "Agreements", "Outlets"] as const;
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<(typeof ALL_TABS)[number]>("Overview");
@@ -498,6 +498,22 @@ export default function Home() {
   } | null>(null);
   const [isLoadingFranchisePayout, setIsLoadingFranchisePayout] = useState(false);
   const [franchisePayoutError, setFranchisePayoutError] = useState<string | null>(null);
+
+  const [territories, setTerritories] = useState<Array<{ id: string; name: string; code: string | null; isActive: boolean; outletCount: number; partnerCount: number }>>([]);
+  const [isLoadingTerritories, setIsLoadingTerritories] = useState(false);
+  const [territoriesError, setTerritoriesError] = useState<string | null>(null);
+
+  const [partners, setPartners] = useState<Array<{ id: string; name: string; email: string | null; phone: string | null; isActive: boolean; outletCount: number; agreementCount: number }>>([]);
+  const [isLoadingPartners, setIsLoadingPartners] = useState(false);
+  const [partnersError, setPartnersError] = useState<string | null>(null);
+
+  const [agreements, setAgreements] = useState<Array<{ id: string; partnerId: string; territoryId: string; partnerName: string; territoryName: string; startDate: string; endDate: string | null; isActive: boolean; outletCount: number }>>([]);
+  const [isLoadingAgreements, setIsLoadingAgreements] = useState(false);
+  const [agreementsError, setAgreementsError] = useState<string | null>(null);
+
+  const [outlets, setOutlets] = useState<Array<{ id: string; partnerId: string; branchId: string; territoryId: string | null; partnerName: string; branchName: string; territoryName: string | null; outletType: string | null; isActive: boolean }>>([]);
+  const [isLoadingOutlets, setIsLoadingOutlets] = useState(false);
+  const [outletsError, setOutletsError] = useState<string | null>(null);
 
   const customerMap = new Map(customers.map((customer) => [customer.id, customer.name]));
   const productMap = new Map(products.map((product) => [product.id, product.name]));
@@ -2269,6 +2285,94 @@ export default function Home() {
       mounted = false;
       window.clearTimeout(loadingTimer);
     };
+  }, [authenticated, activeTab]);
+
+  useEffect(() => {
+    if (authenticated !== true || activeTab !== "Territories") {
+      return;
+    }
+    let mounted = true;
+    const loadingTimer = window.setTimeout(() => {
+      if (mounted) { setIsLoadingTerritories(true); setTerritoriesError(null); }
+    }, 0);
+    void fetch("/api/franchise/territories", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        if (result.status === 401) { setTerritories([]); setAuthenticated(false); return; }
+        if (result.status === 403) { setTerritories([]); setTerritoriesError("You are not authorized to view territories."); return; }
+        if (!result.ok) { throw new Error("Territories request failed"); }
+        const body = await result.json() as { territories?: typeof territories };
+        setTerritories(body.territories ?? []);
+      })
+      .catch(() => { if (mounted) { setTerritories([]); setTerritoriesError("Territories could not be loaded."); } })
+      .finally(() => { if (mounted) { window.clearTimeout(loadingTimer); setIsLoadingTerritories(false); } });
+    return () => { mounted = false; window.clearTimeout(loadingTimer); };
+  }, [authenticated, activeTab]);
+
+  useEffect(() => {
+    if (authenticated !== true || activeTab !== "Partners") {
+      return;
+    }
+    let mounted = true;
+    const loadingTimer = window.setTimeout(() => {
+      if (mounted) { setIsLoadingPartners(true); setPartnersError(null); }
+    }, 0);
+    void fetch("/api/franchise/partners", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        if (result.status === 401) { setPartners([]); setAuthenticated(false); return; }
+        if (result.status === 403) { setPartners([]); setPartnersError("You are not authorized to view partners."); return; }
+        if (!result.ok) { throw new Error("Partners request failed"); }
+        const body = await result.json() as { partners?: typeof partners };
+        setPartners(body.partners ?? []);
+      })
+      .catch(() => { if (mounted) { setPartners([]); setPartnersError("Partners could not be loaded."); } })
+      .finally(() => { if (mounted) { window.clearTimeout(loadingTimer); setIsLoadingPartners(false); } });
+    return () => { mounted = false; window.clearTimeout(loadingTimer); };
+  }, [authenticated, activeTab]);
+
+  useEffect(() => {
+    if (authenticated !== true || activeTab !== "Agreements") {
+      return;
+    }
+    let mounted = true;
+    const loadingTimer = window.setTimeout(() => {
+      if (mounted) { setIsLoadingAgreements(true); setAgreementsError(null); }
+    }, 0);
+    void fetch("/api/franchise/agreements", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        if (result.status === 401) { setAgreements([]); setAuthenticated(false); return; }
+        if (result.status === 403) { setAgreements([]); setAgreementsError("You are not authorized to view agreements."); return; }
+        if (!result.ok) { throw new Error("Agreements request failed"); }
+        const body = await result.json() as { agreements?: typeof agreements };
+        setAgreements(body.agreements ?? []);
+      })
+      .catch(() => { if (mounted) { setAgreements([]); setAgreementsError("Agreements could not be loaded."); } })
+      .finally(() => { if (mounted) { window.clearTimeout(loadingTimer); setIsLoadingAgreements(false); } });
+    return () => { mounted = false; window.clearTimeout(loadingTimer); };
+  }, [authenticated, activeTab]);
+
+  useEffect(() => {
+    if (authenticated !== true || activeTab !== "Outlets") {
+      return;
+    }
+    let mounted = true;
+    const loadingTimer = window.setTimeout(() => {
+      if (mounted) { setIsLoadingOutlets(true); setOutletsError(null); }
+    }, 0);
+    void fetch("/api/franchise/outlets", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        if (result.status === 401) { setOutlets([]); setAuthenticated(false); return; }
+        if (result.status === 403) { setOutlets([]); setOutletsError("You are not authorized to view outlets."); return; }
+        if (!result.ok) { throw new Error("Outlets request failed"); }
+        const body = await result.json() as { outlets?: typeof outlets };
+        setOutlets(body.outlets ?? []);
+      })
+      .catch(() => { if (mounted) { setOutlets([]); setOutletsError("Outlets could not be loaded."); } })
+      .finally(() => { if (mounted) { window.clearTimeout(loadingTimer); setIsLoadingOutlets(false); } });
+    return () => { mounted = false; window.clearTimeout(loadingTimer); };
   }, [authenticated, activeTab]);
 
   const addSetting = async () => {
@@ -6326,6 +6430,131 @@ export default function Home() {
                   ))}
                 </div>
               </>
+            ) : null}
+          </section>
+        ) : null}
+
+        {activeTab === "Territories" ? (
+          <section className="mt-6 space-y-6">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="font-serif text-2xl font-bold bg-gradient-to-r from-[#9c7a1e] via-[#d4af37] to-[#f1d78c] bg-clip-text text-transparent">Territories</h2>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(212,175,55,0.3)] bg-[#17150f] px-3 py-1 text-xs font-medium text-[#d4af37]">{territories.length} registered</span>
+            </div>
+            {isLoadingTerritories ? <div className="text-sm text-[#a39a86]">Loading territories...</div> : null}
+            {!isLoadingTerritories && territoriesError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-4 text-sm text-[#d1554a]">{territoriesError}</div> : null}
+            {!isLoadingTerritories && !territoriesError && territories.length === 0 ? <div className="text-sm text-[#a39a86]">No territories registered yet.</div> : null}
+            {territories.length > 0 ? (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {territories.map((territory) => (
+                  <div key={territory.id} className="rounded-2xl border border-[rgba(212,175,55,0.2)] bg-[#121110] p-5 shadow-sm text-[#f5f1e6]">
+                    <div className="flex items-center justify-between">
+                      <div className="font-serif text-lg font-semibold text-[#f5f1e6]">{territory.name}</div>
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${territory.isActive ? "border border-[rgba(63,174,106,0.3)] bg-[rgba(63,174,106,0.12)] text-[#3fae6a]" : "border border-[rgba(163,154,134,0.3)] bg-[rgba(163,154,134,0.12)] text-[#a39a86]"}`}>{territory.isActive ? "Active" : "Inactive"}</span>
+                    </div>
+                    {territory.code ? <div className="mt-1 text-xs text-[#a39a86]">Code: {territory.code}</div> : null}
+                    <div className="mt-3 flex items-center justify-between text-xs text-[#a39a86]">
+                      <span>Outlets</span>
+                      <span className="font-medium text-[#f5f1e6]">{territory.outletCount}</span>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between text-xs text-[#a39a86]">
+                      <span>Partners</span>
+                      <span className="font-medium text-[#f5f1e6]">{territory.partnerCount}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+
+        {activeTab === "Partners" ? (
+          <section className="mt-6 space-y-6">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="font-serif text-2xl font-bold bg-gradient-to-r from-[#9c7a1e] via-[#d4af37] to-[#f1d78c] bg-clip-text text-transparent">Franchise Partners</h2>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(212,175,55,0.3)] bg-[#17150f] px-3 py-1 text-xs font-medium text-[#d4af37]">{partners.length} registered</span>
+            </div>
+            {isLoadingPartners ? <div className="text-sm text-[#a39a86]">Loading partners...</div> : null}
+            {!isLoadingPartners && partnersError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-4 text-sm text-[#d1554a]">{partnersError}</div> : null}
+            {!isLoadingPartners && !partnersError && partners.length === 0 ? <div className="text-sm text-[#a39a86]">No franchise partners registered yet.</div> : null}
+            {partners.length > 0 ? (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {partners.map((partner) => (
+                  <div key={partner.id} className="rounded-2xl border border-[rgba(212,175,55,0.2)] bg-[#121110] p-5 shadow-sm text-[#f5f1e6]">
+                    <div className="flex items-center justify-between">
+                      <div className="font-serif text-lg font-semibold text-[#f5f1e6]">{partner.name}</div>
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${partner.isActive ? "border border-[rgba(63,174,106,0.3)] bg-[rgba(63,174,106,0.12)] text-[#3fae6a]" : "border border-[rgba(163,154,134,0.3)] bg-[rgba(163,154,134,0.12)] text-[#a39a86]"}`}>{partner.isActive ? "Active" : "Inactive"}</span>
+                    </div>
+                    {partner.email ? <div className="mt-1 text-xs text-[#a39a86]">{partner.email}</div> : null}
+                    {partner.phone ? <div className="mt-1 text-xs text-[#a39a86]">{partner.phone}</div> : null}
+                    <div className="mt-3 flex items-center justify-between text-xs text-[#a39a86]">
+                      <span>Outlets</span>
+                      <span className="font-medium text-[#f5f1e6]">{partner.outletCount}</span>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between text-xs text-[#a39a86]">
+                      <span>Agreements</span>
+                      <span className="font-medium text-[#f5f1e6]">{partner.agreementCount}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+
+        {activeTab === "Agreements" ? (
+          <section className="mt-6 space-y-6">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="font-serif text-2xl font-bold bg-gradient-to-r from-[#9c7a1e] via-[#d4af37] to-[#f1d78c] bg-clip-text text-transparent">Franchise Agreements</h2>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(212,175,55,0.3)] bg-[#17150f] px-3 py-1 text-xs font-medium text-[#d4af37]">{agreements.length} active</span>
+            </div>
+            {isLoadingAgreements ? <div className="text-sm text-[#a39a86]">Loading agreements...</div> : null}
+            {!isLoadingAgreements && agreementsError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-4 text-sm text-[#d1554a]">{agreementsError}</div> : null}
+            {!isLoadingAgreements && !agreementsError && agreements.length === 0 ? <div className="text-sm text-[#a39a86]">No franchise agreements registered yet.</div> : null}
+            {agreements.length > 0 ? (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {agreements.map((agreement) => (
+                  <div key={agreement.id} className="rounded-2xl border border-[rgba(212,175,55,0.2)] bg-[#121110] p-5 shadow-sm text-[#f5f1e6]">
+                    <div className="flex items-center justify-between">
+                      <div className="font-serif text-lg font-semibold text-[#f5f1e6]">{agreement.partnerName}</div>
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${agreement.isActive ? "border border-[rgba(63,174,106,0.3)] bg-[rgba(63,174,106,0.12)] text-[#3fae6a]" : "border border-[rgba(163,154,134,0.3)] bg-[rgba(163,154,134,0.12)] text-[#a39a86]"}`}>{agreement.isActive ? "Active" : "Inactive"}</span>
+                    </div>
+                    <div className="mt-1 text-xs text-[#a39a86]">Territory: {agreement.territoryName}</div>
+                    <div className="mt-1 text-xs text-[#a39a86]">Start: {new Date(agreement.startDate).toLocaleDateString()}</div>
+                    {agreement.endDate ? <div className="mt-1 text-xs text-[#a39a86]">End: {new Date(agreement.endDate).toLocaleDateString()}</div> : null}
+                    <div className="mt-3 flex items-center justify-between text-xs text-[#a39a86]">
+                      <span>Outlets</span>
+                      <span className="font-medium text-[#f5f1e6]">{agreement.outletCount}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+
+        {activeTab === "Outlets" ? (
+          <section className="mt-6 space-y-6">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="font-serif text-2xl font-bold bg-gradient-to-r from-[#9c7a1e] via-[#d4af37] to-[#f1d78c] bg-clip-text text-transparent">Franchise Outlets</h2>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(212,175,55,0.3)] bg-[#17150f] px-3 py-1 text-xs font-medium text-[#d4af37]">{outlets.length} registered</span>
+            </div>
+            {isLoadingOutlets ? <div className="text-sm text-[#a39a86]">Loading outlets...</div> : null}
+            {!isLoadingOutlets && outletsError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-4 text-sm text-[#d1554a]">{outletsError}</div> : null}
+            {!isLoadingOutlets && !outletsError && outlets.length === 0 ? <div className="text-sm text-[#a39a86]">No franchise outlets registered yet.</div> : null}
+            {outlets.length > 0 ? (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {outlets.map((outlet) => (
+                  <div key={outlet.id} className="rounded-2xl border border-[rgba(212,175,55,0.2)] bg-[#121110] p-5 shadow-sm text-[#f5f1e6]">
+                    <div className="flex items-center justify-between">
+                      <div className="font-serif text-lg font-semibold text-[#f5f1e6]">{outlet.branchName}</div>
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${outlet.isActive ? "border border-[rgba(63,174,106,0.3)] bg-[rgba(63,174,106,0.12)] text-[#3fae6a]" : "border border-[rgba(163,154,134,0.3)] bg-[rgba(163,154,134,0.12)] text-[#a39a86]"}`}>{outlet.isActive ? "Active" : "Inactive"}</span>
+                    </div>
+                    <div className="mt-1 text-xs text-[#a39a86]">Partner: {outlet.partnerName}</div>
+                    {outlet.territoryName ? <div className="mt-1 text-xs text-[#a39a86]">Territory: {outlet.territoryName}</div> : null}
+                    {outlet.outletType ? <div className="mt-1 text-xs text-[#a39a86]">Type: {outlet.outletType}</div> : null}
+                  </div>
+                ))}
+              </div>
             ) : null}
           </section>
         ) : null}

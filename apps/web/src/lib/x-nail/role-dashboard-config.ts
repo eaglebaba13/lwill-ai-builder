@@ -72,6 +72,10 @@ const ACCOUNTS_TABS = [
 const FRANCHISE_TABS = [
   "Franchise Overview",
   "Financials",
+  "Territories",
+  "Partners",
+  "Agreements",
+  "Outlets",
   "Overview",
   "Branches",
   "Reports",
