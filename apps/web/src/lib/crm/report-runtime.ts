@@ -42,6 +42,10 @@ export function createReportRouteServices(): ReportRouteServices {
   return {
     authorize,
     getReportSummary: (tenantId) => reportService.getReportSummary({ tenantId }),
+    getFranchiseOverview: (tenantId, userId) =>
+      reportService.getFranchiseOverview({ tenantId, userId }),
+    getFranchisePayout: (tenantId, userId, year, month) =>
+      reportService.getFranchisePayout({ tenantId, userId, year, month }),
     getInventoryStockReport: (tenantId, branchId) =>
       reportService.getInventoryStockReport({ tenantId, branchId }),
   };

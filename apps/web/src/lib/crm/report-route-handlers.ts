@@ -8,8 +8,8 @@ export type ReportAuthorization =
 export interface ReportRouteServices {
   readonly authorize: (permissionCode: string) => Promise<ReportAuthorization>;
   readonly getReportSummary: (tenantId: string) => Promise<unknown>;
-  readonly getFranchiseOverview?: (tenantId: string, userId: string) => Promise<unknown>;
-  readonly getFranchisePayout?: (tenantId: string, userId: string, year: number, month: number) => Promise<unknown>;
+  readonly getFranchiseOverview: (tenantId: string, userId: string) => Promise<unknown>;
+  readonly getFranchisePayout: (tenantId: string, userId: string, year: number, month: number) => Promise<unknown>;
   readonly getInventoryStockReport: (tenantId: string, branchId?: string) => Promise<unknown>;
 }
 
@@ -49,6 +49,38 @@ export async function handleGetReportSummary(
   }
   const summary = await services.getReportSummary(authResult.tenantId);
   return response(200, { report: summary });
+}
+
+export async function handleGetFranchiseOverview(
+  _request: Request,
+  services: ReportRouteServices,
+): Promise<Response> {
+  const authorization = await services.authorize("report.read");
+  const authResult = authorizationOutcome(authorization);
+  if (!authResult.ok) {
+    return authResult.response;
+  }
+  const overview = await services.getFranchiseOverview(authResult.tenantId, authResult.userId);
+  return response(200, { overview });
+}
+
+export async function handleGetFranchisePayout(
+  request: Request,
+  services: ReportRouteServices,
+): Promise<Response> {
+  const authorization = await services.authorize("report.read");
+  const authResult = authorizationOutcome(authorization);
+  if (!authResult.ok) {
+    return authResult.response;
+  }
+  const url = new URL(request.url);
+  const year = Number(url.searchParams.get("year") ?? String(new Date().getFullYear()));
+  const month = Number(url.searchParams.get("month") ?? String(new Date().getMonth() + 1));
+  if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) {
+    return response(400, { error: "Invalid year or month" });
+  }
+  const payout = await services.getFranchisePayout(authResult.tenantId, authResult.userId, year, month);
+  return response(200, { payout });
 }
 
 export async function handleGetInventoryStockReport(

@@ -70,6 +70,8 @@ const ACCOUNTS_TABS = [
   "Settings",
 ] as const;
 const FRANCHISE_TABS = [
+  "Franchise Overview",
+  "Financials",
   "Overview",
   "Branches",
   "Reports",

@@ -17,6 +17,12 @@ model Tenant {
   businessUnits     BusinessUnit[]
   auditLogs         AuditLog[]
   branches          Branch[]
+  territories       Territory[]
+  franchisePartners FranchisePartner[]
+  franchiseOutletProfiles FranchiseOutletProfile[]
+  franchiseAgreements FranchiseAgreement[]
+  franchiseAgreementOutlets FranchiseAgreementOutlet[]
+  franchiseRevenueDistributions FranchiseRevenueDistribution[]
   tenantDomains     TenantDomain[]
   tenantSettings    TenantSetting[]
   tenantMemberships TenantMembership[]
@@ -110,6 +116,8 @@ model Branch {
 
   tenant                Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   businessUnit          BusinessUnit           @relation(fields: [tenantId, businessUnitId], references: [tenantId, id], onDelete: Restrict)
+  territoryId           String?   @db.Uuid
+  territory             Territory? @relation(fields: [tenantId, territoryId], references: [tenantId, id], onDelete: Restrict)
   auditLogs             AuditLog[]
   branchMembershipRoles BranchMembershipRole[]
   membershipRoles       MembershipRole[]
@@ -121,11 +129,138 @@ model Branch {
   outgoingTransfers     StockTransfer[] @relation("FromBranch")
   incomingTransfers     StockTransfer[] @relation("ToBranch")
   stockAdjustments      StockAdjustment[]
+  franchiseOutletProfiles   FranchiseOutletProfile[]
+  franchiseAgreementOutlets FranchiseAgreementOutlet[]
 
   @@unique([tenantId, businessUnitId, id])
   @@unique([tenantId, id])
   @@unique([tenantId, businessUnitId, slug])
   @@index([tenantId, businessUnitId, isActive])
+  @@index([tenantId, territoryId])
+}
+
+model Territory {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @db.Uuid
+  name           String
+  code           String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant         Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  branches       Branch[]
+  franchiseOutletProfiles FranchiseOutletProfile[]
+  agreements     FranchiseAgreement[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive])
+}
+
+model FranchisePartner {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @db.Uuid
+  userId         String?  @unique @db.Uuid
+  name           String
+  email          String?
+  phone          String?
+  panNumber      String?
+  gstin          String?
+  address        String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant        Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  user          User?                   @relation(fields: [userId], references: [id], onDelete: Restrict)
+  outletProfiles FranchiseOutletProfile[]
+  agreements    FranchiseAgreement[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, userId])
+  @@index([tenantId, isActive])
+}
+
+model FranchiseOutletProfile {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @db.Uuid
+  partnerId      String   @db.Uuid
+  branchId       String   @db.Uuid
+  territoryId    String?  @db.Uuid
+  outletType     String?  @default("STANDALONE")
+  investmentCents Int?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant        Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  partner       FranchisePartner     @relation(fields: [partnerId], references: [id], onDelete: Restrict)
+  branch        Branch               @relation(fields: [tenantId, branchId], references: [tenantId, id], onDelete: Restrict)
+  territory     Territory?           @relation(fields: [tenantId, territoryId], references: [tenantId, id], onDelete: Restrict)
+
+  @@unique([tenantId, branchId])
+  @@unique([tenantId, partnerId, branchId])
+  @@index([tenantId, partnerId])
+  @@index([tenantId, territoryId])
+}
+
+model FranchiseAgreement {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @db.Uuid
+  partnerId      String   @db.Uuid
+  territoryId    String   @db.Uuid
+  startDate      DateTime
+  endDate        DateTime?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant     Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  partner    FranchisePartner     @relation(fields: [partnerId], references: [id], onDelete: Restrict)
+  territory  Territory            @relation(fields: [tenantId, territoryId], references: [tenantId, id], onDelete: Restrict)
+  outlets    FranchiseAgreementOutlet[]
+
+  @@unique([tenantId, id])
+  @@index([tenantId, partnerId])
+  @@index([tenantId, territoryId])
+  @@index([tenantId, isActive])
+}
+
+model FranchiseAgreementOutlet {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @db.Uuid
+  agreementId    String   @db.Uuid
+  branchId       String   @db.Uuid
+  createdAt      DateTime @default(now())
+
+  tenant       Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  agreement    FranchiseAgreement   @relation(fields: [tenantId, agreementId], references: [tenantId, id], onDelete: Cascade)
+  branch       Branch               @relation(fields: [tenantId, branchId], references: [tenantId, id], onDelete: Restrict)
+  distributions FranchiseRevenueDistribution[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, agreementId, branchId])
+  @@index([tenantId, agreementId])
+  @@index([tenantId, branchId])
+}
+
+model FranchiseRevenueDistribution {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @db.Uuid
+  agreementOutletId String   @db.Uuid
+  beneficiary     String
+  percentage      Int
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant           Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  agreementOutlet  FranchiseAgreementOutlet @relation(fields: [tenantId, agreementOutletId], references: [tenantId, id], onDelete: Cascade)
+
+  @@unique([tenantId, agreementOutletId, beneficiary])
+  @@index([tenantId, agreementOutletId])
+  @@index([tenantId, beneficiary])
 }
 
 model Customer {
@@ -434,6 +569,7 @@ model User {
   authenticationSessions AuthenticationSession[]
   refreshTokens      RefreshToken[]
   passwordResetTokens PasswordResetToken[]
+  franchisePartner   FranchisePartner?
 }
 
 model PasswordCredential {

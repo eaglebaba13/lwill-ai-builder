@@ -61,6 +61,82 @@ export interface ReportService {
     readonly staffCount: number;
     readonly attendanceCount: number;
   }>>;
+  getFranchiseOverview(args: { tenantId: string; userId?: string }): Promise<{
+    readonly branches: ReadonlyArray<{
+      readonly branchId: string;
+      readonly branchName: string;
+      readonly isActive: boolean;
+      readonly createdAt: string;
+    }>;
+    readonly sales: {
+      readonly invoiceCount: number;
+      readonly totalRevenueCents: number;
+      readonly dailyTrend: ReadonlyArray<{
+        readonly date: string;
+        readonly invoiceCount: number;
+        readonly totalRevenueCents: number;
+      }>;
+    };
+    readonly appointments: {
+      readonly total: number;
+      readonly statusBreakdown: ReadonlyArray<{
+        readonly status: string;
+        readonly count: number;
+      }>;
+    };
+    readonly customers: {
+      readonly total: number;
+    };
+    readonly inventory: {
+      readonly lowStockItems: ReadonlyArray<{
+        readonly productId: string;
+        readonly productName: string;
+        readonly branchId: string;
+        readonly branchName: string;
+        readonly quantity: number;
+      }>;
+    };
+    readonly branchPerformance: ReadonlyArray<{
+      readonly branchId: string;
+      readonly branchName: string;
+      readonly staffCount: number;
+      readonly attendanceCount: number;
+    }>;
+  }>;
+  getFranchisePayout(args: {
+    readonly tenantId: string;
+    readonly userId?: string;
+    readonly year: number;
+    readonly month: number;
+  }): Promise<{
+    readonly year: number;
+    readonly month: number;
+    readonly payouts: ReadonlyArray<{
+      readonly partnerId: string;
+      readonly partnerName: string;
+      readonly agreementPayouts: ReadonlyArray<{
+        readonly agreementId: string;
+        readonly branchId: string;
+        readonly branchName: string;
+        readonly territoryId: string;
+        readonly territoryName: string;
+        readonly grossRevenueCents: number;
+        readonly revenueShareCents: number;
+        readonly eligibleRevenueSharePayoutCents: number;
+      }>;
+      readonly totalRevenueSharePayoutCents: number;
+      readonly territoryRoyalties: ReadonlyArray<{
+        readonly territoryId: string;
+        readonly territoryName: string;
+        readonly territorySalesTurnoverCents: number;
+        readonly royaltyPoolCents: number;
+        readonly eligiblePartnerCount: number;
+        readonly individualRoyaltyCents: number;
+      }>;
+      readonly totalTerritoryRoyaltyCents: number;
+      readonly totalEligiblePayoutCents: number;
+    }>;
+  }>;
   getInventoryStockReport(args: { readonly tenantId: string; readonly branchId?: string }): Promise<ReadonlyArray<{
     readonly stockItemId: string;
     readonly productId: string;
@@ -75,7 +151,7 @@ export interface ReportService {
 
 interface ReportPrismaClient {
   readonly invoice: {
-    findMany(args: { where?: Record<string, unknown>; select?: Record<string, unknown>; orderBy?: Record<string, unknown> }): Promise<ReadonlyArray<{ readonly totalCents: number; readonly issuedAt: Date; readonly gstCents: number; readonly subtotalCents: number }>>;
+    findMany(args: { where?: Record<string, unknown>; select?: Record<string, unknown>; orderBy?: Record<string, unknown> }): Promise<ReadonlyArray<{ readonly totalCents: number; readonly issuedAt: Date; readonly gstCents: number; readonly subtotalCents: number; readonly branchId: string }>>;
   };
   readonly appointment: {
     findMany(args: { where?: Record<string, unknown>; select?: Record<string, unknown>; orderBy?: Record<string, unknown> }): Promise<ReadonlyArray<{ readonly status: string; readonly startsAt: Date }>>;
@@ -100,7 +176,36 @@ interface ReportPrismaClient {
     findMany(args: { where?: Record<string, unknown>; select?: Record<string, unknown> }): Promise<ReadonlyArray<{ readonly status: string; readonly packageId: string }>>;
   };
   readonly branch: {
+    findMany(args: { where?: Record<string, unknown>; select?: Record<string, unknown> }): Promise<ReadonlyArray<{ readonly id: string; readonly name: string; readonly isActive: boolean; readonly territoryId: string | null; readonly createdAt: Date }>>;
+  };
+  readonly territory: {
     findMany(args: { where?: Record<string, unknown>; select?: Record<string, unknown> }): Promise<ReadonlyArray<{ readonly id: string; readonly name: string }>>;
+  };
+  readonly franchisePartner: {
+    findMany(args: { where?: Record<string, unknown>; select?: Record<string, unknown> }): Promise<ReadonlyArray<{ readonly id: string }>>;
+    findFirst(args: { where?: Record<string, unknown>; select?: Record<string, unknown> }): Promise<{ readonly id: string } | null>;
+  };
+  readonly franchiseOutletProfile: {
+    findMany(args: { where?: Record<string, unknown>; select?: Record<string, unknown> }): Promise<ReadonlyArray<{ readonly branchId: string }>>;
+  };
+  readonly franchiseAgreement: {
+    findMany(args: { where?: Record<string, unknown>; select?: Record<string, unknown>; include?: Record<string, unknown> }): Promise<ReadonlyArray<{
+      readonly id: string;
+      readonly partnerId: string;
+      readonly territoryId: string;
+      readonly startDate: Date;
+      readonly endDate: Date | null;
+      readonly partner: { readonly id: string; readonly name: string };
+      readonly territory: { readonly id: string; readonly name: string };
+      readonly outlets: ReadonlyArray<{
+        readonly id: string;
+        readonly branchId: string;
+        readonly branch: { readonly id: string; readonly name: string; readonly territoryId: string | null };
+      }>;
+    }>>;
+  };
+  readonly franchiseRevenueDistribution: {
+    findMany(args: { where?: Record<string, unknown>; select?: Record<string, unknown> }): Promise<ReadonlyArray<{ readonly agreementOutletId: string; readonly percentage: number }>>;
   };
   readonly staff: {
     count(args: { where: Record<string, unknown> }): Promise<number>;
@@ -329,6 +434,377 @@ export function createReportService(prisma: ReportPrismaClient): ReportService {
       );
 
       return results;
+    },
+
+    async getFranchiseOverview({ tenantId, userId }) {
+      let targetBranchIds: string[] | undefined;
+      if (userId) {
+        const partner = await prisma.franchisePartner.findFirst({
+          where: { tenantId, userId, isActive: true },
+          select: { id: true },
+        });
+        if (!partner) {
+          return {
+            branches: [],
+            sales: { invoiceCount: 0, totalRevenueCents: 0, dailyTrend: [] },
+            appointments: { total: 0, statusBreakdown: [] },
+            customers: { total: 0 },
+            inventory: { lowStockItems: [] },
+            branchPerformance: [],
+          };
+        }
+        const outletProfiles = await prisma.franchiseOutletProfile.findMany({
+          where: { tenantId, partnerId: partner.id, isActive: true },
+          select: { branchId: true },
+        });
+        targetBranchIds = outletProfiles.map((profile) => profile.branchId);
+        if (targetBranchIds.length === 0) {
+          return {
+            branches: [],
+            sales: { invoiceCount: 0, totalRevenueCents: 0, dailyTrend: [] },
+            appointments: { total: 0, statusBreakdown: [] },
+            customers: { total: 0 },
+            inventory: { lowStockItems: [] },
+            branchPerformance: [],
+          };
+        }
+      }
+
+      const branchFilter = targetBranchIds === undefined ? { tenantId } : { tenantId, id: { in: targetBranchIds } };
+      const invoiceFilter = targetBranchIds === undefined ? { tenantId } : { tenantId, branchId: { in: targetBranchIds } };
+      const appointmentFilter = targetBranchIds === undefined ? { tenantId } : { tenantId, branchId: { in: targetBranchIds } };
+      const stockItemFilter = targetBranchIds === undefined ? { tenantId } : { tenantId, branchId: { in: targetBranchIds } };
+
+      const [branches, invoices, appointments, customerCount, stockItems, products, branchPerformance] = await Promise.all([
+        prisma.branch.findMany({
+          where: branchFilter,
+          select: { id: true, name: true, isActive: true, createdAt: true },
+        }),
+        prisma.invoice.findMany({
+          where: invoiceFilter,
+          select: { totalCents: true, issuedAt: true },
+        }),
+        prisma.appointment.findMany({
+          where: appointmentFilter,
+          select: { startsAt: true, status: true },
+        }),
+        prisma.customer.count({ where: { tenantId } }),
+        prisma.stockItem.findMany({
+          where: stockItemFilter,
+          select: { productId: true, branchId: true, quantity: true },
+        }),
+        prisma.product.findMany({
+          where: { tenantId },
+          select: { id: true, name: true },
+        }),
+        prisma.branch.findMany({
+          where: branchFilter,
+          select: { id: true, name: true },
+        }),
+      ]);
+
+      const productMap = new Map(products.map((product) => [product.id, product.name]));
+      const branchMap = new Map(branches.map((branch) => [branch.id, branch.name]));
+
+      const dailyMap = new Map<string, { invoiceCount: number; totalRevenueCents: number }>();
+      for (const invoice of invoices) {
+        const dateKey = new Date(invoice.issuedAt).toISOString().slice(0, 10);
+        const current = dailyMap.get(dateKey) ?? { invoiceCount: 0, totalRevenueCents: 0 };
+        dailyMap.set(dateKey, {
+          invoiceCount: current.invoiceCount + 1,
+          totalRevenueCents: current.totalRevenueCents + invoice.totalCents,
+        });
+      }
+
+      const statusBreakdown = new Map<string, number>();
+      for (const appointment of appointments) {
+        const current = statusBreakdown.get(appointment.status) ?? 0;
+        statusBreakdown.set(appointment.status, current + 1);
+      }
+
+      const lowStockItems = stockItems
+        .filter((item) => item.quantity <= 10)
+        .map((item) => ({
+          productId: item.productId,
+          productName: productMap.get(item.productId) ?? "Unknown",
+          branchId: item.branchId,
+          branchName: branchMap.get(item.branchId) ?? "Unknown",
+          quantity: item.quantity,
+        }));
+
+      const branchPerformanceResults = await Promise.all(
+        branchPerformance.map(async (branch) => {
+          const [staffCount, attendanceCount] = await Promise.all([
+            prisma.staff.count({ where: { tenantId, branchId: branch.id } }),
+            prisma.attendance.count({
+              where: {
+                tenantId,
+                staff: { branchId: branch.id },
+              },
+            }),
+          ]);
+
+          return {
+            branchId: branch.id,
+            branchName: branch.name,
+            staffCount,
+            attendanceCount,
+          };
+        }),
+      );
+
+      return {
+        branches: branches.map((branch) => ({
+          branchId: branch.id,
+          branchName: branch.name,
+          isActive: branch.isActive,
+          createdAt: branch.createdAt.toISOString(),
+        })),
+        sales: {
+          invoiceCount: invoices.length,
+          totalRevenueCents: invoices.reduce((sum, invoice) => sum + invoice.totalCents, 0),
+          dailyTrend: Array.from(dailyMap.entries()).map(([date, values]) => ({
+            date,
+            ...values,
+          })),
+        },
+        appointments: {
+          total: appointments.length,
+          statusBreakdown: Array.from(statusBreakdown.entries()).map(([status, count]) => ({
+            status,
+            count,
+          })),
+        },
+        customers: {
+          total: customerCount,
+        },
+        inventory: {
+          lowStockItems,
+        },
+        branchPerformance: branchPerformanceResults,
+      };
+    },
+
+    async getFranchisePayout({ tenantId, userId, year, month }) {
+      const monthStart = new Date(year, month - 1, 1);
+      const monthEnd = new Date(year, month, 1);
+
+      let targetPartnerIds: string[];
+      if (userId) {
+        const partner = await prisma.franchisePartner.findFirst({
+          where: { tenantId, userId, isActive: true },
+          select: { id: true },
+        });
+        if (!partner) {
+          return { year, month, payouts: [] };
+        }
+        targetPartnerIds = [partner.id];
+      } else {
+        const partners = await prisma.franchisePartner.findMany({
+          where: { tenantId, isActive: true },
+          select: { id: true },
+        });
+        targetPartnerIds = partners.map((partner) => partner.id);
+        if (targetPartnerIds.length === 0) {
+          return { year, month, payouts: [] };
+        }
+      }
+
+      const agreements = await prisma.franchiseAgreement.findMany({
+        where: {
+          tenantId,
+          partnerId: { in: targetPartnerIds },
+          isActive: true,
+          startDate: { lte: monthEnd },
+          OR: [
+            { endDate: null },
+            { endDate: { gte: monthStart } },
+          ],
+        },
+        include: {
+          partner: { select: { id: true, name: true } },
+          territory: { select: { id: true, name: true } },
+          outlets: {
+            select: {
+              id: true,
+              branchId: true,
+              branch: { select: { id: true, name: true, territoryId: true } },
+            },
+          },
+        },
+      });
+
+      if (agreements.length === 0) {
+        return { year, month, payouts: [] };
+      }
+
+      const territoryIds = [...new Set(agreements.map((agreement) => agreement.territoryId))];
+      const branchIds = [...new Set(agreements.flatMap((agreement) => agreement.outlets.map((outlet) => outlet.branchId)))];
+      const agreementOutletIds = agreements.flatMap((agreement) => agreement.outlets.map((outlet) => outlet.id));
+
+      const [territories, branches, invoices, allTerritoryAgreements, allTerritoryBranches, distributions] = await Promise.all([
+        prisma.territory.findMany({
+          where: { tenantId, id: { in: territoryIds } },
+          select: { id: true, name: true },
+        }),
+        prisma.branch.findMany({
+          where: { tenantId, id: { in: branchIds } },
+          select: { id: true, name: true, territoryId: true },
+        }),
+        prisma.invoice.findMany({
+          where: {
+            tenantId,
+            branchId: { in: branchIds },
+            issuedAt: {
+              gte: monthStart,
+              lt: monthEnd,
+            },
+          },
+          select: { branchId: true, totalCents: true },
+        }),
+        prisma.franchiseAgreement.findMany({
+          where: {
+            tenantId,
+            territoryId: { in: territoryIds },
+            isActive: true,
+            startDate: { lte: monthEnd },
+            OR: [
+              { endDate: null },
+              { endDate: { gte: monthStart } },
+            ],
+          },
+          select: { partnerId: true, territoryId: true },
+        }),
+        prisma.branch.findMany({
+          where: { tenantId, territoryId: { in: territoryIds } },
+          select: { id: true, territoryId: true },
+        }),
+        prisma.franchiseRevenueDistribution.findMany({
+          where: {
+            tenantId,
+            agreementOutletId: { in: agreementOutletIds },
+            beneficiary: "FRANCHISE_OWNER",
+            isActive: true,
+          },
+          select: { agreementOutletId: true, percentage: true },
+        }),
+      ]);
+
+      const distributionMap = new Map(distributions.map((distribution) => [distribution.agreementOutletId, distribution.percentage]));
+
+      const territoryMap = new Map(territories.map((territory) => [territory.id, territory]));
+      const branchMap = new Map(branches.map((branch) => [branch.id, branch]));
+
+      const allTerritoryBranchIds = allTerritoryBranches.map((branch) => branch.id);
+      const allTerritoryInvoices = await prisma.invoice.findMany({
+        where: {
+          tenantId,
+          branchId: { in: allTerritoryBranchIds },
+          issuedAt: {
+            gte: monthStart,
+            lt: monthEnd,
+          },
+        },
+        select: { branchId: true, totalCents: true },
+      });
+
+      const branchSalesMap = new Map<string, number>();
+      for (const invoice of invoices) {
+        branchSalesMap.set(invoice.branchId, (branchSalesMap.get(invoice.branchId) ?? 0) + invoice.totalCents);
+      }
+
+      const allTerritoryBranchSalesMap = new Map<string, number>();
+      for (const invoice of allTerritoryInvoices) {
+        allTerritoryBranchSalesMap.set(invoice.branchId, (allTerritoryBranchSalesMap.get(invoice.branchId) ?? 0) + invoice.totalCents);
+      }
+
+      const territorySalesMap = new Map<string, number>();
+      for (const [branchId, sales] of allTerritoryBranchSalesMap.entries()) {
+        const branch = allTerritoryBranches.find((b) => b.id === branchId);
+        if (branch?.territoryId) {
+          territorySalesMap.set(branch.territoryId, (territorySalesMap.get(branch.territoryId) ?? 0) + sales);
+        }
+      }
+
+      const allTerritoryPartnerMap = new Map<string, Set<string>>();
+      for (const agreement of allTerritoryAgreements) {
+        const territoryId = agreement.territoryId;
+        if (!allTerritoryPartnerMap.has(territoryId)) {
+          allTerritoryPartnerMap.set(territoryId, new Set());
+        }
+        allTerritoryPartnerMap.get(territoryId)!.add(agreement.partnerId);
+      }
+
+      const territoryRoyaltyMap = new Map<string, { poolCents: number; eligibleCount: number; individualCents: number }>();
+      for (const [territoryId, partners] of allTerritoryPartnerMap.entries()) {
+        const sales = territorySalesMap.get(territoryId) ?? 0;
+        const poolCents = Math.round(sales * 0.02);
+        const eligibleCount = partners.size;
+        const individualCents = eligibleCount > 0 ? Math.round(poolCents / eligibleCount) : 0;
+        territoryRoyaltyMap.set(territoryId, { poolCents, eligibleCount, individualCents });
+      }
+
+      const partnerAgreementMap = new Map<string, typeof agreements>();
+      for (const agreement of agreements) {
+        const partnerId = agreement.partnerId;
+        partnerAgreementMap.set(partnerId, [...(partnerAgreementMap.get(partnerId) ?? []), agreement]);
+      }
+
+      const payouts = [...partnerAgreementMap.entries()].map(([partnerId, partnerAgreements]) => {
+        const agreementPayouts = partnerAgreements.flatMap((agreement) =>
+          agreement.outlets.map((outlet) => {
+            const grossRevenueCents = branchSalesMap.get(outlet.branchId) ?? 0;
+            const percentage = distributionMap.get(outlet.id) ?? 0;
+            const revenueShareCents = Math.round((grossRevenueCents * percentage) / 100);
+            const eligibleRevenueSharePayoutCents = revenueShareCents > 1500000 ? revenueShareCents : 1500000;
+
+            return {
+              agreementId: agreement.id,
+              branchId: outlet.branch.id,
+              branchName: outlet.branch.name,
+              territoryId: agreement.territory.id,
+              territoryName: agreement.territory.name,
+              grossRevenueCents,
+              revenueShareCents,
+              eligibleRevenueSharePayoutCents,
+            };
+          })
+        );
+
+        const totalRevenueSharePayoutCents = agreementPayouts.reduce((sum, item) => sum + item.eligibleRevenueSharePayoutCents, 0);
+
+        const territoryRoyalties = [...new Set(partnerAgreements.map((a) => a.territoryId))].map((territoryId) => {
+          const territory = territoryMap.get(territoryId)!;
+          const royalty = territoryRoyaltyMap.get(territoryId)!;
+
+          return {
+            territoryId,
+            territoryName: territory.name,
+            territorySalesTurnoverCents: territorySalesMap.get(territoryId) ?? 0,
+            royaltyPoolCents: royalty.poolCents,
+            eligiblePartnerCount: royalty.eligibleCount,
+            individualRoyaltyCents: royalty.individualCents,
+          };
+        });
+
+        const totalTerritoryRoyaltyCents = territoryRoyalties.reduce((sum, item) => sum + item.individualRoyaltyCents, 0);
+
+        return {
+          partnerId,
+          partnerName: partnerAgreements[0]?.partner?.name ?? "Unknown",
+          agreementPayouts,
+          totalRevenueSharePayoutCents,
+          territoryRoyalties,
+          totalTerritoryRoyaltyCents,
+          totalEligiblePayoutCents: totalRevenueSharePayoutCents + totalTerritoryRoyaltyCents,
+        };
+      });
+
+      return {
+        year,
+        month,
+        payouts,
+      };
     },
 
     async getInventoryStockReport({ tenantId, branchId }) {

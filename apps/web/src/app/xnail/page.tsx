@@ -167,7 +167,7 @@ function KpiCard({ definition, context }: { readonly definition: RoleDashboardCo
   );
 }
 
-const ALL_TABS = ["Overview", "Customers", "Services", "Packages", "Memberships", "Inventory", "Staff", "Attendance", "Appointments", "Billing", "Branches", "Reports", "Settings", "Notifications"] as const;
+const ALL_TABS = ["Overview", "Customers", "Services", "Packages", "Memberships", "Inventory", "Staff", "Attendance", "Appointments", "Billing", "Branches", "Reports", "Settings", "Notifications", "Franchise Overview", "Financials"] as const;
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<(typeof ALL_TABS)[number]>("Overview");
@@ -457,6 +457,47 @@ export default function Home() {
   const [branchPerformance, setBranchPerformance] = useState<Array<{ branchId: string; branchName: string; staffCount: number; attendanceCount: number }>>([]);
   const [isLoadingBranchPerformance, setIsLoadingBranchPerformance] = useState(false);
   const [branchPerformanceError, setBranchPerformanceError] = useState<string | null>(null);
+  const [franchiseOverview, setFranchiseOverview] = useState<{
+    branches: Array<{ branchId: string; branchName: string; isActive: boolean; createdAt: string }>;
+    sales: { invoiceCount: number; totalRevenueCents: number; dailyTrend: Array<{ date: string; invoiceCount: number; totalRevenueCents: number }> };
+    appointments: { total: number; statusBreakdown: Array<{ status: string; count: number }> };
+    customers: { total: number };
+    inventory: { lowStockItems: Array<{ productId: string; productName: string; branchId: string; branchName: string; quantity: number }> };
+    branchPerformance: Array<{ branchId: string; branchName: string; staffCount: number; attendanceCount: number }>;
+  } | null>(null);
+  const [isLoadingFranchiseOverview, setIsLoadingFranchiseOverview] = useState(false);
+  const [franchiseOverviewError, setFranchiseOverviewError] = useState<string | null>(null);
+  const [franchisePayout, setFranchisePayout] = useState<{
+    year: number;
+    month: number;
+    payouts: Array<{
+      partnerId: string;
+      partnerName: string;
+      agreementPayouts: Array<{
+        agreementId: string;
+        branchId: string;
+        branchName: string;
+        territoryId: string;
+        territoryName: string;
+        grossRevenueCents: number;
+        revenueShareCents: number;
+        eligibleRevenueSharePayoutCents: number;
+      }>;
+      totalRevenueSharePayoutCents: number;
+      territoryRoyalties: Array<{
+        territoryId: string;
+        territoryName: string;
+        territorySalesTurnoverCents: number;
+        royaltyPoolCents: number;
+        eligiblePartnerCount: number;
+        individualRoyaltyCents: number;
+      }>;
+      totalTerritoryRoyaltyCents: number;
+      totalEligiblePayoutCents: number;
+    }>;
+  } | null>(null);
+  const [isLoadingFranchisePayout, setIsLoadingFranchisePayout] = useState(false);
+  const [franchisePayoutError, setFranchisePayoutError] = useState<string | null>(null);
 
   const customerMap = new Map(customers.map((customer) => [customer.id, customer.name]));
   const productMap = new Map(products.map((product) => [product.id, product.name]));
@@ -705,7 +746,7 @@ export default function Home() {
       mounted = false;
       window.clearTimeout(loadingTimer);
     };
-  }, [authenticated, activeTab]);
+  }, [authenticated, activeTab, permissionCodes]);
 
   useEffect(() => {
     if (authenticated !== true || activeTab !== "Appointments") {
@@ -2109,6 +2150,118 @@ export default function Home() {
       .finally(() => {
         if (mounted) {
           setIsLoadingBranchPerformance(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+      window.clearTimeout(loadingTimer);
+    };
+  }, [authenticated, activeTab]);
+
+  useEffect(() => {
+    if (authenticated !== true || activeTab !== "Franchise Overview") {
+      return;
+    }
+
+    let mounted = true;
+    const loadingTimer = window.setTimeout(() => {
+      if (mounted) {
+        setIsLoadingFranchiseOverview(true);
+        setFranchiseOverviewError(null);
+      }
+    }, 0);
+    void fetch("/api/reports/franchise-overview", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        if (result.status === 401) {
+          setFranchiseOverview(null);
+          setAuthenticated(false);
+          return;
+        }
+        if (result.status === 403) {
+          setFranchiseOverview(null);
+          setFranchiseOverviewError("You are not authorized to view the franchise overview.");
+          return;
+        }
+        if (!result.ok) {
+          throw new Error("Franchise overview request failed");
+        }
+        const body = await result.json() as {
+          overview?: {
+            branches: Array<{ branchId: string; branchName: string; isActive: boolean; createdAt: string }>;
+            sales: { invoiceCount: number; totalRevenueCents: number; dailyTrend: Array<{ date: string; invoiceCount: number; totalRevenueCents: number }> };
+            appointments: { total: number; statusBreakdown: Array<{ status: string; count: number }> };
+            customers: { total: number };
+            inventory: { lowStockItems: Array<{ productId: string; productName: string; branchId: string; branchName: string; quantity: number }> };
+            branchPerformance: Array<{ branchId: string; branchName: string; staffCount: number; attendanceCount: number }>;
+          };
+        };
+        setFranchiseOverview(body.overview ?? null);
+      })
+      .catch(() => {
+        if (mounted) {
+          setFranchiseOverview(null);
+          setFranchiseOverviewError("Franchise overview could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          window.clearTimeout(loadingTimer);
+          setIsLoadingFranchiseOverview(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+      window.clearTimeout(loadingTimer);
+    };
+  }, [authenticated, activeTab]);
+
+  useEffect(() => {
+    if (authenticated !== true || activeTab !== "Financials") {
+      return;
+    }
+
+    let mounted = true;
+    const loadingTimer = window.setTimeout(() => {
+      if (mounted) {
+        setIsLoadingFranchisePayout(true);
+        setFranchisePayoutError(null);
+      }
+    }, 0);
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+    void fetch(`/api/franchise/payout?year=${year}&month=${month}`, { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        if (result.status === 401) {
+          setFranchisePayout(null);
+          setAuthenticated(false);
+          return;
+        }
+        if (result.status === 403) {
+          setFranchisePayout(null);
+          setFranchisePayoutError("You are not authorized to view franchise financials.");
+          return;
+        }
+        if (!result.ok) {
+          throw new Error("Franchise payout request failed");
+        }
+        const body = await result.json() as { payout?: typeof franchisePayout };
+        setFranchisePayout(body.payout ?? null);
+      })
+      .catch(() => {
+        if (mounted) {
+          setFranchisePayout(null);
+          setFranchisePayoutError("Franchise financials could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          window.clearTimeout(loadingTimer);
+          setIsLoadingFranchisePayout(false);
         }
       });
 
@@ -5908,6 +6061,212 @@ export default function Home() {
                 </button>
               </div>
             </div>
+          </section>
+        ) : null}
+
+        {activeTab === "Franchise Overview" ? (
+          <section className="mt-6 space-y-6">
+            {isLoadingFranchiseOverview ? (
+              <div className="text-sm text-[#736067]">Loading franchise overview...</div>
+            ) : null}
+            {!isLoadingFranchiseOverview && franchiseOverviewError ? (
+              <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{franchiseOverviewError}</div>
+            ) : null}
+            {!isLoadingFranchiseOverview && !franchiseOverviewError && franchiseOverview === null ? (
+              <div className="text-sm text-[#736067]">No franchise overview data yet.</div>
+            ) : null}
+            {franchiseOverview !== null ? (
+              <>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                  <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
+                    <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Branches</div>
+                    <div className="mt-2 text-3xl font-semibold">{franchiseOverview.branches.length}</div>
+                    <div className="mt-1 text-sm text-[#715a62]">
+                      {franchiseOverview.branches.filter((branch) => branch.isActive).length} active
+                    </div>
+                  </div>
+                  <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
+                    <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Revenue</div>
+                    <div className="mt-2 text-3xl font-semibold">₹{franchiseOverview.sales.totalRevenueCents / 100}</div>
+                    <div className="mt-1 text-sm text-[#715a62]">
+                      {franchiseOverview.sales.invoiceCount} invoice{franchiseOverview.sales.invoiceCount === 1 ? "" : "s"}
+                    </div>
+                  </div>
+                  <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
+                    <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Appointments</div>
+                    <div className="mt-2 text-3xl font-semibold">{franchiseOverview.appointments.total}</div>
+                    <div className="mt-2 space-y-1">
+                      {franchiseOverview.appointments.statusBreakdown.map((item) => (
+                        <div key={item.status} className="flex items-center justify-between text-xs text-[#736067]">
+                          <span>{item.status}</span>
+                          <span className="font-medium">{item.count}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
+                    <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Customers</div>
+                    <div className="mt-2 text-3xl fontibold">{franchiseOverview.customers.total}</div>
+                  </div>
+                </div>
+
+                <div className="mt-6 rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+                  <h2 className="text-xl font-semibold">Outlets</h2>
+                  <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {franchiseOverview.branches.map((branch) => (
+                      <div key={branch.branchId} className="rounded-xl bg-[#fffafc] p-4 ring-1 ring-[#f3e6eb]">
+                        <div className="font-medium">{branch.branchName}</div>
+                        <div className="mt-1 text-sm text-[#736067]">
+                          Status: {branch.isActive ? "Active" : "Inactive"}
+                        </div>
+                        <div className="text-sm text-[#736067]">
+                          Established: {new Date(branch.createdAt).toLocaleDateString()}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-6 rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+                  <h2 className="text-xl font-semibold">Branch Performance</h2>
+                  <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {franchiseOverview.branchPerformance.map((branch) => (
+                      <div key={branch.branchId} className="rounded-xl bg-[#fffafc] p-4 ring-1 ring-[#f3e6eb]">
+                        <div className="font-medium">{branch.branchName}</div>
+                        <div className="mt-1 text-sm text-[#736067]">
+                          Staff: {branch.staffCount}
+                        </div>
+                        <div className="text-sm text-[#736067]">
+                          Attendance records: {branch.attendanceCount}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {franchiseOverview.sales.dailyTrend.length > 0 ? (
+                  <div className="mt-6 rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+                    <h2 className="text-xl font-semibold">Daily Sales Trend</h2>
+                    <div className="mt-4 space-y-3">
+                      {franchiseOverview.sales.dailyTrend.map((item) => (
+                        <div key={item.date} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                          <div>
+                            <div className="font-medium">{item.date}</div>
+                            <div className="text-sm text-[#736067]">
+                              {item.invoiceCount} invoice{item.invoiceCount === 1 ? "" : "s"}
+                            </div>
+                          </div>
+                          <div className="text-right text-sm text-[#736067]">
+                            <div>₹{item.totalRevenueCents / 100}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                {franchiseOverview.inventory.lowStockItems.length > 0 ? (
+                  <div className="mt-6 rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+                    <h2 className="text-xl font-semibold">Low Stock Alerts</h2>
+                    <div className="mt-4 space-y-3">
+                      {franchiseOverview.inventory.lowStockItems.map((item) => (
+                        <div key={`${item.productId}-${item.branchId}`} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                          <div>
+                            <div className="font-medium">{item.productName}</div>
+                            <div className="text-sm text-[#736067]">
+                              {item.branchName}
+                            </div>
+                          </div>
+                          <div className="text-right text-sm text-[#736067]">
+                            <div>Qty: {item.quantity}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </>
+            ) : null}
+          </section>
+        ) : null}
+
+        {activeTab === "Financials" ? (
+          <section className="mt-6 space-y-6">
+            {isLoadingFranchisePayout ? (
+              <div className="text-sm text-[#736067]">Loading franchise financials...</div>
+            ) : null}
+            {!isLoadingFranchisePayout && franchisePayoutError ? (
+              <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{franchisePayoutError}</div>
+            ) : null}
+            {!isLoadingFranchisePayout && !franchisePayoutError && franchisePayout === null ? (
+              <div className="text-sm text-[#736067]">No franchise financial data yet.</div>
+            ) : null}
+            {franchisePayout !== null ? (
+              <>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {franchisePayout.payouts.map((payout) => (
+                    <div key={payout.partnerId} className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
+                      <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Partner</div>
+                      <div className="mt-2 text-lg font-semibold">{payout.partnerName}</div>
+                      <div className="mt-3 space-y-2">
+                        {payout.agreementPayouts.map((agreement) => (
+                          <div key={agreement.agreementId} className="rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                            <div className="text-sm font-medium">{agreement.branchName}</div>
+                            <div className="mt-1 flex items-center justify-between text-xs text-[#736067]">
+                              <span>Gross Revenue</span>
+                              <span>₹{agreement.grossRevenueCents / 100}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs text-[#736067]">
+                              <span>Revenue Share (20%)</span>
+                              <span>₹{agreement.revenueShareCents / 100}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs font-medium text-[#5a1838]">
+                              <span>Eligible Payout</span>
+                              <span>₹{agreement.eligibleRevenueSharePayoutCents / 100}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-3 flex items-center justify-between text-sm font-medium">
+                        <span>Revenue Share Total</span>
+                        <span>₹{payout.totalRevenueSharePayoutCents / 100}</span>
+                      </div>
+                      <div className="mt-3 space-y-2">
+                        {payout.territoryRoyalties.map((royalty) => (
+                          <div key={royalty.territoryId} className="rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                            <div className="text-sm font-medium">{royalty.territoryName}</div>
+                            <div className="mt-1 flex items-center justify-between text-xs text-[#736067]">
+                              <span>Territory Sales</span>
+                              <span>₹{royalty.territorySalesTurnoverCents / 100}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs text-[#736067]">
+                              <span>Royalty Pool (2%)</span>
+                              <span>₹{royalty.royaltyPoolCents / 100}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs text-[#736067]">
+                              <span>Eligible Partners</span>
+                              <span>{royalty.eligiblePartnerCount}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs font-medium text-[#5a1838]">
+                              <span>Individual Royalty</span>
+                              <span>₹{royalty.individualRoyaltyCents / 100}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-3 flex items-center justify-between text-sm font-medium">
+                        <span>Royalty Total</span>
+                        <span>₹{payout.totalTerritoryRoyaltyCents / 100}</span>
+                      </div>
+                      <div className="mt-3 flex items-center justify-between border-t border-[#f2e2e8] pt-3 text-base font-semibold">
+                        <span>Total Eligible Payout</span>
+                        <span>₹{payout.totalEligiblePayoutCents / 100}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : null}
           </section>
         ) : null}
 
