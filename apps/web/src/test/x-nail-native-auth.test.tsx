@@ -811,7 +811,12 @@ describe("X Nail native authentication integration", () => {
       .mockResolvedValueOnce(Response.json({ users: [{ id: "user-1", membershipId: "m-1", email: "admin@test.com", displayName: "Admin", isActive: true }] }))
       .mockResolvedValueOnce(Response.json({ roles: [{ id: "role-1", code: "branch-manager", name: "Branch Manager" }] }))
       .mockResolvedValueOnce(Response.json({ assignment: { id: "assign-1", membershipId: "m-1", roleId: "role-1", scope: { kind: "tenant" } } }))
-      .mockResolvedValueOnce(Response.json({ roles: [{ id: "role-1", code: "tenant-admin", name: "Admin", scope: { kind: "tenant" }, permissions: [] }], permissionCodes: ["tenant.manage"] }));
+      .mockResolvedValueOnce(Response.json({ roles: [{ id: "role-1", code: "tenant-admin", name: "Admin", scope: { kind: "tenant" }, permissions: [] }], permissionCodes: ["tenant.manage"] }))
+      .mockImplementation(async (input: RequestInfo | URL) => {
+        const url = typeof input === "string" ? input : input.toString();
+        if (url === "/api/services") return Response.json({ services: [] });
+        return new Response(null, { status: 404 });
+      });
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
 

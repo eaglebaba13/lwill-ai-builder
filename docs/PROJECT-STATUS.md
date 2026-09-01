@@ -123,6 +123,29 @@
 - Branch-scoped roles receive 403 when attempting tenant-level API access.
 - No production DB, Prisma schema/migrations, or deployment configuration was changed.
 
+## X Nail Role-Assignment Test Stability Fix — 2026-09-01
+
+### Status: **Complete — "assigns a role through the Settings tab form" now passes in full suite**
+
+### Implemented Slice
+
+- Hardened `apps/web/src/test/x-nail-native-auth.test.tsx` > "assigns a role through the Settings tab form" by adding a fallback `mockImplementation` on the `fetch` mock that returns benign responses for any unmocked call (e.g. the deferred `/api/services` refresh triggered by `profileVersion` increment after a successful role assignment).
+- Raised the global Vitest `testTimeout` from the default 5s to 15s in `apps/web/vitest.config.mts` to keep the heavy integration suite (jsdom + React 19) within deterministic limits when run alongside the rest of the test files.
+
+### Verification Results
+
+- `pnpm --filter web exec vitest run src/test/x-nail-native-auth.test.tsx` — 36 tests passed (1 targeted test + 35 others).
+- `pnpm --filter web exec vitest run` (full web suite) — 47 files / 547 tests passed.
+- `pnpm --filter authentication-context-prisma test` — 54 files / 476 tests passed.
+- `pnpm --filter web lint` — 0 errors, 14 pre-existing warnings.
+- `pnpm build` — Next.js production build success.
+
+### Notes
+
+- The 11th `fetch` call was the Settings tab effect that re-fetches `/api/services` when `activeTab === "Settings"`, `profileVersion` increments after role assignment, and the `tenant.manage` permission is held. Production code is unchanged.
+- `mockImplementation` only applies once the 10 explicit `mockResolvedValueOnce` values are consumed, so it does not alter earlier assertions.
+- No production DB, Prisma schema/migrations, deployment configuration, customer/CRM/RBAC/bootstrap work, or unrelated x-nail page logic was modified.
+
 ## Verification Evidence
 
 - `pnpm install --frozen-lockfile`: Passed.
