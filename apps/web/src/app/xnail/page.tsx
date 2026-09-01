@@ -159,10 +159,10 @@ function KpiCard({ definition, context }: { readonly definition: RoleDashboardCo
   }
 
   return (
-    <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
-      <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">{definition.label}</div>
+    <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+      <div className="text-xs uppercase tracking-[0.18em] text-[#a39a86]">{definition.label}</div>
       <div className="mt-2 text-3xl font-semibold">{value}</div>
-      {subtitle ? <div className="mt-1 text-sm text-[#715a62]">{subtitle}</div> : null}
+      {subtitle ? <div className="mt-1 text-sm text-[#a39a86]">{subtitle}</div> : null}
     </div>
   );
 }
@@ -3927,16 +3927,16 @@ export default function Home() {
 
   if (!authenticated) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#fdf8f6] px-4 py-12 text-[#26171d]">
-        <div className="w-full max-w-md rounded-[28px] border border-[#f0dfe6] bg-white p-8 shadow-[0_30px_80px_rgba(59,24,38,0.08)]">
+      <main className="flex min-h-screen items-center justify-center bg-[#080807] px-4 py-12 text-[#f5f1e6]">
+        <div className="w-full max-w-md rounded-2xl border border-[rgba(212,175,55,0.2)] bg-[#0d0c0a] p-8 shadow-[0_30px_80px_rgba(0,0,0,0.5)]">
           <div className="mb-6">
-            <p className="text-xs font-semibold tracking-[0.22em] text-[#7c4f62]">X NAIL</p>
-            <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em]">Operations login</h1>
+            <p className="text-xs font-semibold tracking-[0.22em] text-[#d4af37]">X NAIL</p>
+            <h1 className="mt-2 font-serif text-3xl font-semibold tracking-[-0.04em] text-[#f5f1e6]">Operations login</h1>
           </div>
 
           <form className="space-y-4" onSubmit={handleLogin}>
             <label className="block">
-              <span className="mb-2 block text-sm font-medium text-[#5a3b48]">Email</span>
+              <span className="mb-2 block text-sm font-medium text-[#a39a86]">Email</span>
               <input
                 type="email"
                 name="email"
@@ -3944,12 +3944,12 @@ export default function Home() {
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 required
-                className="w-full rounded-xl border border-[#e8d8df] bg-[#fffafc] px-3 py-2.5 text-sm"
+                className="premium-input"
               />
             </label>
 
             <label className="block">
-              <span className="mb-2 block text-sm font-medium text-[#5a3b48]">Password</span>
+              <span className="mb-2 block text-sm font-medium text-[#a39a86]">Password</span>
               <input
                 type="password"
                 name="password"
@@ -3957,12 +3957,12 @@ export default function Home() {
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 required
-                className="w-full rounded-xl border border-[#e8d8df] bg-[#fffafc] px-3 py-2.5 text-sm"
+                className="premium-input"
               />
             </label>
 
             {loginError ? (
-              <div className="rounded-xl border border-[#f0c5c5] bg-[#fff6f6] px-3 py-2 text-sm text-[#8f3f3f]">
+              <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] px-3 py-2 text-sm text-[#d1554a]">
                 {loginError}
               </div>
             ) : null}
@@ -3970,7 +3970,7 @@ export default function Home() {
             <button
               type="submit"
               disabled={isAuthenticating}
-              className="w-full rounded-xl bg-[#5a1838] px-4 py-3 text-sm font-semibold text-white"
+              className="premium-btn-primary w-full py-3"
             >
               {isAuthenticating ? "Signing in..." : "Sign in"}
             </button>
@@ -3981,30 +3981,33 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-[#faf4f2] text-[#2d1a22]">
-      <header className="border-b border-[#f0dfe5] bg-white/85 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <div>
-            <div className="text-xl font-semibold tracking-tight">X Nail</div>
-            <div className="text-[10px] font-medium uppercase tracking-[0.22em] text-[#8a606d]">
-              {effectiveRole ? `${effectiveRole.roleName} dashboard` : "Operations dashboard"}
+    <main className="min-h-screen bg-[#080807] text-[#f5f1e6]">
+      <header className="sticky top-0 z-20 border-b border-[rgba(212,175,55,0.1)] bg-[#0a0a09]/95 backdrop-blur-sm">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-[#9c7a1e] to-[#d4af37] text-sm font-bold text-[#080807]">X</div>
+            <div>
+              <div className="text-sm font-semibold tracking-tight text-[#f5f1e6]">X Nail</div>
+              <div className="text-[10px] font-medium uppercase tracking-[0.18em] text-[#a39a86]">
+                {effectiveRole ? `${effectiveRole.roleName} dashboard` : "Operations dashboard"}
+              </div>
             </div>
             {userProfile?.displayName ? (
-              <div className="mt-1 text-xs text-[#736067]">{userProfile.displayName}</div>
+              <div className="ml-4 text-xs text-[#a39a86]">{userProfile.displayName}</div>
             ) : null}
           </div>
 
           <div className="flex items-center gap-2 text-sm">
             {effectiveRole ? (
-              <span className="rounded-full bg-[#e8f5e9] px-3 py-1 text-[#2e7d32]">{effectiveRole.roleName}</span>
+              <span className="premium-badge-success">{effectiveRole.roleName}</span>
             ) : (
-              <span className="rounded-full bg-[#fceff4] px-3 py-1 text-[#6a2f4a]">X Nail</span>
+              <span className="premium-badge">X Nail</span>
             )}
             {userRoles.length > 1 ? (
-              <span className="rounded-full bg-[#fff8e1] px-3 py-1 text-[#5d4037]">{userRoles.length} roles</span>
+              <span className="premium-badge-warning">{userRoles.length} roles</span>
             ) : null}
             <button
-              className="rounded-full border border-[#ead0d9] px-3 py-1.5"
+              className="premium-btn-secondary px-3 py-1.5 text-xs"
               onClick={handleLogout}
             >
               Sign out
@@ -4012,27 +4015,27 @@ export default function Home() {
           </div>
         </div>
         {profileError ? (
-          <div className="mx-auto max-w-6xl px-6 pb-4">
-            <div className="rounded-xl border border-[#f0c5c5] bg-[#fff6f6] px-3 py-2 text-sm text-[#8f3f3f]">{profileError}</div>
+          <div className="mx-auto max-w-7xl px-6 pb-4">
+            <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] px-3 py-2 text-sm text-[#d1554a]">{profileError}</div>
           </div>
         ) : null}
       </header>
 
-      <div className="mx-auto max-w-6xl px-6 py-8">
+      <div className="mx-auto max-w-7xl px-6 py-8">
         <div className="mb-6 flex flex-wrap gap-2">
           {visibleTabs.map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                activeTab === tab
-                  ? "bg-[#5a1838] text-white"
-                  : "bg-white text-[#5a3b48] ring-1 ring-[#eed8df]"
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
+                  activeTab === tab
+                    ? "border border-[rgba(212,175,55,0.4)] bg-[#171511] text-[#d4af37]"
+                    : "border border-transparent text-[#a39a86] hover:border-[rgba(212,175,55,0.15)] hover:bg-[#12110f] hover:text-[#f5f1e6]"
+                }`}
+              >
+                {tab}
+              </button>
+            ))}
         </div>
 
         {activeTab === "Overview" ? (
@@ -4043,27 +4046,27 @@ export default function Home() {
               ))
             ) : (
               <>
-                <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
-                  <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Today</div>
+                <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+                  <div className="text-xs uppercase tracking-[0.18em] text-[#a39a86]">Today</div>
                   <div className="mt-2 text-3xl font-semibold">
                     {appointments.filter((appointment) => appointment.startsAt.startsWith(new Date().toISOString().split("T")[0])).length}
                   </div>
-                  <div className="mt-1 text-sm text-[#715a62]">Appointments</div>
+                  <div className="mt-1 text-sm text-[#a39a86]">Appointments</div>
                 </div>
-                <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
-                  <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Revenue</div>
+                <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+                  <div className="text-xs uppercase tracking-[0.18em] text-[#a39a86]">Revenue</div>
                   <div className="mt-2 text-3xl font-semibold">₹{invoices.reduce((sum, invoice) => sum + invoice.totalCents, 0) / 100}</div>
-                  <div className="mt-1 text-sm text-[#715a62]">Gross sales</div>
+                  <div className="mt-1 text-sm text-[#a39a86]">Gross sales</div>
                 </div>
-                <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
-                  <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Members</div>
+                <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+                  <div className="text-xs uppercase tracking-[0.18em] text-[#a39a86]">Members</div>
                   <div className="mt-2 text-3xl font-semibold">{memberships.length}</div>
-                  <div className="mt-1 text-sm text-[#715a62]">Loyalty</div>
+                  <div className="mt-1 text-sm text-[#a39a86]">Loyalty</div>
                 </div>
-                <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
-                  <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Staff</div>
+                <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+                  <div className="text-xs uppercase tracking-[0.18em] text-[#a39a86]">Staff</div>
                   <div className="mt-2 text-3xl font-semibold">{staff.length}</div>
-                  <div className="mt-1 text-sm text-[#715a62]">Active</div>
+                  <div className="mt-1 text-sm text-[#a39a86]">Active</div>
                 </div>
               </>
             )}
@@ -4072,30 +4075,30 @@ export default function Home() {
 
         {activeTab === "Customers" ? (
           <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
               <h2 className="text-xl font-semibold">Customer list</h2>
               <div className="mt-4 space-y-3">
-                {isLoadingCustomers ? <div className="text-sm text-[#736067]">Loading customers...</div> : null}
-                {!isLoadingCustomers && customerError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{customerError}</div> : null}
-                {!isLoadingCustomers && !customerError && customers.length === 0 ? <div className="text-sm text-[#736067]">No customers yet.</div> : null}
+                {isLoadingCustomers ? <div className="text-sm text-[#a39a86]">Loading customers...</div> : null}
+                {!isLoadingCustomers && customerError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{customerError}</div> : null}
+                {!isLoadingCustomers && !customerError && customers.length === 0 ? <div className="text-sm text-[#a39a86]">No customers yet.</div> : null}
                 {customers.map((customer) => {
                   const customerAppointments = appointments.filter((appointment) => appointment.customerId === customer.id);
                   const lastVisit = customerAppointments.length > 0 ? customerAppointments.sort((a, b) => b.startsAt.localeCompare(a.startsAt))[0].startsAt : null;
                   return (
-                  <div key={customer.id} className="rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                  <div key={customer.id} className="rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
                     {editingCustomerId === customer.id ? (
                       <div className="space-y-2">
                         <input
                           value={editingCustomerName}
                           onChange={(event) => setEditingCustomerName(event.target.value)}
                           placeholder="Customer name"
-                          className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                          className="premium-input"
                         />
                         <input
                           value={editingCustomerPhone}
                           onChange={(event) => setEditingCustomerPhone(event.target.value)}
                           placeholder="Phone"
-                          className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                          className="premium-input"
                         />
                         <div className="flex gap-2">
                           <button
@@ -4106,7 +4109,7 @@ export default function Home() {
                           </button>
                           <button
                             onClick={() => setEditingCustomerId(null)}
-                            className="rounded-xl bg-[#f0dfe6] px-3 py-2 text-sm font-semibold text-[#5a1838]"
+                            className="rounded-xl bg-[#f0dfe6] px-3 py-2 text-sm font-semibold text-[#d4af37]"
                           >
                             Cancel
                           </button>
@@ -4117,14 +4120,14 @@ export default function Home() {
                         <div className="flex items-center justify-between">
                           <div>
                             <div className="font-medium">{customer.name}</div>
-                            <div className="text-sm text-[#736067]">{customer.phone}</div>
-                            <div className="text-xs text-[#736067]">
+                            <div className="text-sm text-[#a39a86]">{customer.phone}</div>
+                            <div className="text-xs text-[#a39a86]">
                               {customerAppointments.length > 0 ? (
                                 <>
                                   Visits: {customerAppointments.length} · Last: {new Date(lastVisit!).toLocaleDateString()}
                                 </>
                               ) : (
-                                <span className="text-[#736067]">No visits yet</span>
+                                <span className="text-[#a39a86]">No visits yet</span>
                               )}
                             </div>
                           </div>
@@ -4136,7 +4139,7 @@ export default function Home() {
                                 setEditingCustomerName(customer.name);
                                 setEditingCustomerPhone(customer.phone || "");
                               }}
-                              className="rounded-xl bg-[#f0dfe6] px-3 py-1.5 text-sm font-semibold text-[#5a1838]"
+                              className="rounded-xl bg-[#f0dfe6] px-3 py-1.5 text-sm font-semibold text-[#d4af37]"
                             >
                               Edit
                             </button>
@@ -4150,24 +4153,24 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
               <h2 className="text-xl font-semibold">Add customer</h2>
               <div className="mt-4 space-y-3">
                 <input
                   value={customerName}
                   onChange={(event) => setCustomerName(event.target.value)}
                   placeholder="Customer name"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 />
                 <input
                   value={customerPhone}
                   onChange={(event) => setCustomerPhone(event.target.value)}
                   placeholder="Phone"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 />
                 <button
                   onClick={addCustomer}
-                  className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                  className="premium-btn-primary w-full py-2.5 text-sm"
                 >
                   Save customer
                 </button>
@@ -4178,27 +4181,27 @@ export default function Home() {
 
         {activeTab === "Services" ? (
           <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
               <h2 className="text-xl font-semibold">Service menu</h2>
               <div className="mt-4 space-y-3">
-                {isLoadingServices ? <div className="text-sm text-[#736067]">Loading services...</div> : null}
-                {!isLoadingServices && serviceError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{serviceError}</div> : null}
-                {!isLoadingServices && !serviceError && services.length === 0 ? <div className="text-sm text-[#736067]">No services yet.</div> : null}
+                {isLoadingServices ? <div className="text-sm text-[#a39a86]">Loading services...</div> : null}
+                {!isLoadingServices && serviceError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{serviceError}</div> : null}
+                {!isLoadingServices && !serviceError && services.length === 0 ? <div className="text-sm text-[#a39a86]">No services yet.</div> : null}
                 {services.map((service) => (
-                  <div key={service.id} className="rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                  <div key={service.id} className="rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
                     {editingServiceId === service.id ? (
                       <div className="space-y-2">
                         <input
                           value={editingServiceName}
                           onChange={(event) => setEditingServiceName(event.target.value)}
                           placeholder="Service name"
-                          className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                          className="premium-input"
                         />
                         <input
                           value={editingServicePrice}
                           onChange={(event) => setEditingServicePrice(event.target.value)}
                           placeholder="Price"
-                          className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                          className="premium-input"
                         />
                         <div className="flex gap-2">
                           <button
@@ -4209,7 +4212,7 @@ export default function Home() {
                           </button>
                           <button
                             onClick={() => setEditingServiceId(null)}
-                            className="rounded-xl bg-[#f0dfe6] px-3 py-2 text-sm font-semibold text-[#5a1838]"
+                            className="rounded-xl bg-[#f0dfe6] px-3 py-2 text-sm font-semibold text-[#d4af37]"
                           >
                             Cancel
                           </button>
@@ -4219,17 +4222,17 @@ export default function Home() {
                       <div className="flex items-center justify-between">
                         <div>
                           <div className="font-medium">{service.name}</div>
-                          <div className="text-sm text-[#736067]">{service.durationMinutes} min</div>
+                          <div className="text-sm text-[#a39a86]">{service.durationMinutes} min</div>
                         </div>
                         <div className="flex items-center gap-3">
-                          <div className="font-semibold text-[#6a2f4a]">₹{service.priceCents / 100}</div>
+                          <div className="font-semibold text-[#a39a86]">₹{service.priceCents / 100}</div>
                           <button
                             onClick={() => {
                               setEditingServiceId(service.id);
                               setEditingServiceName(service.name);
                               setEditingServicePrice(String(service.priceCents));
                             }}
-                            className="rounded-xl bg-[#f0dfe6] px-3 py-1.5 text-sm font-semibold text-[#5a1838]"
+                            className="rounded-xl bg-[#f0dfe6] px-3 py-1.5 text-sm font-semibold text-[#d4af37]"
                           >
                             Edit
                           </button>
@@ -4241,24 +4244,24 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
               <h2 className="text-xl font-semibold">Add service</h2>
               <div className="mt-4 space-y-3">
                 <input
                   value={serviceName}
                   onChange={(event) => setServiceName(event.target.value)}
                   placeholder="Service name"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 />
                 <input
                   value={servicePrice}
                   onChange={(event) => setServicePrice(event.target.value)}
                   placeholder="Price"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 />
                 <button
                   onClick={addService}
-                  className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                  className="premium-btn-primary w-full py-2.5 text-sm"
                 >
                   Save service
                 </button>
@@ -4269,21 +4272,21 @@ export default function Home() {
 
         {activeTab === "Packages" ? (
           <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
               <h2 className="text-xl font-semibold">Packages</h2>
               <div className="mt-4 space-y-3">
-                {isLoadingPackages ? <div className="text-sm text-[#736067]">Loading packages...</div> : null}
-                {!isLoadingPackages && packageError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{packageError}</div> : null}
-                {!isLoadingPackages && !packageError && packages.length === 0 ? <div className="text-sm text-[#736067]">No packages yet.</div> : null}
+                {isLoadingPackages ? <div className="text-sm text-[#a39a86]">Loading packages...</div> : null}
+                {!isLoadingPackages && packageError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{packageError}</div> : null}
+                {!isLoadingPackages && !packageError && packages.length === 0 ? <div className="text-sm text-[#a39a86]">No packages yet.</div> : null}
                 {packages.map((pkg) => (
-                  <div key={pkg.id} className="rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                  <div key={pkg.id} className="rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
                     {editingPackageId === pkg.id ? (
                       <div className="space-y-2">
                         <input
                           value={editingPackageName}
                           onChange={(event) => setEditingPackageName(event.target.value)}
                           placeholder="Package name"
-                          className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                          className="premium-input"
                         />
                         <div className="flex gap-2">
                           <button
@@ -4294,7 +4297,7 @@ export default function Home() {
                           </button>
                           <button
                             onClick={() => setEditingPackageId(null)}
-                            className="rounded-xl bg-[#f0dfe6] px-3 py-2 text-sm font-semibold text-[#5a1838]"
+                            className="rounded-xl bg-[#f0dfe6] px-3 py-2 text-sm font-semibold text-[#d4af37]"
                           >
                             Cancel
                           </button>
@@ -4304,16 +4307,16 @@ export default function Home() {
                       <div className="flex items-center justify-between">
                         <div>
                           <div className="font-medium">{pkg.name}</div>
-                          <div className="text-sm text-[#736067]">{pkg.serviceIds.length} service(s)</div>
+                          <div className="text-sm text-[#a39a86]">{pkg.serviceIds.length} service(s)</div>
                         </div>
                         <div className="flex items-center gap-3">
-                          <div className="font-semibold text-[#6a2f4a]">{pkg.priceCents === null ? "—" : `₹${pkg.priceCents / 100}`}</div>
+                          <div className="font-semibold text-[#a39a86]">{pkg.priceCents === null ? "—" : `₹${pkg.priceCents / 100}`}</div>
                           <button
                             onClick={() => {
                               setEditingPackageId(pkg.id);
                               setEditingPackageName(pkg.name);
                             }}
-                            className="rounded-xl bg-[#f0dfe6] px-3 py-1.5 text-sm font-semibold text-[#5a1838]"
+                            className="rounded-xl bg-[#f0dfe6] px-3 py-1.5 text-sm font-semibold text-[#d4af37]"
                           >
                             Edit
                           </button>
@@ -4325,18 +4328,18 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
               <h2 className="text-xl font-semibold">Add package</h2>
               <div className="mt-4 space-y-3">
                 <input
                   value={packageName}
                   onChange={(event) => setPackageName(event.target.value)}
                   placeholder="Package name"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 />
                 <button
                   onClick={addPackage}
-                  className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                  className="premium-btn-primary w-full py-2.5 text-sm"
                 >
                   Save package
                 </button>
@@ -4347,21 +4350,21 @@ export default function Home() {
 
         {activeTab === "Memberships" ? (
           <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
               <h2 className="text-xl font-semibold">Memberships</h2>
               <div className="mt-4 space-y-3">
-                {isLoadingMemberships ? <div className="text-sm text-[#736067]">Loading memberships...</div> : null}
-                {!isLoadingMemberships && membershipError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{membershipError}</div> : null}
-                {!isLoadingMemberships && !membershipError && memberships.length === 0 ? <div className="text-sm text-[#736067]">No memberships yet.</div> : null}
+                {isLoadingMemberships ? <div className="text-sm text-[#a39a86]">Loading memberships...</div> : null}
+                {!isLoadingMemberships && membershipError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{membershipError}</div> : null}
+                {!isLoadingMemberships && !membershipError && memberships.length === 0 ? <div className="text-sm text-[#a39a86]">No memberships yet.</div> : null}
                 {memberships.map((membership) => (
-                  <div key={membership.id} className="rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                  <div key={membership.id} className="rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
                     {editingMembershipId === membership.id ? (
                       <div className="space-y-2">
                         <input
                           value={editingMembershipStatus}
                           onChange={(event) => setEditingMembershipStatus(event.target.value)}
                           placeholder="Status"
-                          className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                          className="premium-input"
                         />
                         <div className="flex gap-2">
                           <button
@@ -4372,7 +4375,7 @@ export default function Home() {
                           </button>
                           <button
                             onClick={() => setEditingMembershipId(null)}
-                            className="rounded-xl bg-[#f0dfe6] px-3 py-2 text-sm font-semibold text-[#5a1838]"
+                            className="rounded-xl bg-[#f0dfe6] px-3 py-2 text-sm font-semibold text-[#d4af37]"
                           >
                             Cancel
                           </button>
@@ -4382,10 +4385,10 @@ export default function Home() {
                       <div className="flex items-center justify-between">
                         <div>
                           <div className="font-medium">{customerMap.get(membership.customerId) ?? `Customer ${membership.customerId}`}</div>
-                          <div className="text-sm text-[#736067]">{packageMap.get(membership.packageId) ?? `Package ${membership.packageId}`}</div>
+                          <div className="text-sm text-[#a39a86]">{packageMap.get(membership.packageId) ?? `Package ${membership.packageId}`}</div>
                         </div>
                         <div className="flex items-center gap-3">
-                          <div className="text-right text-sm text-[#736067]">
+                          <div className="text-right text-sm text-[#a39a86]">
                             <div>{membership.startedAt}</div>
                             <div>{membership.endsAt ?? "—"}</div>
                           </div>
@@ -4394,7 +4397,7 @@ export default function Home() {
                               setEditingMembershipId(membership.id);
                               setEditingMembershipStatus(membership.status || "");
                             }}
-                            className="rounded-xl bg-[#f0dfe6] px-3 py-1.5 text-sm font-semibold text-[#5a1838]"
+                            className="rounded-xl bg-[#f0dfe6] px-3 py-1.5 text-sm font-semibold text-[#d4af37]"
                           >
                             Edit
                           </button>
@@ -4406,42 +4409,42 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
               <h2 className="text-xl font-semibold">Add membership</h2>
               <div className="mt-4 space-y-3">
                 <input
                   value={membershipCustomerId}
                   onChange={(event) => setMembershipCustomerId(event.target.value)}
                   placeholder="Customer ID"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 />
                 <input
                   value={membershipPackageId}
                   onChange={(event) => setMembershipPackageId(event.target.value)}
                   placeholder="Package ID"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 />
                 <input
                   value={membershipStartedAt}
                   onChange={(event) => setMembershipStartedAt(event.target.value)}
                   placeholder="Started at (ISO date)"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 />
                 <input
                   value={membershipEndsAt}
                   onChange={(event) => setMembershipEndsAt(event.target.value)}
                   placeholder="Ends at (optional)"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 />
                 <input
                   value={membershipStatus}
                   onChange={(event) => setMembershipStatus(event.target.value)}
                   placeholder="Status (optional)"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 />
                 <button
                   onClick={addMembership}
-                  className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                  className="premium-btn-primary w-full py-2.5 text-sm"
                 >
                   Save membership
                 </button>
@@ -4452,19 +4455,19 @@ export default function Home() {
 
         {activeTab === "Staff" ? (
           <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
               <h2 className="text-xl font-semibold">Staff roster</h2>
               <div className="mt-4 space-y-3">
-                {isLoadingStaff ? <div className="text-sm text-[#736067]">Loading staff...</div> : null}
-                {!isLoadingStaff && staffError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{staffError}</div> : null}
-                {!isLoadingStaff && !staffError && staff.length === 0 ? <div className="text-sm text-[#736067]">No staff yet.</div> : null}
+                {isLoadingStaff ? <div className="text-sm text-[#a39a86]">Loading staff...</div> : null}
+                {!isLoadingStaff && staffError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{staffError}</div> : null}
+                {!isLoadingStaff && !staffError && staff.length === 0 ? <div className="text-sm text-[#a39a86]">No staff yet.</div> : null}
                 {staff.map((member) => (
-                  <div key={member.id} className="flex flex-col gap-2 rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                  <div key={member.id} className="flex flex-col gap-2 rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
                     {editingStaffId !== member.id ? (
                       <div className="flex items-center justify-between">
                         <div>
                           <div className="font-medium">{member.displayName}</div>
-                          <div className="text-sm text-[#736067]">{member.branchId ?? "No branch"}</div>
+                          <div className="text-sm text-[#a39a86]">{member.branchId ?? "No branch"}</div>
                         </div>
                         <div className="flex items-center gap-2">
                           <button
@@ -4472,13 +4475,13 @@ export default function Home() {
                               setEditingStaffId(member.id);
                               setEditingStaffName(member.displayName);
                             }}
-                            className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                            className="premium-btn-secondary px-3 py-1.5 text-xs"
                           >
                             Edit
                           </button>
                           <button
                             onClick={() => deleteStaff(member.id)}
-                            className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                            className="premium-btn-secondary px-3 py-1.5 text-xs"
                           >
                             Delete
                           </button>
@@ -4490,7 +4493,7 @@ export default function Home() {
                           value={editingStaffName}
                           onChange={(event) => setEditingStaffName(event.target.value)}
                           placeholder="Staff name"
-                          className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                          className="premium-input"
                         />
                         <div className="flex items-center gap-2">
                           <button
@@ -4499,13 +4502,13 @@ export default function Home() {
                               await updateStaff(member.id, editingStaffName);
                               setEditingStaffId(null);
                             }}
-                            className="rounded-xl bg-[#5a1838] px-3 py-1.5 text-xs font-semibold text-white"
+                            className="premium-btn-primary px-3 py-1.5 text-xs"
                           >
                             Save
                           </button>
                           <button
                             onClick={() => setEditingStaffId(null)}
-                            className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                            className="premium-btn-secondary px-3 py-1.5 text-xs"
                           >
                             Cancel
                           </button>
@@ -4517,18 +4520,18 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
               <h2 className="text-xl font-semibold">Add staff</h2>
               <div className="mt-4 space-y-3">
                 <input
                   value={staffName}
                   onChange={(event) => setStaffName(event.target.value)}
                   placeholder="Staff name"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 />
                 <button
                   onClick={addStaff}
-                  className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                  className="premium-btn-primary w-full py-2.5 text-sm"
                 >
                   Save staff
                 </button>
@@ -4539,21 +4542,21 @@ export default function Home() {
 
         {activeTab === "Attendance" ? (
           <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
               <h2 className="text-xl font-semibold">Attendance</h2>
               <div className="mt-4 space-y-3">
-                {isLoadingAttendance ? <div className="text-sm text-[#736067]">Loading attendance...</div> : null}
-                {!isLoadingAttendance && attendanceError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{attendanceError}</div> : null}
-                {!isLoadingAttendance && !attendanceError && attendance.length === 0 ? <div className="text-sm text-[#736067]">No attendance records yet.</div> : null}
+                {isLoadingAttendance ? <div className="text-sm text-[#a39a86]">Loading attendance...</div> : null}
+                {!isLoadingAttendance && attendanceError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{attendanceError}</div> : null}
+                {!isLoadingAttendance && !attendanceError && attendance.length === 0 ? <div className="text-sm text-[#a39a86]">No attendance records yet.</div> : null}
                 {attendance.map((record) => (
-                  <div key={record.id} className="flex flex-col gap-2 rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                  <div key={record.id} className="flex flex-col gap-2 rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
                     {editingAttendanceId !== record.id ? (
                       <div className="flex items-center justify-between">
                         <div>
                           <div className="font-medium">{staffMap.get(record.staffId) ?? `Staff ${record.staffId}`}</div>
-                          <div className="text-sm text-[#736067]">{record.checkInAt}</div>
+                          <div className="text-sm text-[#a39a86]">{record.checkInAt}</div>
                         </div>
-                        <div className="flex items-center gap-3 text-right text-sm text-[#736067]">
+                        <div className="flex items-center gap-3 text-right text-sm text-[#a39a86]">
                           <div>
                             <div>{record.status ?? "—"}</div>
                             <div>{record.checkOutAt ?? "—"}</div>
@@ -4561,7 +4564,7 @@ export default function Home() {
                           {record.checkOutAt === null ? (
                             <button
                               onClick={() => checkOutAttendance(record.id)}
-                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                              className="premium-btn-secondary px-3 py-1.5 text-xs"
                             >
                               Check out
                             </button>
@@ -4572,13 +4575,13 @@ export default function Home() {
                               setEditingAttendanceStatus(record.status ?? "");
                               setEditingAttendanceNotes("");
                             }}
-                            className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                            className="premium-btn-secondary px-3 py-1.5 text-xs"
                           >
                             Edit
                           </button>
                           <button
                             onClick={() => deleteAttendance(record.id)}
-                            className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                            className="premium-btn-secondary px-3 py-1.5 text-xs"
                           >
                             Delete
                           </button>
@@ -4590,13 +4593,13 @@ export default function Home() {
                           value={editingAttendanceStatus}
                           onChange={(event) => setEditingAttendanceStatus(event.target.value)}
                           placeholder="Status"
-                          className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                          className="premium-input"
                         />
                         <input
                           value={editingAttendanceNotes}
                           onChange={(event) => setEditingAttendanceNotes(event.target.value)}
                           placeholder="Notes"
-                          className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                          className="premium-input"
                         />
                         <div className="flex items-center gap-2">
                           <button
@@ -4605,13 +4608,13 @@ export default function Home() {
                               await updateAttendance(record.id, editingAttendanceStatus, editingAttendanceNotes);
                               setEditingAttendanceId(null);
                             }}
-                            className="rounded-xl bg-[#5a1838] px-3 py-1.5 text-xs font-semibold text-white"
+                            className="premium-btn-primary px-3 py-1.5 text-xs"
                           >
                             Save
                           </button>
                           <button
                             onClick={() => setEditingAttendanceId(null)}
-                            className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                            className="premium-btn-secondary px-3 py-1.5 text-xs"
                           >
                             Cancel
                           </button>
@@ -4623,13 +4626,13 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
               <h2 className="text-xl font-semibold">Record attendance</h2>
               <div className="mt-4 space-y-3">
                 <select
                   value={attendanceStaffId}
                   onChange={(event) => setAttendanceStaffId(event.target.value)}
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 >
                   <option value="">Select staff</option>
                   {staff.map((member, index) => (
@@ -4642,29 +4645,29 @@ export default function Home() {
                   value={attendanceCheckIn}
                   onChange={(event) => setAttendanceCheckIn(event.target.value)}
                   placeholder="Check-in (ISO date)"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 />
                 <input
                   value={attendanceCheckOut}
                   onChange={(event) => setAttendanceCheckOut(event.target.value)}
                   placeholder="Check-out (optional, ISO date)"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 />
                 <input
                   value={attendanceStatus}
                   onChange={(event) => setAttendanceStatus(event.target.value)}
                   placeholder="Status (optional)"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 />
                 <input
                   value={attendanceNotes}
                   onChange={(event) => setAttendanceNotes(event.target.value)}
                   placeholder="Notes (optional)"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 />
                 <button
                   onClick={addAttendance}
-                  className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                  className="premium-btn-primary w-full py-2.5 text-sm"
                 >
                   Save attendance
                 </button>
@@ -4675,32 +4678,32 @@ export default function Home() {
 
         {activeTab === "Appointments" ? (
           <section className="mt-6 grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
               <h2 className="text-xl font-semibold">Appointments</h2>
               {!appointmentError ? null : (
-                <div className="mt-2 rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">
+                <div className="mt-2 rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">
                   {appointmentError}
                 </div>
               )}
-              {isLoadingAppointments ? <div className="text-sm text-[#736067]">Loading appointments...</div> : null}
+              {isLoadingAppointments ? <div className="text-sm text-[#a39a86]">Loading appointments...</div> : null}
               {!isLoadingAppointments && !appointmentError && appointments.length === 0 ? (
-                <div className="text-sm text-[#736067]">No appointments yet.</div>
+                <div className="text-sm text-[#a39a86]">No appointments yet.</div>
               ) : null}
                <div className="mt-4 space-y-3">
                 {appointments.map((appointment, index) => (
-                  <div key={`${appointment.customerId}-${index}`} className="rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                  <div key={`${appointment.customerId}-${index}`} className="rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
                     {editingAppointmentIndex !== index ? (
                       <div className="flex items-center justify-between gap-3">
                         <div>
                           <div className="font-medium">{customerMap.get(appointment.customerId) ?? `Customer ${appointment.customerId}`}</div>
-                          <div className="text-sm text-[#736067]">{serviceMap.get(appointment.serviceId) ?? `Service ${appointment.serviceId}`}</div>
-                          <div className="text-sm text-[#736067]">{staffMap.get(appointment.staffId) ?? `Staff ${appointment.staffId}`}</div>
-                          <div className="text-sm text-[#736067]">{appointment.startsAt}</div>
+                          <div className="text-sm text-[#a39a86]">{serviceMap.get(appointment.serviceId) ?? `Service ${appointment.serviceId}`}</div>
+                          <div className="text-sm text-[#a39a86]">{staffMap.get(appointment.staffId) ?? `Staff ${appointment.staffId}`}</div>
+                          <div className="text-sm text-[#a39a86]">{appointment.startsAt}</div>
                         </div>
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => advanceAppointment(index)}
-                            className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                            className="premium-btn-secondary px-3 py-1.5 text-xs"
                           >
                             {appointment.status}
                           </button>
@@ -4709,13 +4712,13 @@ export default function Home() {
                               setEditingAppointmentIndex(index);
                               setEditingAppointmentStartsAt(appointment.startsAt);
                             }}
-                            className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                            className="premium-btn-secondary px-3 py-1.5 text-xs"
                           >
                             Edit
                           </button>
                           <button
                             onClick={() => deleteAppointment(appointment.id)}
-                            className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                            className="premium-btn-secondary px-3 py-1.5 text-xs"
                           >
                             Delete
                           </button>
@@ -4727,7 +4730,7 @@ export default function Home() {
                           value={editingAppointmentStartsAt}
                           onChange={(event) => setEditingAppointmentStartsAt(event.target.value)}
                           placeholder="Start time (ISO)"
-                          className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                          className="premium-input"
                         />
                         <div className="flex items-center gap-2">
                           <button
@@ -4736,13 +4739,13 @@ export default function Home() {
                               await updateAppointment(editingAppointmentIndex, editingAppointmentStartsAt);
                               setEditingAppointmentIndex(null);
                             }}
-                            className="rounded-xl bg-[#5a1838] px-3 py-1.5 text-xs font-semibold text-white"
+                            className="premium-btn-primary px-3 py-1.5 text-xs"
                           >
                             Save
                           </button>
                           <button
                             onClick={() => setEditingAppointmentIndex(null)}
-                            className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                            className="premium-btn-secondary px-3 py-1.5 text-xs"
                           >
                             Cancel
                           </button>
@@ -4754,13 +4757,13 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
               <h2 className="text-xl font-semibold">Book appointment</h2>
               <div className="mt-4 space-y-3">
                 <select
                   value={appointmentCustomer}
                   onChange={(event) => setAppointmentCustomer(event.target.value)}
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 >
                   {customers.map((customer) => (
                     <option key={customer.id} value={customer.id}>
@@ -4771,7 +4774,7 @@ export default function Home() {
                 <select
                   value={appointmentService}
                   onChange={(event) => setAppointmentService(event.target.value)}
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 >
                   {services.map((service) => (
                     <option key={service.id} value={service.id}>
@@ -4782,7 +4785,7 @@ export default function Home() {
                 <select
                   value={appointmentStaff}
                   onChange={(event) => setAppointmentStaff(event.target.value)}
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 >
                   <option value="">Select staff</option>
                   {staff.map((member) => (
@@ -4793,7 +4796,7 @@ export default function Home() {
                 </select>
                 <button
                   onClick={addAppointment}
-                  className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                  className="premium-btn-primary w-full py-2.5 text-sm"
                 >
                   Save appointment
                 </button>
@@ -4805,22 +4808,22 @@ export default function Home() {
         {activeTab === "Inventory" ? (
           <section className="mt-6 space-y-6">
             <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-              <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
                 <h2 className="text-xl font-semibold">Categories</h2>
                 <div className="mt-4 space-y-3">
-                  {isLoadingCategories ? <div className="text-sm text-[#736067]">Loading categories...</div> : null}
-                  {!isLoadingCategories && categoryError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{categoryError}</div> : null}
-                  {!isLoadingCategories && !categoryError && categories.length === 0 ? <div className="text-sm text-[#736067]">No categories yet.</div> : null}
+                  {isLoadingCategories ? <div className="text-sm text-[#a39a86]">Loading categories...</div> : null}
+                  {!isLoadingCategories && categoryError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{categoryError}</div> : null}
+                  {!isLoadingCategories && !categoryError && categories.length === 0 ? <div className="text-sm text-[#a39a86]">No categories yet.</div> : null}
                   {categories.map((category) => (
-                    <div key={category.id} className="flex flex-col gap-2 rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    <div key={category.id} className="flex flex-col gap-2 rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
                       {editingCategoryId !== category.id ? (
                         <div className="flex items-center justify-between">
                           <div>
                             <div className="font-medium">{category.name}</div>
-                            {category.description ? <div className="text-sm text-[#736067]">{category.description}</div> : null}
+                            {category.description ? <div className="text-sm text-[#a39a86]">{category.description}</div> : null}
                           </div>
                           <div className="flex items-center gap-2">
-                            <div className="text-right text-sm text-[#736067]">
+                            <div className="text-right text-sm text-[#a39a86]">
                               <div>{category.isActive ? "Active" : "Inactive"}</div>
                             </div>
                             <button
@@ -4829,7 +4832,7 @@ export default function Home() {
                                 setEditingCategoryName(category.name);
                                 setEditingCategoryDescription(category.description ?? "");
                               }}
-                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                              className="premium-btn-secondary px-3 py-1.5 text-xs"
                             >
                               Edit
                             </button>
@@ -4841,13 +4844,13 @@ export default function Home() {
                             value={editingCategoryName}
                             onChange={(event) => setEditingCategoryName(event.target.value)}
                             placeholder="Category name"
-                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                            className="premium-input"
                           />
                           <input
                             value={editingCategoryDescription}
                             onChange={(event) => setEditingCategoryDescription(event.target.value)}
                             placeholder="Description"
-                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                            className="premium-input"
                           />
                           <div className="flex items-center gap-2">
                             <button
@@ -4856,13 +4859,13 @@ export default function Home() {
                                 await updateCategory(category.id, editingCategoryName, editingCategoryDescription);
                                 setEditingCategoryId(null);
                               }}
-                              className="rounded-xl bg-[#5a1838] px-3 py-1.5 text-xs font-semibold text-white"
+                              className="premium-btn-primary px-3 py-1.5 text-xs"
                             >
                               Save
                             </button>
                             <button
                               onClick={() => setEditingCategoryId(null)}
-                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                              className="premium-btn-secondary px-3 py-1.5 text-xs"
                             >
                               Cancel
                             </button>
@@ -4874,24 +4877,24 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
                 <h2 className="text-xl font-semibold">Add category</h2>
                 <div className="mt-4 space-y-3">
                   <input
                     value={categoryName}
                     onChange={(event) => setCategoryName(event.target.value)}
                     placeholder="Category name"
-                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                    className="premium-input"
                   />
                   <input
                     value={categoryDescription}
                     onChange={(event) => setCategoryDescription(event.target.value)}
                     placeholder="Description (optional)"
-                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                    className="premium-input"
                   />
                   <button
                     onClick={addCategory}
-                    className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                    className="premium-btn-primary w-full py-2.5 text-sm"
                   >
                     Save category
                   </button>
@@ -4900,22 +4903,22 @@ export default function Home() {
             </div>
 
             <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-              <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
                 <h2 className="text-xl font-semibold">Products</h2>
                 <div className="mt-4 space-y-3">
-                  {isLoadingProducts ? <div className="text-sm text-[#736067]">Loading products...</div> : null}
-                  {!isLoadingProducts && productError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{productError}</div> : null}
-                  {!isLoadingProducts && !productError && products.length === 0 ? <div className="text-sm text-[#736067]">No products yet.</div> : null}
+                  {isLoadingProducts ? <div className="text-sm text-[#a39a86]">Loading products...</div> : null}
+                  {!isLoadingProducts && productError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{productError}</div> : null}
+                  {!isLoadingProducts && !productError && products.length === 0 ? <div className="text-sm text-[#a39a86]">No products yet.</div> : null}
                   {products.map((product) => (
-                    <div key={product.id} className="flex flex-col gap-2 rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    <div key={product.id} className="flex flex-col gap-2 rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
                       {editingProductId !== product.id ? (
                         <div className="flex items-center justify-between">
                           <div>
                             <div className="font-medium">{product.name}</div>
-                            <div className="text-sm text-[#736067]">SKU: {product.sku}</div>
+                            <div className="text-sm text-[#a39a86]">SKU: {product.sku}</div>
                           </div>
                           <div className="flex items-center gap-2">
-                            <div className="text-right text-sm text-[#736067]">
+                            <div className="text-right text-sm text-[#a39a86]">
                               <div>₹{product.priceCents / 100}</div>
                               <div>{product.isActive ? "Active" : "Inactive"}</div>
                             </div>
@@ -4926,7 +4929,7 @@ export default function Home() {
                                 setEditingProductSku(product.sku);
                                 setEditingProductPrice(String(product.priceCents));
                               }}
-                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                              className="premium-btn-secondary px-3 py-1.5 text-xs"
                             >
                               Edit
                             </button>
@@ -4938,19 +4941,19 @@ export default function Home() {
                             value={editingProductName}
                             onChange={(event) => setEditingProductName(event.target.value)}
                             placeholder="Product name"
-                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                            className="premium-input"
                           />
                           <input
                             value={editingProductSku}
                             onChange={(event) => setEditingProductSku(event.target.value)}
                             placeholder="SKU"
-                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                            className="premium-input"
                           />
                           <input
                             value={editingProductPrice}
                             onChange={(event) => setEditingProductPrice(event.target.value)}
                             placeholder="Price (cents)"
-                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                            className="premium-input"
                           />
                           <div className="flex items-center gap-2">
                             <button
@@ -4959,13 +4962,13 @@ export default function Home() {
                                 await updateProduct(product.id, editingProductName, editingProductSku, Number(editingProductPrice));
                                 setEditingProductId(null);
                               }}
-                              className="rounded-xl bg-[#5a1838] px-3 py-1.5 text-xs font-semibold text-white"
+                              className="premium-btn-primary px-3 py-1.5 text-xs"
                             >
                               Save
                             </button>
                             <button
                               onClick={() => setEditingProductId(null)}
-                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                              className="premium-btn-secondary px-3 py-1.5 text-xs"
                             >
                               Cancel
                             </button>
@@ -4977,36 +4980,36 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
                 <h2 className="text-xl font-semibold">Add product</h2>
                 <div className="mt-4 space-y-3">
                   <input
                     value={productCategoryId}
                     onChange={(event) => setProductCategoryId(event.target.value)}
                     placeholder="Category ID"
-                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                    className="premium-input"
                   />
                   <input
                     value={productName}
                     onChange={(event) => setProductName(event.target.value)}
                     placeholder="Product name"
-                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                    className="premium-input"
                   />
                   <input
                     value={productSku}
                     onChange={(event) => setProductSku(event.target.value)}
                     placeholder="SKU"
-                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                    className="premium-input"
                   />
                   <input
                     value={productPrice}
                     onChange={(event) => setProductPrice(event.target.value)}
                     placeholder="Price (cents)"
-                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                    className="premium-input"
                   />
                   <button
                     onClick={addProduct}
-                    className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                    className="premium-btn-primary w-full py-2.5 text-sm"
                   >
                     Save product
                   </button>
@@ -5014,22 +5017,22 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
               <h2 className="text-xl font-semibold">Current Stock</h2>
               <div className="mt-4 space-y-3">
-                {isLoadingStockItems ? <div className="text-sm text-[#736067]">Loading stock items...</div> : null}
-                {!isLoadingStockItems && stockItemError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{stockItemError}</div> : null}
-                {!isLoadingStockItems && !stockItemError && stockItems.length === 0 ? <div className="text-sm text-[#736067]">No stock items yet.</div> : null}
+                {isLoadingStockItems ? <div className="text-sm text-[#a39a86]">Loading stock items...</div> : null}
+                {!isLoadingStockItems && stockItemError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{stockItemError}</div> : null}
+                {!isLoadingStockItems && !stockItemError && stockItems.length === 0 ? <div className="text-sm text-[#a39a86]">No stock items yet.</div> : null}
                   {stockItems.map((item) => (
-                    <div key={item.id} className="flex flex-col gap-2 rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    <div key={item.id} className="flex flex-col gap-2 rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
                       {editingStockItemId !== item.id ? (
                         <div className="flex items-center justify-between">
                           <div>
                             <div className="font-medium">{productMap.get(item.productId) ?? `Product ${item.productId}`}</div>
-                            <div className="text-sm text-[#736067]">{branchMap.get(item.branchId) ?? `Branch ${item.branchId}`}</div>
+                            <div className="text-sm text-[#a39a86]">{branchMap.get(item.branchId) ?? `Branch ${item.branchId}`}</div>
                           </div>
                           <div className="flex items-center gap-2">
-                            <div className="text-right text-sm text-[#736067]">
+                            <div className="text-right text-sm text-[#a39a86]">
                               <div>Qty: {item.quantity}</div>
                             </div>
                             <button
@@ -5037,7 +5040,7 @@ export default function Home() {
                                 setEditingStockItemId(item.id);
                                 setEditingStockItemQuantity(String(item.quantity));
                               }}
-                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                              className="premium-btn-secondary px-3 py-1.5 text-xs"
                             >
                               Edit
                             </button>
@@ -5049,7 +5052,7 @@ export default function Home() {
                             value={editingStockItemQuantity}
                             onChange={(event) => setEditingStockItemQuantity(event.target.value)}
                             placeholder="Quantity"
-                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                            className="premium-input"
                           />
                           <div className="flex items-center gap-2">
                             <button
@@ -5058,13 +5061,13 @@ export default function Home() {
                                 await updateStockItem(item.id, Number(editingStockItemQuantity));
                                 setEditingStockItemId(null);
                               }}
-                              className="rounded-xl bg-[#5a1838] px-3 py-1.5 text-xs font-semibold text-white"
+                              className="premium-btn-primary px-3 py-1.5 text-xs"
                             >
                               Save
                             </button>
                             <button
                               onClick={() => setEditingStockItemId(null)}
-                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                              className="premium-btn-secondary px-3 py-1.5 text-xs"
                             >
                               Cancel
                             </button>
@@ -5076,50 +5079,50 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
               <h2 className="text-xl font-semibold">Add stock item</h2>
               <div className="mt-4 space-y-3">
                 <input
                   value={stockItemProductId}
                   onChange={(event) => setStockItemProductId(event.target.value)}
                   placeholder="Product ID"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 />
                 <input
                   value={stockItemBranchId}
                   onChange={(event) => setStockItemBranchId(event.target.value)}
                   placeholder="Branch ID"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 />
                 <input
                   value={stockItemQuantity}
                   onChange={(event) => setStockItemQuantity(event.target.value)}
                   placeholder="Quantity"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 />
                 <button
                   onClick={addStockItem}
-                  className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                  className="premium-btn-primary w-full py-2.5 text-sm"
                 >
                   Save stock item
                 </button>
               </div>
             </div>
 
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
               <h2 className="text-xl font-semibold">Movement History</h2>
               <div className="mt-4 space-y-3">
-                {isLoadingStockMovements ? <div className="text-sm text-[#736067]">Loading stock movements...</div> : null}
-                {!isLoadingStockMovements && stockMovementError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{stockMovementError}</div> : null}
-                {!isLoadingStockMovements && !stockMovementError && stockMovements.length === 0 ? <div className="text-sm text-[#736067]">No stock movements yet.</div> : null}
+                {isLoadingStockMovements ? <div className="text-sm text-[#a39a86]">Loading stock movements...</div> : null}
+                {!isLoadingStockMovements && stockMovementError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{stockMovementError}</div> : null}
+                {!isLoadingStockMovements && !stockMovementError && stockMovements.length === 0 ? <div className="text-sm text-[#a39a86]">No stock movements yet.</div> : null}
                 {stockMovements.map((movement) => (
-                  <div key={movement.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                  <div key={movement.id} className="flex items-center justify-between rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
                     <div>
                       <div className="font-medium">{movement.movementType}</div>
-                      <div className="text-sm text-[#736067]">{productMap.get(movement.productId) ?? `Product ${movement.productId}`}</div>
-                      {movement.notes ? <div className="text-sm text-[#736067]">{movement.notes}</div> : null}
+                      <div className="text-sm text-[#a39a86]">{productMap.get(movement.productId) ?? `Product ${movement.productId}`}</div>
+                      {movement.notes ? <div className="text-sm text-[#a39a86]">{movement.notes}</div> : null}
                     </div>
-                    <div className="text-right text-sm text-[#736067]">
+                    <div className="text-right text-sm text-[#a39a86]">
                       <div>{movement.quantity > 0 ? "+" : ""}{movement.quantity}</div>
                       <div>{new Date(movement.createdAt).toLocaleString()}</div>
                     </div>
@@ -5128,25 +5131,25 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
               <h2 className="text-xl font-semibold">Record movement</h2>
               <div className="mt-4 space-y-3">
                 <input
                   value={stockMovementProductId}
                   onChange={(event) => setStockMovementProductId(event.target.value)}
                   placeholder="Product ID"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 />
                 <input
                   value={stockMovementBranchId}
                   onChange={(event) => setStockMovementBranchId(event.target.value)}
                   placeholder="Branch ID"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 />
                 <select
                   value={stockMovementType}
                   onChange={(event) => setStockMovementType(event.target.value)}
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 >
                   <option value="PURCHASE">Purchase</option>
                   <option value="SALE">Sale</option>
@@ -5162,7 +5165,7 @@ export default function Home() {
                         value="IN"
                         checked={adjustmentDirection === "IN"}
                         onChange={() => setAdjustmentDirection("IN")}
-                        className="h-4 w-4 border-[#ead7df] text-[#5a1838] focus:ring-[#5a1838]"
+                        className="h-4 w-4 border-[rgba(212,175,55,0.15)] text-[#d4af37] focus:ring-[#5a1838]"
                       />
                       Stock In (+)
                     </label>
@@ -5173,7 +5176,7 @@ export default function Home() {
                         value="OUT"
                         checked={adjustmentDirection === "OUT"}
                         onChange={() => setAdjustmentDirection("OUT")}
-                        className="h-4 w-4 border-[#ead7df] text-[#5a1838] focus:ring-[#5a1838]"
+                        className="h-4 w-4 border-[rgba(212,175,55,0.15)] text-[#d4af37] focus:ring-[#5a1838]"
                       />
                       Stock Out (-)
                     </label>
@@ -5183,17 +5186,17 @@ export default function Home() {
                   value={stockMovementQuantity}
                   onChange={(event) => setStockMovementQuantity(event.target.value)}
                   placeholder="Quantity"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 />
                 <input
                   value={stockMovementNotes}
                   onChange={(event) => setStockMovementNotes(event.target.value)}
                   placeholder="Notes (optional)"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 />
                 <button
                   onClick={addStockMovement}
-                  className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                  className="premium-btn-primary w-full py-2.5 text-sm"
                 >
                   Record movement
                 </button>
@@ -5201,22 +5204,22 @@ export default function Home() {
             </div>
 
             <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-              <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
                 <h2 className="text-xl font-semibold">Warehouses</h2>
                 <div className="mt-4 space-y-3">
-                  {isLoadingWarehouses ? <div className="text-sm text-[#736067]">Loading warehouses...</div> : null}
-                  {!isLoadingWarehouses && warehouseError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{warehouseError}</div> : null}
-                  {!isLoadingWarehouses && !warehouseError && warehouses.length === 0 ? <div className="text-sm text-[#736067]">No warehouses yet.</div> : null}
+                  {isLoadingWarehouses ? <div className="text-sm text-[#a39a86]">Loading warehouses...</div> : null}
+                  {!isLoadingWarehouses && warehouseError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{warehouseError}</div> : null}
+                  {!isLoadingWarehouses && !warehouseError && warehouses.length === 0 ? <div className="text-sm text-[#a39a86]">No warehouses yet.</div> : null}
                   {warehouses.map((warehouse) => (
-                    <div key={warehouse.id} className="flex flex-col gap-2 rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    <div key={warehouse.id} className="flex flex-col gap-2 rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
                       {editingWarehouseId !== warehouse.id ? (
                         <div className="flex items-center justify-between">
                           <div>
                             <div className="font-medium">{warehouse.name}</div>
-                            <div className="text-sm text-[#736067]">{warehouse.location ?? "No location"}</div>
+                            <div className="text-sm text-[#a39a86]">{warehouse.location ?? "No location"}</div>
                           </div>
                           <div className="flex items-center gap-2">
-                            <div className="text-right text-sm text-[#736067]">
+                            <div className="text-right text-sm text-[#a39a86]">
                               <div>{warehouse.isActive ? "Active" : "Inactive"}</div>
                             </div>
                             <button
@@ -5225,7 +5228,7 @@ export default function Home() {
                                 setEditingWarehouseName(warehouse.name);
                                 setEditingWarehouseLocation(warehouse.location ?? "");
                               }}
-                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                              className="premium-btn-secondary px-3 py-1.5 text-xs"
                             >
                               Edit
                             </button>
@@ -5237,13 +5240,13 @@ export default function Home() {
                             value={editingWarehouseName}
                             onChange={(event) => setEditingWarehouseName(event.target.value)}
                             placeholder="Warehouse name"
-                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                            className="premium-input"
                           />
                           <input
                             value={editingWarehouseLocation}
                             onChange={(event) => setEditingWarehouseLocation(event.target.value)}
                             placeholder="Location"
-                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                            className="premium-input"
                           />
                           <div className="flex items-center gap-2">
                             <button
@@ -5252,13 +5255,13 @@ export default function Home() {
                                 await updateWarehouse(warehouse.id, editingWarehouseName, editingWarehouseLocation);
                                 setEditingWarehouseId(null);
                               }}
-                              className="rounded-xl bg-[#5a1838] px-3 py-1.5 text-xs font-semibold text-white"
+                              className="premium-btn-primary px-3 py-1.5 text-xs"
                             >
                               Save
                             </button>
                             <button
                               onClick={() => setEditingWarehouseId(null)}
-                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                              className="premium-btn-secondary px-3 py-1.5 text-xs"
                             >
                               Cancel
                             </button>
@@ -5270,24 +5273,24 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
                 <h2 className="text-xl font-semibold">Add warehouse</h2>
                 <div className="mt-4 space-y-3">
                   <input
                     value={warehouseName}
                     onChange={(event) => setWarehouseName(event.target.value)}
                     placeholder="Warehouse name"
-                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                    className="premium-input"
                   />
                   <input
                     value={warehouseLocation}
                     onChange={(event) => setWarehouseLocation(event.target.value)}
                     placeholder="Location (optional)"
-                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                    className="premium-input"
                   />
                   <button
                     onClick={addWarehouse}
-                    className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                    className="premium-btn-primary w-full py-2.5 text-sm"
                   >
                     Save warehouse
                   </button>
@@ -5296,23 +5299,23 @@ export default function Home() {
             </div>
 
             <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-              <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
                 <h2 className="text-xl font-semibold">Suppliers</h2>
                 <div className="mt-4 space-y-3">
-                  {isLoadingSuppliers ? <div className="text-sm text-[#736067]">Loading suppliers...</div> : null}
-                  {!isLoadingSuppliers && supplierError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{supplierError}</div> : null}
-                  {!isLoadingSuppliers && !supplierError && suppliers.length === 0 ? <div className="text-sm text-[#736067]">No suppliers yet.</div> : null}
+                  {isLoadingSuppliers ? <div className="text-sm text-[#a39a86]">Loading suppliers...</div> : null}
+                  {!isLoadingSuppliers && supplierError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{supplierError}</div> : null}
+                  {!isLoadingSuppliers && !supplierError && suppliers.length === 0 ? <div className="text-sm text-[#a39a86]">No suppliers yet.</div> : null}
                   {suppliers.map((supplier) => (
-                    <div key={supplier.id} className="flex flex-col gap-2 rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    <div key={supplier.id} className="flex flex-col gap-2 rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
                       {editingSupplierId !== supplier.id ? (
                         <div className="flex items-center justify-between">
                           <div>
                             <div className="font-medium">{supplier.name}</div>
-                            <div className="text-sm text-[#736067]">{supplier.contactName ?? "No contact"}</div>
-                            <div className="text-sm text-[#736067]">{supplier.phone ?? supplier.email ?? "No contact info"}</div>
+                            <div className="text-sm text-[#a39a86]">{supplier.contactName ?? "No contact"}</div>
+                            <div className="text-sm text-[#a39a86]">{supplier.phone ?? supplier.email ?? "No contact info"}</div>
                           </div>
                           <div className="flex items-center gap-2">
-                            <div className="text-right text-sm text-[#736067]">
+                            <div className="text-right text-sm text-[#a39a86]">
                               <div>{supplier.isActive ? "Active" : "Inactive"}</div>
                             </div>
                             <button
@@ -5323,7 +5326,7 @@ export default function Home() {
                                 setEditingSupplierEmail(supplier.email ?? "");
                                 setEditingSupplierPhone(supplier.phone ?? "");
                               }}
-                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                              className="premium-btn-secondary px-3 py-1.5 text-xs"
                             >
                               Edit
                             </button>
@@ -5335,25 +5338,25 @@ export default function Home() {
                             value={editingSupplierName}
                             onChange={(event) => setEditingSupplierName(event.target.value)}
                             placeholder="Supplier name"
-                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                            className="premium-input"
                           />
                           <input
                             value={editingSupplierContactName}
                             onChange={(event) => setEditingSupplierContactName(event.target.value)}
                             placeholder="Contact name"
-                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                            className="premium-input"
                           />
                           <input
                             value={editingSupplierEmail}
                             onChange={(event) => setEditingSupplierEmail(event.target.value)}
                             placeholder="Email"
-                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                            className="premium-input"
                           />
                           <input
                             value={editingSupplierPhone}
                             onChange={(event) => setEditingSupplierPhone(event.target.value)}
                             placeholder="Phone"
-                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                            className="premium-input"
                           />
                           <div className="flex items-center gap-2">
                             <button
@@ -5362,13 +5365,13 @@ export default function Home() {
                                 await updateSupplier(supplier.id, editingSupplierName, editingSupplierContactName, editingSupplierEmail, editingSupplierPhone);
                                 setEditingSupplierId(null);
                               }}
-                              className="rounded-xl bg-[#5a1838] px-3 py-1.5 text-xs font-semibold text-white"
+                              className="premium-btn-primary px-3 py-1.5 text-xs"
                             >
                               Save
                             </button>
                             <button
                               onClick={() => setEditingSupplierId(null)}
-                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                              className="premium-btn-secondary px-3 py-1.5 text-xs"
                             >
                               Cancel
                             </button>
@@ -5380,36 +5383,36 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
                 <h2 className="text-xl font-semibold">Add supplier</h2>
                 <div className="mt-4 space-y-3">
                   <input
                     value={supplierName}
                     onChange={(event) => setSupplierName(event.target.value)}
                     placeholder="Supplier name"
-                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                    className="premium-input"
                   />
                   <input
                     value={supplierContactName}
                     onChange={(event) => setSupplierContactName(event.target.value)}
                     placeholder="Contact name (optional)"
-                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                    className="premium-input"
                   />
                   <input
                     value={supplierEmail}
                     onChange={(event) => setSupplierEmail(event.target.value)}
                     placeholder="Email (optional)"
-                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                    className="premium-input"
                   />
                   <input
                     value={supplierPhone}
                     onChange={(event) => setSupplierPhone(event.target.value)}
                     placeholder="Phone (optional)"
-                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                    className="premium-input"
                   />
                   <button
                     onClick={addSupplier}
-                    className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                    className="premium-btn-primary w-full py-2.5 text-sm"
                   >
                     Save supplier
                   </button>
@@ -5418,23 +5421,23 @@ export default function Home() {
             </div>
 
             <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-              <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
                 <h2 className="text-xl font-semibold">Reorder Rules</h2>
                 <div className="mt-4 space-y-3">
-                  {isLoadingReorderRules ? <div className="text-sm text-[#736067]">Loading reorder rules...</div> : null}
-                  {!isLoadingReorderRules && reorderRuleError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{reorderRuleError}</div> : null}
-                  {!isLoadingReorderRules && !reorderRuleError && reorderRules.length === 0 ? <div className="text-sm text-[#736067]">No reorder rules yet.</div> : null}
+                  {isLoadingReorderRules ? <div className="text-sm text-[#a39a86]">Loading reorder rules...</div> : null}
+                  {!isLoadingReorderRules && reorderRuleError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{reorderRuleError}</div> : null}
+                  {!isLoadingReorderRules && !reorderRuleError && reorderRules.length === 0 ? <div className="text-sm text-[#a39a86]">No reorder rules yet.</div> : null}
                   {reorderRules.map((rule) => (
-                    <div key={rule.id} className="flex flex-col gap-2 rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    <div key={rule.id} className="flex flex-col gap-2 rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
                       {editingReorderRuleId !== rule.id ? (
                         <div className="flex items-center justify-between">
                           <div>
                             <div className="font-medium">{productMap.get(rule.productId) ?? `Product ${rule.productId}`}</div>
-                            <div className="text-sm text-[#736067]">{branchMap.get(rule.branchId) ?? `Branch ${rule.branchId}`} / {warehouseMap.get(rule.warehouseId) ?? `Warehouse ${rule.warehouseId}`}</div>
-                            <div className="text-sm text-[#736067]">Min: {rule.minQuantity} | Reorder: {rule.reorderQuantity}</div>
+                            <div className="text-sm text-[#a39a86]">{branchMap.get(rule.branchId) ?? `Branch ${rule.branchId}`} / {warehouseMap.get(rule.warehouseId) ?? `Warehouse ${rule.warehouseId}`}</div>
+                            <div className="text-sm text-[#a39a86]">Min: {rule.minQuantity} | Reorder: {rule.reorderQuantity}</div>
                           </div>
                           <div className="flex items-center gap-2">
-                            <div className="text-right text-sm text-[#736067]">
+                            <div className="text-right text-sm text-[#a39a86]">
                               <div>{rule.isActive ? "Active" : "Inactive"}</div>
                             </div>
                             <button
@@ -5446,7 +5449,7 @@ export default function Home() {
                                 setEditingReorderRuleMinQuantity(String(rule.minQuantity));
                                 setEditingReorderRuleReorderQuantity(String(rule.reorderQuantity));
                               }}
-                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                              className="premium-btn-secondary px-3 py-1.5 text-xs"
                             >
                               Edit
                             </button>
@@ -5458,32 +5461,32 @@ export default function Home() {
                             value={editingReorderRuleProductId}
                             onChange={(event) => setEditingReorderRuleProductId(event.target.value)}
                             placeholder="Product ID"
-                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                            className="premium-input"
                           />
                           <input
                             value={editingReorderRuleBranchId}
                             onChange={(event) => setEditingReorderRuleBranchId(event.target.value)}
                             placeholder="Branch ID"
-                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                            className="premium-input"
                           />
                           <input
                             value={editingReorderRuleWarehouseId}
                             onChange={(event) => setEditingReorderRuleWarehouseId(event.target.value)}
                             placeholder="Warehouse ID"
-                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                            className="premium-input"
                           />
                           <div className="grid grid-cols-2 gap-3">
                             <input
                               value={editingReorderRuleMinQuantity}
                               onChange={(event) => setEditingReorderRuleMinQuantity(event.target.value)}
                               placeholder="Min qty"
-                              className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                              className="premium-input"
                             />
                             <input
                               value={editingReorderRuleReorderQuantity}
                               onChange={(event) => setEditingReorderRuleReorderQuantity(event.target.value)}
                               placeholder="Reorder qty"
-                              className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                              className="premium-input"
                             />
                           </div>
                           <div className="flex items-center gap-2">
@@ -5493,13 +5496,13 @@ export default function Home() {
                                 await updateReorderRule(rule.id, editingReorderRuleProductId, editingReorderRuleBranchId, editingReorderRuleWarehouseId, Number(editingReorderRuleMinQuantity), Number(editingReorderRuleReorderQuantity));
                                 setEditingReorderRuleId(null);
                               }}
-                              className="rounded-xl bg-[#5a1838] px-3 py-1.5 text-xs font-semibold text-white"
+                              className="premium-btn-primary px-3 py-1.5 text-xs"
                             >
                               Save
                             </button>
                             <button
                               onClick={() => setEditingReorderRuleId(null)}
-                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                              className="premium-btn-secondary px-3 py-1.5 text-xs"
                             >
                               Cancel
                             </button>
@@ -5511,44 +5514,44 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
                 <h2 className="text-xl font-semibold">Add reorder rule</h2>
                 <div className="mt-4 space-y-3">
                   <input
                     value={reorderRuleProductId}
                     onChange={(event) => setReorderRuleProductId(event.target.value)}
                     placeholder="Product ID"
-                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                    className="premium-input"
                   />
                   <input
                     value={reorderRuleBranchId}
                     onChange={(event) => setReorderRuleBranchId(event.target.value)}
                     placeholder="Branch ID"
-                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                    className="premium-input"
                   />
                   <input
                     value={reorderRuleWarehouseId}
                     onChange={(event) => setReorderRuleWarehouseId(event.target.value)}
                     placeholder="Warehouse ID"
-                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                    className="premium-input"
                   />
                   <div className="grid grid-cols-2 gap-3">
                     <input
                       value={reorderRuleMinQuantity}
                       onChange={(event) => setReorderRuleMinQuantity(event.target.value)}
                       placeholder="Min qty"
-                      className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                      className="premium-input"
                     />
                     <input
                       value={reorderRuleReorderQuantity}
                       onChange={(event) => setReorderRuleReorderQuantity(event.target.value)}
                       placeholder="Reorder qty"
-                      className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                      className="premium-input"
                     />
                   </div>
                   <button
                     onClick={addReorderRule}
-                    className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                    className="premium-btn-primary w-full py-2.5 text-sm"
                   >
                     Save reorder rule
                   </button>
@@ -5556,19 +5559,19 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
               <h2 className="text-xl font-semibold">Low Stock Alerts</h2>
               <div className="mt-4 space-y-3">
-                {isLoadingLowStockItems ? <div className="text-sm text-[#736067]">Loading low stock items...</div> : null}
-                {!isLoadingLowStockItems && lowStockItemError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{lowStockItemError}</div> : null}
-                {!isLoadingLowStockItems && !lowStockItemError && lowStockItems.length === 0 ? <div className="text-sm text-[#736067]">No low stock items.</div> : null}
+                {isLoadingLowStockItems ? <div className="text-sm text-[#a39a86]">Loading low stock items...</div> : null}
+                {!isLoadingLowStockItems && lowStockItemError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{lowStockItemError}</div> : null}
+                {!isLoadingLowStockItems && !lowStockItemError && lowStockItems.length === 0 ? <div className="text-sm text-[#a39a86]">No low stock items.</div> : null}
                 {lowStockItems.map((item) => (
-                  <div key={item.stockItemId} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                  <div key={item.stockItemId} className="flex items-center justify-between rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
                     <div>
                       <div className="font-medium">{productMap.get(item.productId) ?? `Product ${item.productId}`}</div>
-                      <div className="text-sm text-[#736067]">{branchMap.get(item.branchId) ?? `Branch ${item.branchId}`}</div>
+                      <div className="text-sm text-[#a39a86]">{branchMap.get(item.branchId) ?? `Branch ${item.branchId}`}</div>
                     </div>
-                    <div className="text-right text-sm text-[#736067]">
+                    <div className="text-right text-sm text-[#a39a86]">
                       <div>Qty: {item.quantity} / Min: {item.minQuantity}</div>
                       <div>Reorder: {item.reorderQuantity}</div>
                     </div>
@@ -5580,25 +5583,25 @@ export default function Home() {
         ) : null}
 
         <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+          <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
             <h2 className="text-xl font-semibold">Purchase Receipts</h2>
             <div className="mt-4 space-y-3">
-              {isLoadingPurchaseReceipts ? <div className="text-sm text-[#736067]">Loading purchase receipts...</div> : null}
-              {!isLoadingPurchaseReceipts && purchaseReceiptError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{purchaseReceiptError}</div> : null}
-              {!isLoadingPurchaseReceipts && !purchaseReceiptError && purchaseReceipts.length === 0 ? <div className="text-sm text-[#736067]">No purchase receipts yet.</div> : null}
+              {isLoadingPurchaseReceipts ? <div className="text-sm text-[#a39a86]">Loading purchase receipts...</div> : null}
+              {!isLoadingPurchaseReceipts && purchaseReceiptError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{purchaseReceiptError}</div> : null}
+              {!isLoadingPurchaseReceipts && !purchaseReceiptError && purchaseReceipts.length === 0 ? <div className="text-sm text-[#a39a86]">No purchase receipts yet.</div> : null}
               {purchaseReceipts.map((receipt) => (
-                <div key={receipt.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                <div key={receipt.id} className="flex items-center justify-between rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
                   <div>
                     <div className="font-medium">Receipt {receipt.id}</div>
-                     <div className="text-sm text-[#736067]">{warehouseMap.get(receipt.warehouseId) ?? `Warehouse ${receipt.warehouseId}`} / {branchMap.get(receipt.branchId) ?? `Branch ${receipt.branchId}`}</div>
-                     <div className="text-sm text-[#736067]">{new Date(receipt.receivedAt).toLocaleString()}</div>
+                     <div className="text-sm text-[#a39a86]">{warehouseMap.get(receipt.warehouseId) ?? `Warehouse ${receipt.warehouseId}`} / {branchMap.get(receipt.branchId) ?? `Branch ${receipt.branchId}`}</div>
+                     <div className="text-sm text-[#a39a86]">{new Date(receipt.receivedAt).toLocaleString()}</div>
                      {receipt.lineItems.length > 0 ? (
-                       <div className="text-sm text-[#736067]">
+                       <div className="text-sm text-[#a39a86]">
                          {receipt.lineItems.map((item) => `${productMap.get(item.productId) ?? `Product ${item.productId}`}: ${item.quantity}`).join(", ")}
                        </div>
                     ) : null}
                   </div>
-                  <div className="text-right text-sm text-[#736067]">
+                  <div className="text-right text-sm text-[#a39a86]">
                     <div>{receipt.supplierId ? `Supplier ${receipt.supplierId}` : "No supplier"}</div>
                   </div>
                 </div>
@@ -5606,54 +5609,54 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+          <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
             <h2 className="text-xl font-semibold">Record purchase receipt</h2>
             <div className="mt-4 space-y-3">
               <input
                 value={purchaseReceiptSupplierId}
                 onChange={(event) => setPurchaseReceiptSupplierId(event.target.value)}
                 placeholder="Supplier ID (optional)"
-                className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                className="premium-input"
               />
               <input
                 value={purchaseReceiptWarehouseId}
                 onChange={(event) => setPurchaseReceiptWarehouseId(event.target.value)}
                 placeholder="Warehouse ID"
-                className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                className="premium-input"
               />
               <input
                 value={purchaseReceiptBranchId}
                 onChange={(event) => setPurchaseReceiptBranchId(event.target.value)}
                 placeholder="Branch ID"
-                className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                className="premium-input"
               />
               <input
                 value={purchaseReceiptReceivedBy}
                 onChange={(event) => setPurchaseReceiptReceivedBy(event.target.value)}
                 placeholder="Received by (optional)"
-                className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                className="premium-input"
               />
               <input
                 value={purchaseReceiptProductId}
                 onChange={(event) => setPurchaseReceiptProductId(event.target.value)}
                 placeholder="Product ID"
-                className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                className="premium-input"
               />
               <input
                 value={purchaseReceiptQuantity}
                 onChange={(event) => setPurchaseReceiptQuantity(event.target.value)}
                 placeholder="Quantity"
-                className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                className="premium-input"
               />
               <input
                 value={purchaseReceiptNotes}
                 onChange={(event) => setPurchaseReceiptNotes(event.target.value)}
                 placeholder="Notes (optional)"
-                className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                className="premium-input"
               />
               <button
                 onClick={addPurchaseReceipt}
-                className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                className="premium-btn-primary w-full py-2.5 text-sm"
               >
                 Save purchase receipt
               </button>
@@ -5662,26 +5665,26 @@ export default function Home() {
           </section>
 
         <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+          <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
             <h2 className="text-xl font-semibold">Stock Transfers</h2>
             <div className="mt-4 space-y-3">
-              {isLoadingStockTransfers ? <div className="text-sm text-[#736067]">Loading stock transfers...</div> : null}
-              {!isLoadingStockTransfers && stockTransferError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{stockTransferError}</div> : null}
-              {!isLoadingStockTransfers && !stockTransferError && stockTransfers.length === 0 ? <div className="text-sm text-[#736067]">No stock transfers yet.</div> : null}
+              {isLoadingStockTransfers ? <div className="text-sm text-[#a39a86]">Loading stock transfers...</div> : null}
+              {!isLoadingStockTransfers && stockTransferError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{stockTransferError}</div> : null}
+              {!isLoadingStockTransfers && !stockTransferError && stockTransfers.length === 0 ? <div className="text-sm text-[#a39a86]">No stock transfers yet.</div> : null}
               {stockTransfers.map((transfer) => (
-                <div key={transfer.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                <div key={transfer.id} className="flex items-center justify-between rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
                   <div>
                     <div className="font-medium">Transfer {transfer.id}</div>
-                     <div className="text-sm text-[#736067]">From: {warehouseMap.get(transfer.fromWarehouseId) ?? `Warehouse ${transfer.fromWarehouseId}`} / {branchMap.get(transfer.fromBranchId) ?? `Branch ${transfer.fromBranchId}`}</div>
-                     <div className="text-sm text-[#736067]">To: {warehouseMap.get(transfer.toWarehouseId) ?? `Warehouse ${transfer.toWarehouseId}`} / {branchMap.get(transfer.toBranchId) ?? `Branch ${transfer.toBranchId}`}</div>
-                     <div className="text-sm text-[#736067]">Status: {transfer.status}</div>
+                     <div className="text-sm text-[#a39a86]">From: {warehouseMap.get(transfer.fromWarehouseId) ?? `Warehouse ${transfer.fromWarehouseId}`} / {branchMap.get(transfer.fromBranchId) ?? `Branch ${transfer.fromBranchId}`}</div>
+                     <div className="text-sm text-[#a39a86]">To: {warehouseMap.get(transfer.toWarehouseId) ?? `Warehouse ${transfer.toWarehouseId}`} / {branchMap.get(transfer.toBranchId) ?? `Branch ${transfer.toBranchId}`}</div>
+                     <div className="text-sm text-[#a39a86]">Status: {transfer.status}</div>
                      {transfer.lineItems.length > 0 ? (
-                       <div className="text-sm text-[#736067]">
+                       <div className="text-sm text-[#a39a86]">
                          {transfer.lineItems.map((item) => `${productMap.get(item.productId) ?? `Product ${item.productId}`}: ${item.quantity}`).join(", ")}
                        </div>
                     ) : null}
                   </div>
-                  <div className="text-right text-sm text-[#736067]">
+                  <div className="text-right text-sm text-[#a39a86]">
                     <div>{transfer.notes ?? "—"}</div>
                   </div>
                 </div>
@@ -5689,48 +5692,48 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+          <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
             <h2 className="text-xl font-semibold">Create stock transfer</h2>
             <div className="mt-4 space-y-3">
               <input
                 value={stockTransferFromWarehouseId}
                 onChange={(event) => setStockTransferFromWarehouseId(event.target.value)}
                 placeholder="From Warehouse ID"
-                className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                className="premium-input"
               />
               <input
                 value={stockTransferToWarehouseId}
                 onChange={(event) => setStockTransferToWarehouseId(event.target.value)}
                 placeholder="To Warehouse ID"
-                className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                className="premium-input"
               />
               <input
                 value={stockTransferFromBranchId}
                 onChange={(event) => setStockTransferFromBranchId(event.target.value)}
                 placeholder="From Branch ID"
-                className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                className="premium-input"
               />
               <input
                 value={stockTransferToBranchId}
                 onChange={(event) => setStockTransferToBranchId(event.target.value)}
                 placeholder="To Branch ID"
-                className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                className="premium-input"
               />
               <input
                 value={stockTransferProductId}
                 onChange={(event) => setStockTransferProductId(event.target.value)}
                 placeholder="Product ID"
-                className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                className="premium-input"
               />
               <input
                 value={stockTransferQuantity}
                 onChange={(event) => setStockTransferQuantity(event.target.value)}
                 placeholder="Quantity"
-                className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                className="premium-input"
               />
               <button
                 onClick={addStockTransfer}
-                className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                className="premium-btn-primary w-full py-2.5 text-sm"
               >
                 Save stock transfer
               </button>
@@ -5739,25 +5742,25 @@ export default function Home() {
         </section>
 
         <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+          <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
             <h2 className="text-xl font-semibold">Stock Adjustments</h2>
             <div className="mt-4 space-y-3">
-              {isLoadingStockAdjustments ? <div className="text-sm text-[#736067]">Loading stock adjustments...</div> : null}
-              {!isLoadingStockAdjustments && stockAdjustmentError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{stockAdjustmentError}</div> : null}
-              {!isLoadingStockAdjustments && !stockAdjustmentError && stockAdjustments.length === 0 ? <div className="text-sm text-[#736067]">No stock adjustments yet.</div> : null}
+              {isLoadingStockAdjustments ? <div className="text-sm text-[#a39a86]">Loading stock adjustments...</div> : null}
+              {!isLoadingStockAdjustments && stockAdjustmentError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{stockAdjustmentError}</div> : null}
+              {!isLoadingStockAdjustments && !stockAdjustmentError && stockAdjustments.length === 0 ? <div className="text-sm text-[#a39a86]">No stock adjustments yet.</div> : null}
               {stockAdjustments.map((adjustment) => (
-                <div key={adjustment.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                <div key={adjustment.id} className="flex items-center justify-between rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
                   <div>
                     <div className="font-medium">Adjustment {adjustment.id}</div>
-                     <div className="text-sm text-[#736067]">{branchMap.get(adjustment.branchId) ?? `Branch ${adjustment.branchId}`}</div>
-                     <div className="text-sm text-[#736067]">Direction: {adjustment.direction}</div>
+                     <div className="text-sm text-[#a39a86]">{branchMap.get(adjustment.branchId) ?? `Branch ${adjustment.branchId}`}</div>
+                     <div className="text-sm text-[#a39a86]">Direction: {adjustment.direction}</div>
                      {adjustment.lineItems.length > 0 ? (
-                       <div className="text-sm text-[#736067]">
+                       <div className="text-sm text-[#a39a86]">
                          {adjustment.lineItems.map((item) => `${productMap.get(item.productId) ?? `Product ${item.productId}`}: ${item.quantity}`).join(", ")}
                       </div>
                     ) : null}
                   </div>
-                  <div className="text-right text-sm text-[#736067]">
+                  <div className="text-right text-sm text-[#a39a86]">
                     <div>{adjustment.notes ?? "—"}</div>
                   </div>
                 </div>
@@ -5765,19 +5768,19 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+          <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
             <h2 className="text-xl font-semibold">Record stock adjustment</h2>
             <div className="mt-4 space-y-3">
               <input
                 value={stockAdjustmentBranchId}
                 onChange={(event) => setStockAdjustmentBranchId(event.target.value)}
                 placeholder="Branch ID"
-                className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                className="premium-input"
               />
               <select
                 value={stockAdjustmentDirection}
                 onChange={(event) => setStockAdjustmentDirection(event.target.value)}
-                className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                className="premium-input"
               >
                 <option value="IN">Stock In (+)</option>
                 <option value="OUT">Stock Out (-)</option>
@@ -5786,17 +5789,17 @@ export default function Home() {
                 value={stockAdjustmentProductId}
                 onChange={(event) => setStockAdjustmentProductId(event.target.value)}
                 placeholder="Product ID"
-                className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                className="premium-input"
               />
               <input
                 value={stockAdjustmentQuantity}
                 onChange={(event) => setStockAdjustmentQuantity(event.target.value)}
                 placeholder="Quantity"
-                className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                className="premium-input"
               />
               <button
                 onClick={addStockAdjustment}
-                className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                className="premium-btn-primary w-full py-2.5 text-sm"
               >
                 Save stock adjustment
               </button>
@@ -5806,22 +5809,22 @@ export default function Home() {
 
         {activeTab === "Billing" ? (
           <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
               <h2 className="text-xl font-semibold">Invoices</h2>
               <div className="mt-4 space-y-3">
-                {isLoadingInvoices ? <div className="text-sm text-[#736067]">Loading invoices...</div> : null}
-                {!isLoadingInvoices && invoiceError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{invoiceError}</div> : null}
-                {!isLoadingInvoices && !invoiceError && invoices.length === 0 ? <div className="text-sm text-[#736067]">No invoices yet.</div> : null}
+                {isLoadingInvoices ? <div className="text-sm text-[#a39a86]">Loading invoices...</div> : null}
+                {!isLoadingInvoices && invoiceError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{invoiceError}</div> : null}
+                {!isLoadingInvoices && !invoiceError && invoices.length === 0 ? <div className="text-sm text-[#a39a86]">No invoices yet.</div> : null}
                   {invoices.map((invoice) => (
-                    <div key={invoice.id} className="flex flex-col gap-2 rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    <div key={invoice.id} className="flex flex-col gap-2 rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
                       {editingInvoiceId !== invoice.id ? (
                         <div className="flex items-center justify-between">
                           <div>
                             <div className="font-medium">{customerMap.get(invoice.customerId) ?? `Customer ${invoice.customerId}`}</div>
-                            <div className="text-sm text-[#736067]">{invoice.issuedAt}</div>
+                            <div className="text-sm text-[#a39a86]">{invoice.issuedAt}</div>
                           </div>
                           <div className="flex items-center gap-2">
-                            <div className="text-right text-sm text-[#736067]">
+                            <div className="text-right text-sm text-[#a39a86]">
                               <div>Total ₹{invoice.totalCents / 100}</div>
                               <div>{invoice.notes ?? "—"}</div>
                             </div>
@@ -5831,7 +5834,7 @@ export default function Home() {
                                 setEditingInvoiceDiscountCents(String(invoice.discountCents));
                                 setEditingInvoiceNotes(invoice.notes ?? "");
                               }}
-                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                              className="premium-btn-secondary px-3 py-1.5 text-xs"
                             >
                               Edit
                             </button>
@@ -5843,13 +5846,13 @@ export default function Home() {
                             value={editingInvoiceDiscountCents}
                             onChange={(event) => setEditingInvoiceDiscountCents(event.target.value)}
                             placeholder="Discount (cents)"
-                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                            className="premium-input"
                           />
                           <input
                             value={editingInvoiceNotes}
                             onChange={(event) => setEditingInvoiceNotes(event.target.value)}
                             placeholder="Notes"
-                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                            className="premium-input"
                           />
                           <div className="flex items-center gap-2">
                             <button
@@ -5858,13 +5861,13 @@ export default function Home() {
                                 await updateInvoice(invoice.id, Number(editingInvoiceDiscountCents), editingInvoiceNotes);
                                 setEditingInvoiceId(null);
                               }}
-                              className="rounded-xl bg-[#5a1838] px-3 py-1.5 text-xs font-semibold text-white"
+                              className="premium-btn-primary px-3 py-1.5 text-xs"
                             >
                               Save
                             </button>
                             <button
                               onClick={() => setEditingInvoiceId(null)}
-                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                              className="premium-btn-secondary px-3 py-1.5 text-xs"
                             >
                               Cancel
                             </button>
@@ -5876,13 +5879,13 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
               <h2 className="text-xl font-semibold">POS checkout</h2>
               <div className="mt-4 space-y-3">
                 <select
                   value={invoiceCustomerId}
                   onChange={(event) => setInvoiceCustomerId(event.target.value)}
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 >
                   <option value="">Select customer</option>
                   {customers.map((customer) => (
@@ -5892,7 +5895,7 @@ export default function Home() {
                 <select
                   value={cartItemType}
                   onChange={(event) => { setCartItemType(event.target.value as "product" | "service" | "package"); setCartItemId(""); }}
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 >
                   <option value="product">Product</option>
                   <option value="service">Service</option>
@@ -5901,7 +5904,7 @@ export default function Home() {
                 <select
                   value={cartItemId}
                   onChange={(event) => setCartItemId(event.target.value)}
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 >
                   <option value="">Select item</option>
                   {cartItemType === "product" && products.filter((product) => product.isActive).map((product) => (
@@ -5921,11 +5924,11 @@ export default function Home() {
                     placeholder="Qty"
                     type="number"
                     min="1"
-                    className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                    className="premium-input"
                   />
                   <button
                     onClick={addToCart}
-                    className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                    className="premium-btn-primary w-full py-2.5 text-sm"
                   >
                     Add to cart
                   </button>
@@ -5934,10 +5937,10 @@ export default function Home() {
                   <div className="mt-4 space-y-2">
                     <div className="max-h-48 overflow-y-auto space-y-2">
                       {cartItems.map((item) => (
-                        <div key={item.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                        <div key={item.id} className="flex items-center justify-between rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
                           <div className="flex-1">
                             <div className="font-medium">{item.description}</div>
-                            <div className="text-sm text-[#736067]">₹{item.unitPriceCents / 100} × {item.quantity}</div>
+                            <div className="text-sm text-[#a39a86]">₹{item.unitPriceCents / 100} × {item.quantity}</div>
                           </div>
                           <div className="flex items-center gap-3">
                             <div className="text-sm font-medium">₹{item.unitPriceCents * item.quantity / 100}</div>
@@ -5961,13 +5964,13 @@ export default function Home() {
                   value={invoiceNotes}
                   onChange={(event) => setInvoiceNotes(event.target.value)}
                   placeholder="Notes (optional)"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 />
-                {checkoutError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{checkoutError}</div> : null}
+                {checkoutError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{checkoutError}</div> : null}
                 <button
                   onClick={checkout}
                   disabled={isCheckingOut || cartItems.length === 0 || !invoiceCustomerId}
-                  className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                  className="premium-btn-primary w-full py-2.5 text-sm disabled:opacity-60"
                 >
                   {isCheckingOut ? "Processing..." : "Checkout"}
                 </button>
@@ -5978,29 +5981,29 @@ export default function Home() {
 
         {activeTab === "Branches" ? (
           <section className="mt-6 grid gap-6 lg:grid-cols-2">
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
               <h2 className="text-xl font-semibold">Business units</h2>
               <div className="mt-4 space-y-3">
-                {isLoadingBusinessUnits ? <div className="text-sm text-[#736067]">Loading business units...</div> : null}
-                {!isLoadingBusinessUnits && businessUnitError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{businessUnitError}</div> : null}
-                {!isLoadingBusinessUnits && !businessUnitError && businessUnits.length === 0 ? <div className="text-sm text-[#736067]">No business units yet.</div> : null}
+                {isLoadingBusinessUnits ? <div className="text-sm text-[#a39a86]">Loading business units...</div> : null}
+                {!isLoadingBusinessUnits && businessUnitError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{businessUnitError}</div> : null}
+                {!isLoadingBusinessUnits && !businessUnitError && businessUnits.length === 0 ? <div className="text-sm text-[#a39a86]">No business units yet.</div> : null}
                   {businessUnits.map((bu) => (
-                    <div key={bu.id} className="flex flex-col gap-2 rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    <div key={bu.id} className="flex flex-col gap-2 rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
                       {editingBusinessUnitId !== bu.id ? (
                         <div className="flex items-center justify-between">
                           <div>
                             <div className="font-medium">{bu.name}</div>
-                            <div className="text-sm text-[#736067]">{bu.slug}</div>
+                            <div className="text-sm text-[#a39a86]">{bu.slug}</div>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className={`rounded-full px-2.5 py-1 text-xs ${bu.isActive ? "bg-[#e6f4ea] text-[#1e7e34]" : "bg-[#fceff4] text-[#6a2f4a]"}`}>{bu.isActive ? "Active" : "Inactive"}</span>
+                            <span className={`rounded-full px-2.5 py-1 text-xs ${bu.isActive ? "premium-badge-success" : "premium-badge-danger"}`}>{bu.isActive ? "Active" : "Inactive"}</span>
                             <button
                               onClick={() => {
                                 setEditingBusinessUnitId(bu.id);
                                 setEditingBusinessUnitName(bu.name);
                                 setEditingBusinessUnitSlug(bu.slug);
                               }}
-                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                              className="premium-btn-secondary px-3 py-1.5 text-xs"
                             >
                               Edit
                             </button>
@@ -6012,13 +6015,13 @@ export default function Home() {
                             value={editingBusinessUnitName}
                             onChange={(event) => setEditingBusinessUnitName(event.target.value)}
                             placeholder="Business unit name"
-                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                            className="premium-input"
                           />
                           <input
                             value={editingBusinessUnitSlug}
                             onChange={(event) => setEditingBusinessUnitSlug(event.target.value)}
                             placeholder="Slug"
-                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                            className="premium-input"
                           />
                           <div className="flex items-center gap-2">
                             <button
@@ -6027,13 +6030,13 @@ export default function Home() {
                                 await updateBusinessUnit(bu.id, editingBusinessUnitName, editingBusinessUnitSlug);
                                 setEditingBusinessUnitId(null);
                               }}
-                              className="rounded-xl bg-[#5a1838] px-3 py-1.5 text-xs font-semibold text-white"
+                              className="premium-btn-primary px-3 py-1.5 text-xs"
                             >
                               Save
                             </button>
                             <button
                               onClick={() => setEditingBusinessUnitId(null)}
-                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                              className="premium-btn-secondary px-3 py-1.5 text-xs"
                             >
                               Cancel
                             </button>
@@ -6045,53 +6048,53 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
               <h2 className="text-xl font-semibold">Add business unit</h2>
               <div className="mt-4 space-y-3">
                 <input
                   value={businessUnitName}
                   onChange={(event) => setBusinessUnitName(event.target.value)}
                   placeholder="Business unit name"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 />
                 <input
                   value={businessUnitSlug}
                   onChange={(event) => setBusinessUnitSlug(event.target.value)}
                   placeholder="Slug"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 />
                 <button
                   onClick={addBusinessUnit}
-                  className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                  className="premium-btn-primary w-full py-2.5 text-sm"
                 >
                   Save business unit
                 </button>
               </div>
             </div>
 
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
               <h2 className="text-xl font-semibold">Branches</h2>
               <div className="mt-4 space-y-3">
-                {isLoadingBranches ? <div className="text-sm text-[#736067]">Loading branches...</div> : null}
-                {!isLoadingBranches && branchError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{branchError}</div> : null}
-                {!isLoadingBranches && !branchError && branches.length === 0 ? <div className="text-sm text-[#736067]">No branches yet.</div> : null}
+                {isLoadingBranches ? <div className="text-sm text-[#a39a86]">Loading branches...</div> : null}
+                {!isLoadingBranches && branchError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{branchError}</div> : null}
+                {!isLoadingBranches && !branchError && branches.length === 0 ? <div className="text-sm text-[#a39a86]">No branches yet.</div> : null}
                   {branches.map((branch) => (
-                    <div key={branch.id} className="flex flex-col gap-2 rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    <div key={branch.id} className="flex flex-col gap-2 rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
                       {editingBranchId !== branch.id ? (
                         <div className="flex items-center justify-between">
                           <div>
                             <div className="font-medium">{branch.name}</div>
-                            <div className="text-sm text-[#736067]">{branch.slug} · BU {branch.businessUnitId}</div>
+                            <div className="text-sm text-[#a39a86]">{branch.slug} · BU {branch.businessUnitId}</div>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className={`rounded-full px-2.5 py-1 text-xs ${branch.isActive ? "bg-[#e6f4ea] text-[#1e7e34]" : "bg-[#fceff4] text-[#6a2f4a]"}`}>{branch.isActive ? "Active" : "Inactive"}</span>
+                            <span className={`rounded-full px-2.5 py-1 text-xs ${branch.isActive ? "premium-badge-success" : "premium-badge-danger"}`}>{branch.isActive ? "Active" : "Inactive"}</span>
                             <button
                               onClick={() => {
                                 setEditingBranchId(branch.id);
                                 setEditingBranchName(branch.name);
                                 setEditingBranchSlug(branch.slug);
                               }}
-                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                              className="premium-btn-secondary px-3 py-1.5 text-xs"
                             >
                               Edit
                             </button>
@@ -6103,13 +6106,13 @@ export default function Home() {
                             value={editingBranchName}
                             onChange={(event) => setEditingBranchName(event.target.value)}
                             placeholder="Branch name"
-                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                            className="premium-input"
                           />
                           <input
                             value={editingBranchSlug}
                             onChange={(event) => setEditingBranchSlug(event.target.value)}
                             placeholder="Slug"
-                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                            className="premium-input"
                           />
                           <div className="flex items-center gap-2">
                             <button
@@ -6118,13 +6121,13 @@ export default function Home() {
                                 await updateBranch(branch.id, editingBranchName, editingBranchSlug);
                                 setEditingBranchId(null);
                               }}
-                              className="rounded-xl bg-[#5a1838] px-3 py-1.5 text-xs font-semibold text-white"
+                              className="premium-btn-primary px-3 py-1.5 text-xs"
                             >
                               Save
                             </button>
                             <button
                               onClick={() => setEditingBranchId(null)}
-                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                              className="premium-btn-secondary px-3 py-1.5 text-xs"
                             >
                               Cancel
                             </button>
@@ -6136,30 +6139,30 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
               <h2 className="text-xl font-semibold">Add branch</h2>
               <div className="mt-4 space-y-3">
                 <input
                   value={branchName}
                   onChange={(event) => setBranchName(event.target.value)}
                   placeholder="Branch name"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 />
                 <input
                   value={branchSlug}
                   onChange={(event) => setBranchSlug(event.target.value)}
                   placeholder="Slug"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 />
                 <input
                   value={branchBusinessUnitId}
                   onChange={(event) => setBranchBusinessUnitId(event.target.value)}
                   placeholder="Business unit ID"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 />
                 <button
                   onClick={addBranch}
-                  className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                  className="premium-btn-primary w-full py-2.5 text-sm"
                 >
                   Save branch
                 </button>
@@ -6239,7 +6242,7 @@ export default function Home() {
                   </div>
                   <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {franchiseOverview.branches.map((branch) => (
-                      <div key={branch.branchId} className="rounded-xl border border-[rgba(212,175,55,0.12)] bg-[#17150f] p-4 text-[#f5f1e6]">
+                      <div key={branch.branchId} className="rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-4 text-[#f5f1e6]">
                         <div className="flex items-center justify-between">
                           <div className="font-medium text-[#f5f1e6]">{branch.branchName}</div>
                           <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -6267,7 +6270,7 @@ export default function Home() {
                   </div>
                   <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {franchiseOverview.branchPerformance.map((branch) => (
-                      <div key={branch.branchId} className="rounded-xl border border-[rgba(212,175,55,0.12)] bg-[#17150f] p-4 text-[#f5f1e6]">
+                      <div key={branch.branchId} className="rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-4 text-[#f5f1e6]">
                         <div className="font-medium text-[#f5f1e6]">{branch.branchName}</div>
                         <div className="mt-2 flex items-center justify-between text-xs text-[#a39a86]">
                           <span>Active Staff</span>
@@ -6560,7 +6563,7 @@ export default function Home() {
         ) : null}
 
         {activeTab === "Overview" ? (
-          <section className="mt-6 rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+          <section className="mt-6 rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
             <h2 className="text-xl font-semibold">Launch workflow</h2>
             <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               {[
@@ -6570,8 +6573,8 @@ export default function Home() {
                 "Appointment + completion",
                 "Invoice / POS",
               ].map((step, index) => (
-                <div key={step} className="rounded-xl bg-[#fffafc] p-4 ring-1 ring-[#f3e6eb]">
-                  <div className="text-xs uppercase tracking-[0.2em] text-[#8a606d]">0{index + 1}</div>
+                <div key={step} className="rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-4">
+                  <div className="text-xs uppercase tracking-[0.2em] text-[#a39a86]">0{index + 1}</div>
                   <div className="mt-2 font-medium">{step}</div>
                 </div>
               ))}
@@ -6581,60 +6584,60 @@ export default function Home() {
 
         {activeTab === "Reports" ? (
           <section className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {isLoadingReport ? <div className="text-sm text-[#736067]">Loading reports...</div> : null}
-            {!isLoadingReport && reportError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{reportError}</div> : null}
-            {!isLoadingReport && !reportError && report === null ? <div className="text-sm text-[#736067]">No report data yet.</div> : null}
+            {isLoadingReport ? <div className="text-sm text-[#a39a86]">Loading reports...</div> : null}
+            {!isLoadingReport && reportError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{reportError}</div> : null}
+            {!isLoadingReport && !reportError && report === null ? <div className="text-sm text-[#a39a86]">No report data yet.</div> : null}
             {report !== null ? (
               <>
-                <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
-                  <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Invoices</div>
+                <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+                  <div className="text-xs uppercase tracking-[0.18em] text-[#a39a86]">Invoices</div>
                   <div className="mt-2 text-3xl font-semibold">{report.sales.invoiceCount}</div>
                 </div>
-                <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
-                  <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Revenue</div>
+                <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+                  <div className="text-xs uppercase tracking-[0.18em] text-[#a39a86]">Revenue</div>
                   <div className="mt-2 text-3xl font-semibold">₹{report.sales.totalRevenueCents / 100}</div>
                 </div>
-                <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
-                  <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Appointments</div>
+                <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+                  <div className="text-xs uppercase tracking-[0.18em] text-[#a39a86]">Appointments</div>
                   <div className="mt-2 text-3xl font-semibold">{report.appointments.total}</div>
                   <div className="mt-2 space-y-1">
                     {report.appointments.statusBreakdown.map((item) => (
-                      <div key={item.status} className="flex items-center justify-between text-xs text-[#736067]">
+                      <div key={item.status} className="flex items-center justify-between text-xs text-[#a39a86]">
                         <span>{item.status}</span>
                         <span className="font-medium">{item.count}</span>
                       </div>
                     ))}
                   </div>
                 </div>
-                <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
-                  <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Customers</div>
+                <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+                  <div className="text-xs uppercase tracking-[0.18em] text-[#a39a86]">Customers</div>
                   <div className="mt-2 text-3xl font-semibold">{report.customers.total}</div>
                 </div>
-                <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
-                  <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Stock Items</div>
+                <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+                  <div className="text-xs uppercase tracking-[0.18em] text-[#a39a86]">Stock Items</div>
                   <div className="mt-2 text-3xl font-semibold">{report.inventory.stockItemCount}</div>
-                  <div className="mt-1 text-sm text-[#715a62]">Total qty: {report.inventory.totalQuantity}</div>
+                  <div className="mt-1 text-sm text-[#a39a86]">Total qty: {report.inventory.totalQuantity}</div>
                 </div>
-                <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
-                  <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Movements</div>
+                <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+                  <div className="text-xs uppercase tracking-[0.18em] text-[#a39a86]">Movements</div>
                   <div className="mt-2 text-3xl font-semibold">{report.inventory.movementCount}</div>
                 </div>
               </>
             ) : null}
-            {isLoadingDailySales ? <div className="text-sm text-[#736067]">Loading daily sales...</div> : null}
-            {!isLoadingDailySales && dailySalesError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{dailySalesError}</div> : null}
-            {!isLoadingDailySales && !dailySalesError && dailySales.length === 0 ? <div className="text-sm text-[#736067]">No daily sales yet.</div> : null}
+            {isLoadingDailySales ? <div className="text-sm text-[#a39a86]">Loading daily sales...</div> : null}
+            {!isLoadingDailySales && dailySalesError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{dailySalesError}</div> : null}
+            {!isLoadingDailySales && !dailySalesError && dailySales.length === 0 ? <div className="text-sm text-[#a39a86]">No daily sales yet.</div> : null}
             {dailySales.length > 0 ? (
-              <div className="mt-6 rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <div className="mt-6 rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
                 <h2 className="text-xl font-semibold">Daily Sales</h2>
                 <div className="mt-4 space-y-3">
                   {dailySales.map((item) => (
-                    <div key={item.date} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    <div key={item.date} className="flex items-center justify-between rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
                       <div>
                         <div className="font-medium">{item.date}</div>
-                        <div className="text-sm text-[#736067]">{item.invoiceCount} invoice{item.invoiceCount === 1 ? "" : "s"}</div>
+                        <div className="text-sm text-[#a39a86]">{item.invoiceCount} invoice{item.invoiceCount === 1 ? "" : "s"}</div>
                       </div>
-                      <div className="text-right text-sm text-[#736067]">
+                      <div className="text-right text-sm text-[#a39a86]">
                         <div>₹{item.totalRevenueCents / 100}</div>
                       </div>
                     </div>
@@ -6642,21 +6645,21 @@ export default function Home() {
                 </div>
               </div>
             ) : null}
-            {isLoadingAppointmentReport ? <div className="text-sm text-[#736067]">Loading appointment report...</div> : null}
-            {!isLoadingAppointmentReport && appointmentReportError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{appointmentReportError}</div> : null}
-            {!isLoadingAppointmentReport && !appointmentReportError && appointmentReport.length === 0 ? <div className="text-sm text-[#736067]">No appointment data yet.</div> : null}
+            {isLoadingAppointmentReport ? <div className="text-sm text-[#a39a86]">Loading appointment report...</div> : null}
+            {!isLoadingAppointmentReport && appointmentReportError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{appointmentReportError}</div> : null}
+            {!isLoadingAppointmentReport && !appointmentReportError && appointmentReport.length === 0 ? <div className="text-sm text-[#a39a86]">No appointment data yet.</div> : null}
             {appointmentReport.length > 0 ? (
-              <div className="mt-6 rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <div className="mt-6 rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
                 <h2 className="text-xl font-semibold">Appointment Report</h2>
                 <div className="mt-4 space-y-3">
                   {appointmentReport.map((item) => (
-                    <div key={item.date} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    <div key={item.date} className="flex items-center justify-between rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
                       <div>
                         <div className="font-medium">{item.date}</div>
-                        <div className="text-sm text-[#736067]">{item.appointmentCount} appointment{item.appointmentCount === 1 ? "" : "s"}</div>
+                        <div className="text-sm text-[#a39a86]">{item.appointmentCount} appointment{item.appointmentCount === 1 ? "" : "s"}</div>
                         <div className="mt-1 space-y-1">
                           {item.statusBreakdown.map((status) => (
-                            <div key={status.status} className="flex items-center justify-between text-xs text-[#736067]">
+                            <div key={status.status} className="flex items-center justify-between text-xs text-[#a39a86]">
                               <span>{status.status}</span>
                               <span className="font-medium">{status.count}</span>
                             </div>
@@ -6668,21 +6671,21 @@ export default function Home() {
                 </div>
               </div>
             ) : null}
-            {isLoadingMembershipReport ? <div className="text-sm text-[#736067]">Loading membership report...</div> : null}
-            {!isLoadingMembershipReport && membershipReportError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{membershipReportError}</div> : null}
-            {!isLoadingMembershipReport && !membershipReportError && membershipReport.length === 0 ? <div className="text-sm text-[#736067]">No membership data yet.</div> : null}
+            {isLoadingMembershipReport ? <div className="text-sm text-[#a39a86]">Loading membership report...</div> : null}
+            {!isLoadingMembershipReport && membershipReportError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{membershipReportError}</div> : null}
+            {!isLoadingMembershipReport && !membershipReportError && membershipReport.length === 0 ? <div className="text-sm text-[#a39a86]">No membership data yet.</div> : null}
             {membershipReport.length > 0 ? (
-              <div className="mt-6 rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <div className="mt-6 rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
                 <h2 className="text-xl font-semibold">Membership Report</h2>
                 <div className="mt-4 space-y-3">
                   {membershipReport.map((item) => (
-                    <div key={item.status} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    <div key={item.status} className="flex items-center justify-between rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
                       <div>
                         <div className="font-medium">{item.status}</div>
-                        <div className="text-sm text-[#736067]">{item.count} membership{item.count === 1 ? "" : "s"}</div>
+                        <div className="text-sm text-[#a39a86]">{item.count} membership{item.count === 1 ? "" : "s"}</div>
                         <div className="mt-1 space-y-1">
                           {item.packageBreakdown.map((pkg) => (
-                            <div key={pkg.packageId} className="flex items-center justify-between text-xs text-[#736067]">
+                            <div key={pkg.packageId} className="flex items-center justify-between text-xs text-[#a39a86]">
                               <span>{pkg.packageName}</span>
                               <span className="font-medium">{pkg.count}</span>
                             </div>
@@ -6694,60 +6697,60 @@ export default function Home() {
                 </div>
               </div>
             ) : null}
-            {isLoadingPackageUtilizationReport ? <div className="text-sm text-[#736067]">Loading package utilization...</div> : null}
-            {!isLoadingPackageUtilizationReport && packageUtilizationReportError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{packageUtilizationReportError}</div> : null}
-            {!isLoadingPackageUtilizationReport && !packageUtilizationReportError && packageUtilizationReport.length === 0 ? <div className="text-sm text-[#736067]">No package utilization data yet.</div> : null}
+            {isLoadingPackageUtilizationReport ? <div className="text-sm text-[#a39a86]">Loading package utilization...</div> : null}
+            {!isLoadingPackageUtilizationReport && packageUtilizationReportError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{packageUtilizationReportError}</div> : null}
+            {!isLoadingPackageUtilizationReport && !packageUtilizationReportError && packageUtilizationReport.length === 0 ? <div className="text-sm text-[#a39a86]">No package utilization data yet.</div> : null}
             {packageUtilizationReport.length > 0 ? (
-              <div className="mt-6 rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <div className="mt-6 rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
                 <h2 className="text-xl font-semibold">Package Utilization</h2>
                 <div className="mt-4 space-y-3">
                   {packageUtilizationReport.map((item) => (
-                    <div key={item.packageId} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    <div key={item.packageId} className="flex items-center justify-between rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
                       <div>
                         <div className="font-medium">{item.packageName}</div>
-                        <div className="text-sm text-[#736067]">{item.totalMemberships} total / {item.activeMemberships} active</div>
+                        <div className="text-sm text-[#a39a86]">{item.totalMemberships} total / {item.activeMemberships} active</div>
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
             ) : null}
-            {isLoadingGstSummary ? <div className="text-sm text-[#736067]">Loading GST summary...</div> : null}
-            {!isLoadingGstSummary && gstSummaryError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{gstSummaryError}</div> : null}
-            {!isLoadingGstSummary && !gstSummaryError && gstSummary === null ? <div className="text-sm text-[#736067]">No GST data yet.</div> : null}
+            {isLoadingGstSummary ? <div className="text-sm text-[#a39a86]">Loading GST summary...</div> : null}
+            {!isLoadingGstSummary && gstSummaryError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{gstSummaryError}</div> : null}
+            {!isLoadingGstSummary && !gstSummaryError && gstSummary === null ? <div className="text-sm text-[#a39a86]">No GST data yet.</div> : null}
             {gstSummary !== null ? (
-              <div className="mt-6 rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <div className="mt-6 rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
                 <h2 className="text-xl font-semibold">GST Summary</h2>
                 <div className="mt-4 grid gap-4 md:grid-cols-3">
-                  <div className="rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
-                    <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Total GST</div>
+                  <div className="rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
+                    <div className="text-xs uppercase tracking-[0.18em] text-[#a39a86]">Total GST</div>
                     <div className="mt-2 text-2xl font-semibold">₹{gstSummary.totalGstCents / 100}</div>
                   </div>
-                  <div className="rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
-                    <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Taxable Amount</div>
+                  <div className="rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
+                    <div className="text-xs uppercase tracking-[0.18em] text-[#a39a86]">Taxable Amount</div>
                     <div className="mt-2 text-2xl font-semibold">₹{gstSummary.totalTaxableCents / 100}</div>
                   </div>
-                  <div className="rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
-                    <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Invoices</div>
+                  <div className="rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
+                    <div className="text-xs uppercase tracking-[0.18em] text-[#a39a86]">Invoices</div>
                     <div className="mt-2 text-2xl font-semibold">{gstSummary.invoiceCount}</div>
                   </div>
                 </div>
               </div>
             ) : null}
-            {isLoadingBranchPerformance ? <div className="text-sm text-[#736067]">Loading branch performance...</div> : null}
-            {!isLoadingBranchPerformance && branchPerformanceError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{branchPerformanceError}</div> : null}
-            {!isLoadingBranchPerformance && !branchPerformanceError && branchPerformance.length === 0 ? <div className="text-sm text-[#736067]">No branch performance data yet.</div> : null}
+            {isLoadingBranchPerformance ? <div className="text-sm text-[#a39a86]">Loading branch performance...</div> : null}
+            {!isLoadingBranchPerformance && branchPerformanceError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{branchPerformanceError}</div> : null}
+            {!isLoadingBranchPerformance && !branchPerformanceError && branchPerformance.length === 0 ? <div className="text-sm text-[#a39a86]">No branch performance data yet.</div> : null}
             {branchPerformance.length > 0 ? (
-              <div className="mt-6 rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <div className="mt-6 rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
                 <h2 className="text-xl font-semibold">Branch Performance</h2>
                 <div className="mt-4 grid gap-4 md:grid-cols-2">
                   {branchPerformance.map((branch) => (
-                    <div key={branch.branchId} className="rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    <div key={branch.branchId} className="rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
                       <div className="font-medium">{branch.branchName}</div>
-                      <div className="mt-2 text-sm text-[#736067]">
+                      <div className="mt-2 text-sm text-[#a39a86]">
                         Staff: {branch.staffCount}
                       </div>
-                      <div className="text-sm text-[#736067]">
+                      <div className="text-sm text-[#a39a86]">
                         Attendance records: {branch.attendanceCount}
                       </div>
                     </div>
@@ -6760,29 +6763,29 @@ export default function Home() {
 
         {activeTab === "Settings" ? (
           <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
               <h2 className="text-xl font-semibold">Settings</h2>
               <div className="mt-4 space-y-3">
-                {isLoadingSettings ? <div className="text-sm text-[#736067]">Loading settings...</div> : null}
-                {!isLoadingSettings && settingError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{settingError}</div> : null}
-                {!isLoadingSettings && !settingError && settings.length === 0 ? <div className="text-sm text-[#736067]">No settings yet.</div> : null}
+                {isLoadingSettings ? <div className="text-sm text-[#a39a86]">Loading settings...</div> : null}
+                {!isLoadingSettings && settingError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{settingError}</div> : null}
+                {!isLoadingSettings && !settingError && settings.length === 0 ? <div className="text-sm text-[#a39a86]">No settings yet.</div> : null}
                 {settings.map((setting) => (
-                  <div key={setting.id} className="rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                  <div key={setting.id} className="rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
                     {editingSettingId === setting.id ? (
                       <div className="space-y-2">
                         <input
                           value={editingSettingKey}
                           onChange={(event) => setEditingSettingKey(event.target.value)}
                           placeholder="Setting key"
-                          className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                          className="premium-input"
                         />
                         <input
                           value={editingSettingValue}
                           onChange={(event) => setEditingSettingValue(event.target.value)}
                           placeholder="Setting value"
-                          className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                          className="premium-input"
                         />
-                        <label className="flex items-center gap-2 text-sm text-[#736067]">
+                        <label className="flex items-center gap-2 text-sm text-[#a39a86]">
                           <input
                             type="checkbox"
                             checked={editingSettingIsActive}
@@ -6799,7 +6802,7 @@ export default function Home() {
                           </button>
                           <button
                             onClick={() => setEditingSettingId(null)}
-                            className="rounded-xl bg-[#f0dfe6] px-3 py-2 text-sm font-semibold text-[#5a1838]"
+                            className="rounded-xl bg-[#f0dfe6] px-3 py-2 text-sm font-semibold text-[#d4af37]"
                           >
                             Cancel
                           </button>
@@ -6810,10 +6813,10 @@ export default function Home() {
                         <div className="flex items-center justify-between">
                           <div>
                             <div className="font-medium">{setting.key}</div>
-                            <div className="text-sm text-[#736067]">{setting.value}</div>
+                            <div className="text-sm text-[#a39a86]">{setting.value}</div>
                           </div>
                           <div className="flex items-center gap-3">
-                            <div className="text-right text-sm text-[#736067]">
+                            <div className="text-right text-sm text-[#a39a86]">
                               <div>{setting.isActive ? "Active" : "Inactive"}</div>
                             </div>
                             <button
@@ -6823,7 +6826,7 @@ export default function Home() {
                                 setEditingSettingValue(setting.value);
                                 setEditingSettingIsActive(setting.isActive);
                               }}
-                              className="rounded-xl bg-[#f0dfe6] px-3 py-1.5 text-sm font-semibold text-[#5a1838]"
+                              className="rounded-xl bg-[#f0dfe6] px-3 py-1.5 text-sm font-semibold text-[#d4af37]"
                             >
                               Edit
                             </button>
@@ -6836,24 +6839,24 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
               <h2 className="text-xl font-semibold">Add setting</h2>
               <div className="mt-4 space-y-3">
                 <input
                   value={settingKey}
                   onChange={(event) => setSettingKey(event.target.value)}
                   placeholder="Setting key"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 />
                 <input
                   value={settingValue}
                   onChange={(event) => setSettingValue(event.target.value)}
                   placeholder="Setting value"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 />
                 <button
                   onClick={addSetting}
-                  className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                  className="premium-btn-primary w-full py-2.5 text-sm"
                 >
                   Save setting
                 </button>
@@ -6861,24 +6864,24 @@ export default function Home() {
             </div>
 
             {permissionCodes.includes("tenant.manage") ? (
-              <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
                 <h2 className="text-xl font-semibold">Assign role</h2>
                 <div className="mt-4 space-y-3">
                   {isLoadingRoleAssignmentUsers || isLoadingRoleAssignmentRoles ? (
-                    <div className="text-sm text-[#736067]">Loading users and roles...</div>
+                    <div className="text-sm text-[#a39a86]">Loading users and roles...</div>
                   ) : null}
                   {roleAssignmentError ? (
-                    <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{roleAssignmentError}</div>
+                    <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{roleAssignmentError}</div>
                   ) : null}
                   {roleAssignmentSuccess ? (
-                    <div className="rounded-xl bg-[#f0fdf4] p-3 text-sm text-[#2e7d32]">{roleAssignmentSuccess}</div>
+                    <div className="rounded-xl border border-[rgba(63,174,106,0.3)] bg-[rgba(63,174,106,0.12)] p-3 text-sm text-[#3fae6a]">{roleAssignmentSuccess}</div>
                   ) : null}
                   <label className="block text-sm font-medium text-[#5a3b48]" htmlFor="role-user">User</label>
                   <select
                     id="role-user"
                     value={roleAssignmentUserId}
                     onChange={(event) => setRoleAssignmentUserId(event.target.value)}
-                    className="w-full rounded-xl border border-[#ead7df] bg-[#fffafc] px-3 py-2.5 text-sm"
+                    className="w-full rounded-xl border border-[rgba(212,175,55,0.15)] bg-[#17150f] px-3 py-2.5 text-sm"
                   >
                     <option value="">Select user</option>
                     {roleAssignmentUsers.map((user) => (
@@ -6892,7 +6895,7 @@ export default function Home() {
                     id="role-role"
                     value={roleAssignmentRoleId}
                     onChange={(event) => setRoleAssignmentRoleId(event.target.value)}
-                    className="w-full rounded-xl border border-[#ead7df] bg-[#fffafc] px-3 py-2.5 text-sm"
+                    className="w-full rounded-xl border border-[rgba(212,175,55,0.15)] bg-[#17150f] px-3 py-2.5 text-sm"
                   >
                     <option value="">Select role</option>
                     {roleAssignmentRoles.map((role) => (
@@ -6906,7 +6909,7 @@ export default function Home() {
                     id="role-scope"
                     value={roleAssignmentScopeKind}
                     onChange={(event) => setRoleAssignmentScopeKind(event.target.value as "tenant" | "business-unit" | "branch")}
-                    className="w-full rounded-xl border border-[#ead7df] bg-[#fffafc] px-3 py-2.5 text-sm"
+                    className="w-full rounded-xl border border-[rgba(212,175,55,0.15)] bg-[#17150f] px-3 py-2.5 text-sm"
                   >
                     <option value="tenant">Tenant scope</option>
                     <option value="business-unit">Business unit scope</option>
@@ -6919,7 +6922,7 @@ export default function Home() {
                         id="role-business-unit"
                         value={roleAssignmentBusinessUnitId}
                         onChange={(event) => setRoleAssignmentBusinessUnitId(event.target.value)}
-                        className="w-full rounded-xl border border-[#ead7df] bg-[#fffafc] px-3 py-2.5 text-sm"
+                        className="w-full rounded-xl border border-[rgba(212,175,55,0.15)] bg-[#17150f] px-3 py-2.5 text-sm"
                       >
                         <option value="">Select business unit</option>
                         {businessUnits.map((bu) => (
@@ -6937,7 +6940,7 @@ export default function Home() {
                         id="role-branch"
                         value={roleAssignmentBranchId}
                         onChange={(event) => setRoleAssignmentBranchId(event.target.value)}
-                        className="w-full rounded-xl border border-[#ead7df] bg-[#fffafc] px-3 py-2.5 text-sm"
+                        className="w-full rounded-xl border border-[rgba(212,175,55,0.15)] bg-[#17150f] px-3 py-2.5 text-sm"
                       >
                         <option value="">Select branch</option>
                         {branches
@@ -6953,7 +6956,7 @@ export default function Home() {
                   <button
                     onClick={assignRole}
                     disabled={isAssigningRole}
-                    className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                    className="premium-btn-primary w-full py-2.5 text-sm disabled:opacity-60"
                   >
                     {isAssigningRole ? "Assigning..." : "Assign role"}
                   </button>
@@ -6966,23 +6969,23 @@ export default function Home() {
         {activeTab === "Notifications" ? (
           <>
             <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-              <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+              <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
                 <h2 className="text-xl font-semibold">Notification Templates</h2>
               <div className="mt-4 space-y-3">
-                {isLoadingNotificationTemplates ? <div className="text-sm text-[#736067]">Loading notification templates...</div> : null}
-                {!isLoadingNotificationTemplates && notificationTemplateError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{notificationTemplateError}</div> : null}
-                {!isLoadingNotificationTemplates && !notificationTemplateError && notificationTemplates.length === 0 ? <div className="text-sm text-[#736067]">No notification templates yet.</div> : null}
+                {isLoadingNotificationTemplates ? <div className="text-sm text-[#a39a86]">Loading notification templates...</div> : null}
+                {!isLoadingNotificationTemplates && notificationTemplateError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{notificationTemplateError}</div> : null}
+                {!isLoadingNotificationTemplates && !notificationTemplateError && notificationTemplates.length === 0 ? <div className="text-sm text-[#a39a86]">No notification templates yet.</div> : null}
                   {notificationTemplates.map((template) => (
-                    <div key={template.id} className="flex flex-col gap-2 rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                    <div key={template.id} className="flex flex-col gap-2 rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
                       {editingTemplateId !== template.id ? (
                         <div className="flex items-center justify-between">
                           <div>
                             <div className="font-medium">{template.name}</div>
-                            <div className="text-sm text-[#736067]">Channel: {template.channel}</div>
-                            <div className="text-sm text-[#736067]">{template.subject ?? "No subject"}</div>
+                            <div className="text-sm text-[#a39a86]">Channel: {template.channel}</div>
+                            <div className="text-sm text-[#a39a86]">{template.subject ?? "No subject"}</div>
                           </div>
                           <div className="flex items-center gap-2">
-                            <div className="text-right text-sm text-[#736067]">
+                            <div className="text-right text-sm text-[#a39a86]">
                               <div>{template.isActive ? "Active" : "Inactive"}</div>
                             </div>
                             <button
@@ -6993,7 +6996,7 @@ export default function Home() {
                                 setEditingTemplateSubject(template.subject ?? "");
                                 setEditingTemplateBody(template.body);
                               }}
-                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                              className="premium-btn-secondary px-3 py-1.5 text-xs"
                             >
                               Edit
                             </button>
@@ -7005,25 +7008,25 @@ export default function Home() {
                             value={editingTemplateName}
                             onChange={(event) => setEditingTemplateName(event.target.value)}
                             placeholder="Template name"
-                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                            className="premium-input"
                           />
                           <input
                             value={editingTemplateChannel}
                             onChange={(event) => setEditingTemplateChannel(event.target.value)}
                             placeholder="Channel"
-                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                            className="premium-input"
                           />
                           <input
                             value={editingTemplateSubject}
                             onChange={(event) => setEditingTemplateSubject(event.target.value)}
                             placeholder="Subject"
-                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                            className="premium-input"
                           />
                           <textarea
                             value={editingTemplateBody}
                             onChange={(event) => setEditingTemplateBody(event.target.value)}
                             placeholder="Body"
-                            className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                            className="premium-input"
                           />
                           <div className="flex items-center gap-2">
                             <button
@@ -7032,13 +7035,13 @@ export default function Home() {
                                 await updateNotificationTemplate(template.id, editingTemplateName, editingTemplateChannel, editingTemplateSubject, editingTemplateBody);
                                 setEditingTemplateId(null);
                               }}
-                              className="rounded-xl bg-[#5a1838] px-3 py-1.5 text-xs font-semibold text-white"
+                              className="premium-btn-primary px-3 py-1.5 text-xs"
                             >
                               Save
                             </button>
                             <button
                               onClick={() => setEditingTemplateId(null)}
-                              className="rounded-full border border-[#ead0d9] px-3 py-1.5 text-xs font-medium"
+                              className="premium-btn-secondary px-3 py-1.5 text-xs"
                             >
                               Cancel
                             </button>
@@ -7050,36 +7053,36 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
               <h2 className="text-xl font-semibold">Add notification template</h2>
               <div className="mt-4 space-y-3">
                 <input
                   value={templateName}
                   onChange={(event) => setTemplateName(event.target.value)}
                   placeholder="Template name"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 />
                 <input
                   value={templateChannel}
                   onChange={(event) => setTemplateChannel(event.target.value)}
                   placeholder="Channel (e.g. email, sms)"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 />
                 <input
                   value={templateSubject}
                   onChange={(event) => setTemplateSubject(event.target.value)}
                   placeholder="Subject (optional)"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 />
                 <textarea
                   value={templateBody}
                   onChange={(event) => setTemplateBody(event.target.value)}
                   placeholder="Body"
-                  className="w-full rounded-xl border border-[#ead7df] px-3 py-2.5 text-sm"
+                  className="premium-input"
                 />
                 <button
                   onClick={addNotificationTemplate}
-                  className="w-full rounded-xl bg-[#5a1838] px-4 py-2.5 text-sm font-semibold text-white"
+                  className="premium-btn-primary w-full py-2.5 text-sm"
                 >
                   Save template
                 </button>
@@ -7087,20 +7090,20 @@ export default function Home() {
             </div>
           </section>
 
-          <section className="mt-6 rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
+          <section className="mt-6 rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
             <h2 className="text-xl font-semibold">Notification Logs</h2>
             <div className="mt-4 space-y-3">
-              {isLoadingNotificationLogs ? <div className="text-sm text-[#736067]">Loading notification logs...</div> : null}
-              {!isLoadingNotificationLogs && notificationLogError ? <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{notificationLogError}</div> : null}
-              {!isLoadingNotificationLogs && !notificationLogError && notificationLogs.length === 0 ? <div className="text-sm text-[#736067]">No notification logs yet.</div> : null}
+              {isLoadingNotificationLogs ? <div className="text-sm text-[#a39a86]">Loading notification logs...</div> : null}
+              {!isLoadingNotificationLogs && notificationLogError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{notificationLogError}</div> : null}
+              {!isLoadingNotificationLogs && !notificationLogError && notificationLogs.length === 0 ? <div className="text-sm text-[#a39a86]">No notification logs yet.</div> : null}
               {notificationLogs.map((log) => (
-                <div key={log.id} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                <div key={log.id} className="flex items-center justify-between rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
                   <div>
                     <div className="font-medium">{log.channel}</div>
-                    <div className="text-sm text-[#736067]">{log.subject ?? "No subject"}</div>
-                    <div className="text-sm text-[#736067]">{log.body}</div>
+                    <div className="text-sm text-[#a39a86]">{log.subject ?? "No subject"}</div>
+                    <div className="text-sm text-[#a39a86]">{log.body}</div>
                   </div>
-                  <div className="text-right text-sm text-[#736067]">
+                  <div className="text-right text-sm text-[#a39a86]">
                     <div>{log.status}</div>
                     <div>{log.sentAt ? new Date(log.sentAt).toLocaleString() : "Not sent"}</div>
                   </div>
