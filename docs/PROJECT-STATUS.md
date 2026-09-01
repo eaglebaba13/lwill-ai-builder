@@ -5,8 +5,27 @@
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
   - **Current Branch**: `phase-1d-native-auth`
-  - **Current HEAD Commit**: `28b1af4` (`docs: record Coolify deployment fix in PROJECT-STATUS`)
-  - **Git State**: `phase-1d-native-auth` at `28b1af4`; working tree has uncommitted Franchise/MakeMeArtist changes (NOT X Nail). X Nail has zero uncommitted changes.
+  - **Current HEAD Commit**: `568cb7e` (`feat(franchise): implement franchise dashboard`)
+  - **Git State**: `phase-1d-native-auth` at `568cb7e`; Franchise Dashboard fully implemented, tested, and deployed to production.
+
+## Franchise Dashboard — Technical Implementation & Production Delivery — 2026-09-01
+
+### Status: **COMPLETE & DEPLOYED TO PRODUCTION**
+
+### Implemented Vertical Slice
+- **Data Model**: `Territory`, `FranchisePartner`, `FranchiseOutletProfile`, `FranchiseAgreement`, `FranchiseAgreementOutlet`, and `FranchiseRevenueDistribution` models defined and validated in Prisma schema (`packages/database/prisma/schema.prisma`) with data-preserving migration `20260830180000_add_franchise_territory_models`.
+- **API Endpoints**:
+  - `GET /api/reports/franchise-overview` (Live on production, returning 401 fail-closed for unauthenticated)
+  - `GET /api/franchise/payout` (Live on production, returning 401 fail-closed for unauthenticated)
+- **Route Services & Runtime**: `getFranchiseOverview` and `getFranchisePayout` in `report-service.ts` aggregate outlet sales, appointments, customers, inventory, branch performance, and partner revenue share/royalty calculations. Handlers wired in `report-route-handlers.ts` and `report-runtime.ts`.
+- **UI & Dashboard**: Added "Franchise Overview" and "Financials" tabs to `FRANCHISE_TABS` in `role-dashboard-config.ts` and rendered dedicated KPI cards (Branches, Revenue, Appointments, Low Stock), branch performance table, agreement payouts, and territory royalty pool breakdown in `xnail/page.tsx`.
+- **Commercial Rule Safety (ADR-014)**: Preserved exact executed agreement terms without inventing hardcoded assumptions for pending commercial rules. Handles missing distributions safely without runtime exceptions.
+- **Verification Results**:
+  - `@lwill/authentication-context-prisma` tests: 54 files / 476 tests PASS
+  - `apps/web` tests: 52 files / 572 tests PASS (including `franchise-overview-route-handlers.test.ts` and `franchise-payout-route-handlers.test.ts`)
+  - `pnpm --filter web lint`: 0 errors, 14 pre-existing warnings
+  - `pnpm build`: PASS (Turbopack production build)
+  - Production health: `builder.lwill.in` = 200, `xnail.makemeartist.com` = 200, `/api/reports/franchise-overview` = 401, `/api/franchise/payout` = 401.
 
 ## X Nail ERP MVP — Technical Implementation Complete — FROZEN 2026-09-01
 
