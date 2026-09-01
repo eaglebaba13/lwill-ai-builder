@@ -5,8 +5,8 @@
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
   - **Current Branch**: `phase-1d-native-auth`
-  - **Current HEAD Commit**: `9684c3b` (`feat(auth): add idempotent demo user bootstrap`)
-  - **Git State**: `phase-1d-native-auth` at `9684c3b`; working tree has uncommitted changes including franchise management, CRM report enhancements, and X Nail navigation updates.
+  - **Current HEAD Commit**: `b37b836` (`fix(build): add userId to report-runtime authorize return to fix Coolify deployment`)
+  - **Git State**: `phase-1d-native-auth` at `b37b836`; working tree has uncommitted changes including franchise management, CRM report enhancements, and X Nail navigation updates.
 
 ## State Breakdown
 
@@ -145,6 +145,48 @@
 - Five new route-handler test files added: `reorder-rule-route-handlers.test.ts`, `stock-adjustment-route-handlers.test.ts`, `stock-transfer-route-handlers.test.ts`, `supplier-route-handlers.test.ts`, `warehouse-route-handlers.test.ts` — each covers permission-code forwarding, 401/403 auth gating, and tenant-isolation rejection of client-supplied `tenantId`.
 - The existing `purchase-receipt-route-handlers.test.ts` permission-forwarding assertions were updated to expect `purchaseReceipt.read/write` instead of `branch.read/write`.
 - No schema, migration, production data, deployment configuration, Franchise, MakeMeArtist, or unrelated X Nail page work was modified.
+
+## Coolify Deployment Fix — 2026-09-01
+
+### Status: **Complete — TypeScript type error in report-runtime.ts resolved; build passes**
+
+### Root Cause
+
+Commit `fbf4cb7` changed the `ReportAuthorization` type in `report-route-handlers.ts` to require `userId` in the `authorized` variant, but did not update `report-runtime.ts` to provide it. The `authorize` function returned `{ outcome: "authorized", tenantId }` without `userId`, causing:
+
+```
+TS2322: Type '{ outcome: "authorized"; tenantId: string; }' is not assignable to type 'ReportAuthorization'.
+Property 'userId' is missing in type '{ outcome: "authorized"; tenantId: string; }' but required in type
+'{ readonly outcome: "authorized"; readonly tenantId: string; readonly userId: string; }'.
+```
+
+This error only manifests during `next build` (which runs TypeScript type-checking) and not during local dev or test runs because Vitest does not enforce TypeScript type-checking on the runtime module boundary.
+
+### Why 9684c3b Succeeded
+
+The `ReportAuthorization` type did not include `userId`; the authorize return value matched.
+
+### Why fbf4cb7 Failed
+
+`fbf4cb7` added `userId` to `ReportAuthorization` and `authorizationOutcome` but forgot to add it to the `authorize` function in `report-runtime.ts`.
+
+### Fix
+
+Added `userId: context.user.userId` to the authorize return value in `apps/web/src/lib/crm/report-runtime.ts` (one-line change).
+
+### Verification Results
+
+- `pnpm install --frozen-lockfile`: PASS
+- `DATABASE_URL=... pnpm --filter @lwill/database run generate`: PASS
+- `pnpm build` (Next.js production build): PASS
+- `pnpm --filter web exec vitest run`: 50 files / 562 tests PASS
+- `pnpm --filter authentication-context-prisma test`: 54 files / 476 tests PASS
+- `pnpm --filter web lint`: 0 errors, 14 pre-existing warnings
+
+### Notes
+
+- No schema, migration, franchise, MakeMeArtist, or unrelated changes were included.
+- The untracked franchise route files (`apps/web/src/app/api/franchise/`, `apps/web/src/app/api/reports/franchise-overview/`) cause local `tsc --noEmit` failures because they import `handleGetFranchisePayout`/`handleGetFranchiseOverview` which don't exist in the committed code. These files are NOT committed and NOT present on Coolify, so they don't affect the deployment.
 
 ## X Nail Role-Assignment Test Stability Fix — 2026-09-01
 
