@@ -136,7 +136,7 @@ export async function handleListStockTransfers(
   _request: Request,
   services: StockTransferRouteServices,
 ): Promise<Response> {
-  const authorization = await services.authorize("branch.read");
+  const authorization = await services.authorize("stockTransfer.read");
   const authResult = authorizationOutcome(authorization);
   if (!authResult.ok) {
     return authResult.response;
@@ -149,7 +149,7 @@ export async function handleCreateStockTransfer(
   request: Request,
   services: StockTransferRouteServices,
 ): Promise<Response> {
-  const authorization = await services.authorize("branch.write");
+  const authorization = await services.authorize("stockTransfer.write");
   const authResult = authorizationOutcome(authorization);
   if (!authResult.ok) {
     return authResult.response;
@@ -178,7 +178,7 @@ export async function handleGetStockTransfer(
   services: StockTransferRouteServices,
   stockTransferId: string,
 ): Promise<Response> {
-  const authorization = await services.authorize("branch.read");
+  const authorization = await services.authorize("stockTransfer.read");
   const authResult = authorizationOutcome(authorization);
   if (!authResult.ok) {
     return authResult.response;

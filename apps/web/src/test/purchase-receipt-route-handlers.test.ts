@@ -51,19 +51,19 @@ describe("purchase receipt route handlers: authentication/authorization gating",
 });
 
 describe("purchase receipt route handlers: permission code forwarding", () => {
-  it("passes 'branch.read' to authorize for list and get operations", async () => {
+  it("passes 'purchaseReceipt.read' to authorize for list and get operations", async () => {
     const services = createServices({ outcome: "authorized", tenantId: "tenant-1" });
     await handleListPurchaseReceipts(request(), services);
-    expect(services.authorize).toHaveBeenCalledWith("branch.read");
+    expect(services.authorize).toHaveBeenCalledWith("purchaseReceipt.read");
 
     await handleGetPurchaseReceipt(request(), services, "r1");
-    expect(services.authorize).toHaveBeenCalledWith("branch.read");
+    expect(services.authorize).toHaveBeenCalledWith("purchaseReceipt.read");
   });
 
-  it("passes 'branch.write' to authorize for create operations", async () => {
+  it("passes 'purchaseReceipt.write' to authorize for create operations", async () => {
     const services = createServices({ outcome: "authorized", tenantId: "tenant-1" });
     await handleCreatePurchaseReceipt(request({ warehouseId: "w1", branchId: "b1", items: [{ productId: "p1", quantity: 1 }] }), services);
-    expect(services.authorize).toHaveBeenCalledWith("branch.write");
+    expect(services.authorize).toHaveBeenCalledWith("purchaseReceipt.write");
   });
 });
 

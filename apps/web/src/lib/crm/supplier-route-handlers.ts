@@ -167,7 +167,7 @@ export async function handleListSuppliers(
   _request: Request,
   services: SupplierRouteServices,
 ): Promise<Response> {
-  const authorization = await services.authorize("branch.read");
+  const authorization = await services.authorize("supplier.read");
   const authResult = authorizationOutcome(authorization);
   if (!authResult.ok) {
     return authResult.response;
@@ -180,7 +180,7 @@ export async function handleCreateSupplier(
   request: Request,
   services: SupplierRouteServices,
 ): Promise<Response> {
-  const authorization = await services.authorize("branch.write");
+  const authorization = await services.authorize("supplier.write");
   const authResult = authorizationOutcome(authorization);
   if (!authResult.ok) {
     return authResult.response;
@@ -202,7 +202,7 @@ export async function handleGetSupplier(
   services: SupplierRouteServices,
   supplierId: string,
 ): Promise<Response> {
-  const authorization = await services.authorize("branch.read");
+  const authorization = await services.authorize("supplier.read");
   const authResult = authorizationOutcome(authorization);
   if (!authResult.ok) {
     return authResult.response;
@@ -219,7 +219,7 @@ export async function handleUpdateSupplier(
   services: SupplierRouteServices,
   supplierId: string,
 ): Promise<Response> {
-  const authorization = await services.authorize("branch.write");
+  const authorization = await services.authorize("supplier.write");
   const authResult = authorizationOutcome(authorization);
   if (!authResult.ok) {
     return authResult.response;

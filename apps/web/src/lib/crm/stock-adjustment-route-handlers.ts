@@ -126,7 +126,7 @@ export async function handleListStockAdjustments(
   _request: Request,
   services: StockAdjustmentRouteServices,
 ): Promise<Response> {
-  const authorization = await services.authorize("branch.read");
+  const authorization = await services.authorize("stockAdjustment.read");
   const authResult = authorizationOutcome(authorization);
   if (!authResult.ok) {
     return authResult.response;
@@ -139,7 +139,7 @@ export async function handleCreateStockAdjustment(
   request: Request,
   services: StockAdjustmentRouteServices,
 ): Promise<Response> {
-  const authorization = await services.authorize("branch.write");
+  const authorization = await services.authorize("stockAdjustment.write");
   const authResult = authorizationOutcome(authorization);
   if (!authResult.ok) {
     return authResult.response;
@@ -168,7 +168,7 @@ export async function handleGetStockAdjustment(
   services: StockAdjustmentRouteServices,
   stockAdjustmentId: string,
 ): Promise<Response> {
-  const authorization = await services.authorize("branch.read");
+  const authorization = await services.authorize("stockAdjustment.read");
   const authResult = authorizationOutcome(authorization);
   if (!authResult.ok) {
     return authResult.response;

@@ -138,7 +138,7 @@ export async function handleListPurchaseReceipts(
   _request: Request,
   services: PurchaseReceiptRouteServices,
 ): Promise<Response> {
-  const authorization = await services.authorize("branch.read");
+  const authorization = await services.authorize("purchaseReceipt.read");
   const authResult = authorizationOutcome(authorization);
   if (!authResult.ok) {
     return authResult.response;
@@ -151,7 +151,7 @@ export async function handleCreatePurchaseReceipt(
   request: Request,
   services: PurchaseReceiptRouteServices,
 ): Promise<Response> {
-  const authorization = await services.authorize("branch.write");
+  const authorization = await services.authorize("purchaseReceipt.write");
   const authResult = authorizationOutcome(authorization);
   if (!authResult.ok) {
     return authResult.response;
@@ -185,7 +185,7 @@ export async function handleGetPurchaseReceipt(
   services: PurchaseReceiptRouteServices,
   purchaseReceiptId: string,
 ): Promise<Response> {
-  const authorization = await services.authorize("branch.read");
+  const authorization = await services.authorize("purchaseReceipt.read");
   const authResult = authorizationOutcome(authorization);
   if (!authResult.ok) {
     return authResult.response;

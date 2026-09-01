@@ -131,7 +131,7 @@ export async function handleListWarehouses(
   _request: Request,
   services: WarehouseRouteServices,
 ): Promise<Response> {
-  const authorization = await services.authorize("branch.read");
+  const authorization = await services.authorize("warehouse.read");
   const authResult = authorizationOutcome(authorization);
   if (!authResult.ok) {
     return authResult.response;
@@ -144,7 +144,7 @@ export async function handleCreateWarehouse(
   request: Request,
   services: WarehouseRouteServices,
 ): Promise<Response> {
-  const authorization = await services.authorize("branch.write");
+  const authorization = await services.authorize("warehouse.write");
   const authResult = authorizationOutcome(authorization);
   if (!authResult.ok) {
     return authResult.response;
@@ -166,7 +166,7 @@ export async function handleGetWarehouse(
   services: WarehouseRouteServices,
   warehouseId: string,
 ): Promise<Response> {
-  const authorization = await services.authorize("branch.read");
+  const authorization = await services.authorize("warehouse.read");
   const authResult = authorizationOutcome(authorization);
   if (!authResult.ok) {
     return authResult.response;
@@ -183,7 +183,7 @@ export async function handleUpdateWarehouse(
   services: WarehouseRouteServices,
   warehouseId: string,
 ): Promise<Response> {
-  const authorization = await services.authorize("branch.write");
+  const authorization = await services.authorize("warehouse.write");
   const authResult = authorizationOutcome(authorization);
   if (!authResult.ok) {
     return authResult.response;

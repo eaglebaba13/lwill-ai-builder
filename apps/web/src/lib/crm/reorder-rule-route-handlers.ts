@@ -146,7 +146,7 @@ export async function handleListReorderRules(
   _request: Request,
   services: ReorderRuleRouteServices,
 ): Promise<Response> {
-  const authorization = await services.authorize("branch.read");
+  const authorization = await services.authorize("reorderRule.read");
   const authResult = authorizationOutcome(authorization);
   if (!authResult.ok) {
     return authResult.response;
@@ -159,7 +159,7 @@ export async function handleCreateReorderRule(
   request: Request,
   services: ReorderRuleRouteServices,
 ): Promise<Response> {
-  const authorization = await services.authorize("branch.write");
+  const authorization = await services.authorize("reorderRule.write");
   const authResult = authorizationOutcome(authorization);
   if (!authResult.ok) {
     return authResult.response;
@@ -193,7 +193,7 @@ export async function handleGetReorderRule(
   services: ReorderRuleRouteServices,
   reorderRuleId: string,
 ): Promise<Response> {
-  const authorization = await services.authorize("branch.read");
+  const authorization = await services.authorize("reorderRule.read");
   const authResult = authorizationOutcome(authorization);
   if (!authResult.ok) {
     return authResult.response;
@@ -210,7 +210,7 @@ export async function handleUpdateReorderRule(
   services: ReorderRuleRouteServices,
   reorderRuleId: string,
 ): Promise<Response> {
-  const authorization = await services.authorize("branch.write");
+  const authorization = await services.authorize("reorderRule.write");
   const authResult = authorizationOutcome(authorization);
   if (!authResult.ok) {
     return authResult.response;
