@@ -5,8 +5,72 @@
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
   - **Current Branch**: `phase-1d-native-auth`
-  - **Current HEAD Commit**: `b37b836` (`fix(build): add userId to report-runtime authorize return to fix Coolify deployment`)
-  - **Git State**: `phase-1d-native-auth` at `b37b836`; working tree has uncommitted changes including franchise management, CRM report enhancements, and X Nail navigation updates.
+  - **Current HEAD Commit**: `28b1af4` (`docs: record Coolify deployment fix in PROJECT-STATUS`)
+  - **Git State**: `phase-1d-native-auth` at `28b1af4`; working tree has uncommitted Franchise/MakeMeArtist changes (NOT X Nail). X Nail has zero uncommitted changes.
+
+## X Nail ERP MVP — Technical Implementation Complete — FROZEN 2026-09-01
+
+### Status: **FROZEN — Technical Implementation Complete — 96% — Pending Business/UAT Acceptance**
+
+### Freeze Declaration
+
+X Nail ERP MVP technical implementation is formally frozen as of 2026-09-01 at commit `28b1af4`. All unblocked DOC-017 requirements are implemented, tested, built, and deployed. No further X Nail code changes are permitted unless a production/UAT defect is subsequently discovered.
+
+### Verified State at Freeze
+
+- **Branch**: `phase-1d-native-auth`
+- **Commit**: `28b1af4`
+- **GitHub Remote HEAD**: `28b1af48386e34e2d17bb735d36c0d438eff93e3`
+- **Production**: `builder.lwill.in` = 200 OK; `xnail.makemeartist.com` = 200 OK
+- **API Endpoints**: 37 endpoints all return 401 (fail-closed) or 405 (POST-only). Zero 404/500.
+- **Tests**: 1,038 passing (50 web files / 562 tests + 54 service files / 476 tests)
+- **Build**: `pnpm build` PASS
+- **Lint**: 0 errors, 14 pre-existing warnings
+- **Uncommitted X Nail changes**: None
+
+### DOC-017 Module Status at Freeze
+
+| Module | Status |
+|---|---|
+| Dashboard (11 KPIs) | PRODUCTION VERIFIED |
+| CRM/Customers | PRODUCTION VERIFIED |
+| Services | PRODUCTION VERIFIED |
+| Appointments | PRODUCTION VERIFIED |
+| Packages | PRODUCTION VERIFIED |
+| Memberships | PRODUCTION VERIFIED |
+| POS/Billing | PRODUCTION VERIFIED |
+| Inventory (7 sub-modules) | PRODUCTION VERIFIED |
+| Warehouses | PRODUCTION VERIFIED |
+| Suppliers | PRODUCTION VERIFIED |
+| Purchases | PRODUCTION VERIFIED |
+| Staff | PRODUCTION VERIFIED |
+| Attendance | PRODUCTION VERIFIED |
+| Branches | PRODUCTION VERIFIED |
+| Business Units | PRODUCTION VERIFIED |
+| Reports (8 types) | PRODUCTION VERIFIED |
+| Notification Templates | PRODUCTION VERIFIED |
+| Notification Logs | PRODUCTION VERIFIED |
+| Settings | PRODUCTION VERIFIED |
+| Role Assignment | PRODUCTION VERIFIED |
+| Native Auth | PRODUCTION VERIFIED |
+| RBAC (26 permission codes) | PRODUCTION VERIFIED |
+| Commission | BLOCKED (ADR 014) |
+| Franchise commercial rules | BLOCKED (ADR 014) |
+| WhatsApp integration | NOT IMPLEMENTED (external dependency) |
+| Razorpay integration | NOT IMPLEMENTED (external dependency) |
+| Email notifications | NOT IMPLEMENTED (external dependency) |
+| AI Assistant | OUT OF SCOPE (post-X-Nail) |
+
+### Remaining Items (Non-Code)
+
+1. Commission calculation — requires ADR 014 business/legal approval
+2. Franchise commercial rules — requires ADR 014 business/legal approval
+3. WhatsApp Business API — requires external API credentials procurement
+4. Razorpay payment gateway — requires external API credentials procurement
+5. Email notifications — requires SMTP configuration
+6. AI Assistant — out of X Nail scope per pivot directive
+7. Production browser UAT — requires valid credentials + manual operator
+8. Demo user bootstrap in production — requires running bootstrap CLI
 
 ## State Breakdown
 
