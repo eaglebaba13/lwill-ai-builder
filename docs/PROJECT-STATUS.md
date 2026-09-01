@@ -123,6 +123,29 @@
 - Branch-scoped roles receive 403 when attempting tenant-level API access.
 - No production DB, Prisma schema/migrations, or deployment configuration was changed.
 
+## X Nail RBAC Permission-Code Alignment — 2026-09-01
+
+### Status: **Complete — six inventory/procurement modules now consume their own bootstrap permission codes**
+
+### Implemented Slice
+
+- The initial permission bootstraps for `purchase-receipt`, `reorder-rule`, `stock-adjustment`, `stock-transfer`, `supplier`, and `warehouse` create module-specific permission codes (`purchaseReceipt.read/write`, etc.), but the web route handlers were calling `services.authorize("branch.read"/"branch.write")`. Because `branch.read/write` is also granted to `tenant-admin`, the production behaviour was incidentally correct, but the module-level grants had no consumer.
+- All six route handlers now call their module-specific permission codes, matching the bootstrap and giving the platform correct RBAC granularity.
+- `branch-route-handlers.ts` correctly retains `branch.read/write` because the branch module legitimately shares that code with the branch bootstrap.
+
+### Verification Results
+
+- `pnpm --filter web exec vitest run` — 52 files / 572 tests pass (+5 files / +25 tests vs. baseline `c87f97f`).
+- `pnpm --filter authentication-context-prisma test` — 54 files / 476 tests pass.
+- `pnpm --filter web lint` — 0 errors, 14 pre-existing warnings.
+- `pnpm build` — Next.js production build success.
+
+### Notes
+
+- Five new route-handler test files added: `reorder-rule-route-handlers.test.ts`, `stock-adjustment-route-handlers.test.ts`, `stock-transfer-route-handlers.test.ts`, `supplier-route-handlers.test.ts`, `warehouse-route-handlers.test.ts` — each covers permission-code forwarding, 401/403 auth gating, and tenant-isolation rejection of client-supplied `tenantId`.
+- The existing `purchase-receipt-route-handlers.test.ts` permission-forwarding assertions were updated to expect `purchaseReceipt.read/write` instead of `branch.read/write`.
+- No schema, migration, production data, deployment configuration, Franchise, MakeMeArtist, or unrelated X Nail page work was modified.
+
 ## X Nail Role-Assignment Test Stability Fix — 2026-09-01
 
 ### Status: **Complete — "assigns a role through the Settings tab form" now passes in full suite**
