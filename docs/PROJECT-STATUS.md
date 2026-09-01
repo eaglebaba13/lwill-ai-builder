@@ -5,8 +5,8 @@
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
   - **Current Branch**: `phase-1d-native-auth`
-  - **Current HEAD Commit**: `568cb7e` (`feat(franchise): implement franchise dashboard`)
-  - **Git State**: `phase-1d-native-auth` at `568cb7e`; Franchise Dashboard fully implemented, tested, and deployed to production.
+  - **Current HEAD Commit**: `27160cb` (`feat(franchise): add territory, partner, agreement, outlet CRUD and dashboard`)
+  - **Git State**: `phase-1d-native-auth` at `27160cb`; Franchise Dashboard with full CRUD for territories, partners, agreements, outlets deployed to production.
 
 ## Franchise Dashboard — Technical Implementation & Production Delivery — 2026-09-01
 
