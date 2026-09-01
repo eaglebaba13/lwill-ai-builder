@@ -39,6 +39,12 @@ const ALL_TABS = [
   "Reports",
   "Settings",
   "Notifications",
+  "Franchise Overview",
+  "Financials",
+  "Territories",
+  "Partners",
+  "Agreements",
+  "Outlets",
 ] as const;
 
 const ADMIN_TABS = ALL_TABS;
@@ -185,5 +191,13 @@ export function deriveTabsFromPermissions(permissionCodes: readonly string[]): r
   if (has("report.read")) tabs.push("Reports");
   if (has("setting.read") || has("setting.write")) tabs.push("Settings");
   if (has("notification.read") || has("notification.write")) tabs.push("Notifications");
+  if (has("franchise.read") || has("franchise.write") || has("report.read")) {
+    tabs.push("Franchise Overview");
+    tabs.push("Financials");
+    tabs.push("Territories");
+    tabs.push("Partners");
+    tabs.push("Agreements");
+    tabs.push("Outlets");
+  }
   return tabs;
 }
