@@ -6066,60 +6066,87 @@ export default function Home() {
 
         {activeTab === "Franchise Overview" ? (
           <section className="mt-6 space-y-6">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="font-serif text-2xl font-bold bg-gradient-to-r from-[#9c7a1e] via-[#d4af37] to-[#f1d78c] bg-clip-text text-transparent">
+                Franchise Overview
+              </h2>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(212,175,55,0.3)] bg-[#17150f] px-3 py-1 text-xs font-medium text-[#d4af37]">
+                Multi-Outlet Network
+              </span>
+            </div>
+
             {isLoadingFranchiseOverview ? (
-              <div className="text-sm text-[#736067]">Loading franchise overview...</div>
+              <div className="text-sm text-[#a39a86]">Loading franchise overview...</div>
             ) : null}
             {!isLoadingFranchiseOverview && franchiseOverviewError ? (
-              <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{franchiseOverviewError}</div>
+              <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-4 text-sm text-[#d1554a]">
+                {franchiseOverviewError}
+              </div>
             ) : null}
             {!isLoadingFranchiseOverview && !franchiseOverviewError && franchiseOverview === null ? (
-              <div className="text-sm text-[#736067]">No franchise overview data yet.</div>
+              <div className="text-sm text-[#a39a86]">No franchise overview data yet.</div>
             ) : null}
             {franchiseOverview !== null ? (
               <>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                  <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
-                    <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Branches</div>
-                    <div className="mt-2 text-3xl font-semibold">{franchiseOverview.branches.length}</div>
-                    <div className="mt-1 text-sm text-[#715a62]">
+                  <div className="relative overflow-hidden rounded-2xl border border-[rgba(212,175,55,0.2)] bg-[#121110] p-5 shadow-sm">
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-[#d4af37] to-[#9c7a1e]" />
+                    <div className="text-xs font-medium uppercase tracking-[0.18em] text-[#a39a86]">Outlets</div>
+                    <div className="mt-2 text-3xl font-semibold text-[#f5f1e6]">{franchiseOverview.branches.length}</div>
+                    <div className="mt-1 text-sm text-[#a39a86]">
                       {franchiseOverview.branches.filter((branch) => branch.isActive).length} active
                     </div>
                   </div>
-                  <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
-                    <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Revenue</div>
-                    <div className="mt-2 text-3xl font-semibold">₹{franchiseOverview.sales.totalRevenueCents / 100}</div>
-                    <div className="mt-1 text-sm text-[#715a62]">
+                  <div className="relative overflow-hidden rounded-2xl border border-[rgba(212,175,55,0.2)] bg-[#121110] p-5 shadow-sm">
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-[#d4af37] to-[#9c7a1e]" />
+                    <div className="text-xs font-medium uppercase tracking-[0.18em] text-[#a39a86]">Total Revenue</div>
+                    <div className="mt-2 text-3xl font-semibold text-[#d4af37]">₹{(franchiseOverview.sales.totalRevenueCents / 100).toLocaleString()}</div>
+                    <div className="mt-1 text-sm text-[#a39a86]">
                       {franchiseOverview.sales.invoiceCount} invoice{franchiseOverview.sales.invoiceCount === 1 ? "" : "s"}
                     </div>
                   </div>
-                  <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
-                    <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Appointments</div>
-                    <div className="mt-2 text-3xl font-semibold">{franchiseOverview.appointments.total}</div>
+                  <div className="relative overflow-hidden rounded-2xl border border-[rgba(212,175,55,0.2)] bg-[#121110] p-5 shadow-sm">
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-[#d4af37] to-[#9c7a1e]" />
+                    <div className="text-xs font-medium uppercase tracking-[0.18em] text-[#a39a86]">Appointments</div>
+                    <div className="mt-2 text-3xl font-semibold text-[#f5f1e6]">{franchiseOverview.appointments.total}</div>
                     <div className="mt-2 space-y-1">
                       {franchiseOverview.appointments.statusBreakdown.map((item) => (
-                        <div key={item.status} className="flex items-center justify-between text-xs text-[#736067]">
+                        <div key={item.status} className="flex items-center justify-between text-xs text-[#a39a86]">
                           <span>{item.status}</span>
-                          <span className="font-medium">{item.count}</span>
+                          <span className="font-medium text-[#f5f1e6]">{item.count}</span>
                         </div>
                       ))}
                     </div>
                   </div>
-                  <div className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
-                    <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Customers</div>
-                    <div className="mt-2 text-3xl fontibold">{franchiseOverview.customers.total}</div>
+                  <div className="relative overflow-hidden rounded-2xl border border-[rgba(212,175,55,0.2)] bg-[#121110] p-5 shadow-sm">
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-[#d4af37] to-[#9c7a1e]" />
+                    <div className="text-xs font-medium uppercase tracking-[0.18em] text-[#a39a86]">Total Customers</div>
+                    <div className="mt-2 text-3xl font-semibold text-[#f5f1e6]">{franchiseOverview.customers.total}</div>
+                    <div className="mt-1 text-sm text-[#a39a86]">Registered across network</div>
                   </div>
                 </div>
 
-                <div className="mt-6 rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
-                  <h2 className="text-xl font-semibold">Outlets</h2>
+                <div className="mt-6 rounded-2xl border border-[rgba(212,175,55,0.16)] bg-[#121110] p-6 shadow-sm text-[#f5f1e6]">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-serif text-xl font-semibold text-[#f5f1e6]">Franchise Outlets</h3>
+                    <span className="rounded-full border border-[rgba(212,175,55,0.3)] bg-[#17150f] px-2.5 py-0.5 text-xs text-[#d4af37]">
+                      Network Locations
+                    </span>
+                  </div>
                   <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {franchiseOverview.branches.map((branch) => (
-                      <div key={branch.branchId} className="rounded-xl bg-[#fffafc] p-4 ring-1 ring-[#f3e6eb]">
-                        <div className="font-medium">{branch.branchName}</div>
-                        <div className="mt-1 text-sm text-[#736067]">
-                          Status: {branch.isActive ? "Active" : "Inactive"}
+                      <div key={branch.branchId} className="rounded-xl border border-[rgba(212,175,55,0.12)] bg-[#17150f] p-4 text-[#f5f1e6]">
+                        <div className="flex items-center justify-between">
+                          <div className="font-medium text-[#f5f1e6]">{branch.branchName}</div>
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                            branch.isActive
+                              ? "border border-[rgba(63,174,106,0.3)] bg-[rgba(63,174,106,0.12)] text-[#3fae6a]"
+                              : "border border-[rgba(163,154,134,0.3)] bg-[rgba(163,154,134,0.12)] text-[#a39a86]"
+                          }`}>
+                            {branch.isActive ? "Active" : "Inactive"}
+                          </span>
                         </div>
-                        <div className="text-sm text-[#736067]">
+                        <div className="mt-2 text-xs text-[#a39a86]">
                           Established: {new Date(branch.createdAt).toLocaleDateString()}
                         </div>
                       </div>
@@ -6127,17 +6154,24 @@ export default function Home() {
                   </div>
                 </div>
 
-                <div className="mt-6 rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
-                  <h2 className="text-xl font-semibold">Branch Performance</h2>
+                <div className="mt-6 rounded-2xl border border-[rgba(212,175,55,0.16)] bg-[#121110] p-6 shadow-sm text-[#f5f1e6]">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-serif text-xl font-semibold text-[#f5f1e6]">Branch Performance</h3>
+                    <span className="rounded-full border border-[rgba(212,175,55,0.3)] bg-[#17150f] px-2.5 py-0.5 text-xs text-[#d4af37]">
+                      Staffing & Attendance
+                    </span>
+                  </div>
                   <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {franchiseOverview.branchPerformance.map((branch) => (
-                      <div key={branch.branchId} className="rounded-xl bg-[#fffafc] p-4 ring-1 ring-[#f3e6eb]">
-                        <div className="font-medium">{branch.branchName}</div>
-                        <div className="mt-1 text-sm text-[#736067]">
-                          Staff: {branch.staffCount}
+                      <div key={branch.branchId} className="rounded-xl border border-[rgba(212,175,55,0.12)] bg-[#17150f] p-4 text-[#f5f1e6]">
+                        <div className="font-medium text-[#f5f1e6]">{branch.branchName}</div>
+                        <div className="mt-2 flex items-center justify-between text-xs text-[#a39a86]">
+                          <span>Active Staff</span>
+                          <span className="font-medium text-[#f5f1e6]">{branch.staffCount}</span>
                         </div>
-                        <div className="text-sm text-[#736067]">
-                          Attendance records: {branch.attendanceCount}
+                        <div className="mt-1 flex items-center justify-between text-xs text-[#a39a86]">
+                          <span>Attendance Records</span>
+                          <span className="font-medium text-[#f5f1e6]">{branch.attendanceCount}</span>
                         </div>
                       </div>
                     ))}
@@ -6145,19 +6179,24 @@ export default function Home() {
                 </div>
 
                 {franchiseOverview.sales.dailyTrend.length > 0 ? (
-                  <div className="mt-6 rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
-                    <h2 className="text-xl font-semibold">Daily Sales Trend</h2>
+                  <div className="mt-6 rounded-2xl border border-[rgba(212,175,55,0.16)] bg-[#121110] p-6 shadow-sm text-[#f5f1e6]">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-serif text-xl font-semibold text-[#f5f1e6]">Daily Sales Trend</h3>
+                      <span className="rounded-full border border-[rgba(212,175,55,0.3)] bg-[#17150f] px-2.5 py-0.5 text-xs text-[#d4af37]">
+                        Revenue Activity
+                      </span>
+                    </div>
                     <div className="mt-4 space-y-3">
                       {franchiseOverview.sales.dailyTrend.map((item) => (
-                        <div key={item.date} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                        <div key={item.date} className="flex items-center justify-between rounded-xl border border-[rgba(212,175,55,0.12)] bg-[#17150f] p-3 text-sm">
                           <div>
-                            <div className="font-medium">{item.date}</div>
-                            <div className="text-sm text-[#736067]">
+                            <div className="font-medium text-[#f5f1e6]">{item.date}</div>
+                            <div className="text-xs text-[#a39a86]">
                               {item.invoiceCount} invoice{item.invoiceCount === 1 ? "" : "s"}
                             </div>
                           </div>
-                          <div className="text-right text-sm text-[#736067]">
-                            <div>₹{item.totalRevenueCents / 100}</div>
+                          <div className="text-right font-medium text-[#d4af37]">
+                            ₹{(item.totalRevenueCents / 100).toLocaleString()}
                           </div>
                         </div>
                       ))}
@@ -6166,19 +6205,24 @@ export default function Home() {
                 ) : null}
 
                 {franchiseOverview.inventory.lowStockItems.length > 0 ? (
-                  <div className="mt-6 rounded-2xl bg-white p-5 ring-1 ring-[#f0dfe6]">
-                    <h2 className="text-xl font-semibold">Low Stock Alerts</h2>
+                  <div className="mt-6 rounded-2xl border border-[rgba(209,85,74,0.3)] bg-[#121110] p-6 shadow-sm text-[#f5f1e6]">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-serif text-xl font-semibold text-[#d1554a]">Low Stock Alerts</h3>
+                      <span className="rounded-full border border-[rgba(209,85,74,0.4)] bg-[rgba(209,85,74,0.12)] px-2.5 py-0.5 text-xs font-medium text-[#d1554a]">
+                        Inventory Attention
+                      </span>
+                    </div>
                     <div className="mt-4 space-y-3">
                       {franchiseOverview.inventory.lowStockItems.map((item) => (
-                        <div key={`${item.productId}-${item.branchId}`} className="flex items-center justify-between rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
+                        <div key={`${item.productId}-${item.branchId}`} className="flex items-center justify-between rounded-xl border border-[rgba(209,85,74,0.2)] bg-[#17150f] p-3 text-sm">
                           <div>
-                            <div className="font-medium">{item.productName}</div>
-                            <div className="text-sm text-[#736067]">
+                            <div className="font-medium text-[#f5f1e6]">{item.productName}</div>
+                            <div className="text-xs text-[#a39a86]">
                               {item.branchName}
                             </div>
                           </div>
-                          <div className="text-right text-sm text-[#736067]">
-                            <div>Qty: {item.quantity}</div>
+                          <div className="text-right font-semibold text-[#d1554a]">
+                            Qty: {item.quantity}
                           </div>
                         </div>
                       ))}
@@ -6192,75 +6236,91 @@ export default function Home() {
 
         {activeTab === "Financials" ? (
           <section className="mt-6 space-y-6">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="font-serif text-2xl font-bold bg-gradient-to-r from-[#9c7a1e] via-[#d4af37] to-[#f1d78c] bg-clip-text text-transparent">
+                Franchise Financials & Payouts
+              </h2>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(224,168,59,0.3)] bg-[rgba(224,168,59,0.12)] px-3 py-1 text-xs font-medium text-[#e0a83b]">
+                Pending Commercial Approval (ADR-014)
+              </span>
+            </div>
+
             {isLoadingFranchisePayout ? (
-              <div className="text-sm text-[#736067]">Loading franchise financials...</div>
+              <div className="text-sm text-[#a39a86]">Loading franchise financials...</div>
             ) : null}
             {!isLoadingFranchisePayout && franchisePayoutError ? (
-              <div className="rounded-xl bg-[#fff6f6] p-3 text-sm text-[#8f3f3f]">{franchisePayoutError}</div>
+              <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-4 text-sm text-[#d1554a]">{franchisePayoutError}</div>
             ) : null}
             {!isLoadingFranchisePayout && !franchisePayoutError && franchisePayout === null ? (
-              <div className="text-sm text-[#736067]">No franchise financial data yet.</div>
+              <div className="text-sm text-[#a39a86]">No franchise financial data yet.</div>
             ) : null}
             {franchisePayout !== null ? (
               <>
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                   {franchisePayout.payouts.map((payout) => (
-                    <div key={payout.partnerId} className="rounded-2xl bg-white p-5 ring-1 ring-[#f2e2e8]">
-                      <div className="text-xs uppercase tracking-[0.18em] text-[#8a606d]">Partner</div>
-                      <div className="mt-2 text-lg font-semibold">{payout.partnerName}</div>
-                      <div className="mt-3 space-y-2">
+                    <div key={payout.partnerId} className="rounded-2xl border border-[rgba(212,175,55,0.2)] bg-[#121110] p-5 shadow-sm text-[#f5f1e6]">
+                      <div className="text-xs font-medium uppercase tracking-[0.18em] text-[#a39a86]">Partner Counterparty</div>
+                      <div className="mt-1 font-serif text-xl font-semibold text-[#f5f1e6]">{payout.partnerName}</div>
+                      
+                      <div className="mt-4 space-y-2">
+                        <div className="text-xs font-medium uppercase tracking-wider text-[#d4af37]">Outlet Agreement Revenue Share</div>
                         {payout.agreementPayouts.map((agreement) => (
-                          <div key={agreement.agreementId} className="rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
-                            <div className="text-sm font-medium">{agreement.branchName}</div>
-                            <div className="mt-1 flex items-center justify-between text-xs text-[#736067]">
+                          <div key={agreement.agreementId} className="rounded-xl border border-[rgba(212,175,55,0.12)] bg-[#17150f] p-3 text-xs">
+                            <div className="font-medium text-[#f5f1e6]">{agreement.branchName}</div>
+                            <div className="mt-1.5 flex items-center justify-between text-[#a39a86]">
                               <span>Gross Revenue</span>
-                              <span>₹{agreement.grossRevenueCents / 100}</span>
+                              <span className="text-[#f5f1e6]">₹{(agreement.grossRevenueCents / 100).toLocaleString()}</span>
                             </div>
-                            <div className="flex items-center justify-between text-xs text-[#736067]">
-                              <span>Revenue Share (20%)</span>
-                              <span>₹{agreement.revenueShareCents / 100}</span>
+                            <div className="mt-1 flex items-center justify-between text-[#a39a86]">
+                              <span>Revenue Share</span>
+                              <span className="text-[#f5f1e6]">₹{(agreement.revenueShareCents / 100).toLocaleString()}</span>
                             </div>
-                            <div className="flex items-center justify-between text-xs font-medium text-[#5a1838]">
-                              <span>Eligible Payout</span>
-                              <span>₹{agreement.eligibleRevenueSharePayoutCents / 100}</span>
+                            <div className="mt-1.5 flex items-center justify-between border-t border-[rgba(212,175,55,0.1)] pt-1.5 font-medium text-[#d4af37]">
+                              <span>Eligible Revenue Share</span>
+                              <span>₹{(agreement.eligibleRevenueSharePayoutCents / 100).toLocaleString()}</span>
                             </div>
                           </div>
                         ))}
                       </div>
-                      <div className="mt-3 flex items-center justify-between text-sm font-medium">
+
+                      <div className="mt-3 flex items-center justify-between text-xs font-medium text-[#f5f1e6] border-t border-[rgba(212,175,55,0.15)] pt-2">
                         <span>Revenue Share Total</span>
-                        <span>₹{payout.totalRevenueSharePayoutCents / 100}</span>
+                        <span className="text-[#d4af37]">₹{(payout.totalRevenueSharePayoutCents / 100).toLocaleString()}</span>
                       </div>
-                      <div className="mt-3 space-y-2">
+
+                      <div className="mt-4 space-y-2">
+                        <div className="text-xs font-medium uppercase tracking-wider text-[#d4af37]">Territory Royalty Pool (2%)</div>
                         {payout.territoryRoyalties.map((royalty) => (
-                          <div key={royalty.territoryId} className="rounded-xl bg-[#fffafc] p-3 ring-1 ring-[#f3e6eb]">
-                            <div className="text-sm font-medium">{royalty.territoryName}</div>
-                            <div className="mt-1 flex items-center justify-between text-xs text-[#736067]">
-                              <span>Territory Sales</span>
-                              <span>₹{royalty.territorySalesTurnoverCents / 100}</span>
+                          <div key={royalty.territoryId} className="rounded-xl border border-[rgba(212,175,55,0.12)] bg-[#17150f] p-3 text-xs">
+                            <div className="font-medium text-[#f5f1e6]">{royalty.territoryName}</div>
+                            <div className="mt-1.5 flex items-center justify-between text-[#a39a86]">
+                              <span>Territory Sales Turnover</span>
+                              <span className="text-[#f5f1e6]">₹{(royalty.territorySalesTurnoverCents / 100).toLocaleString()}</span>
                             </div>
-                            <div className="flex items-center justify-between text-xs text-[#736067]">
+                            <div className="mt-1 flex items-center justify-between text-[#a39a86]">
                               <span>Royalty Pool (2%)</span>
-                              <span>₹{royalty.royaltyPoolCents / 100}</span>
+                              <span className="text-[#f5f1e6]">₹{(royalty.royaltyPoolCents / 100).toLocaleString()}</span>
                             </div>
-                            <div className="flex items-center justify-between text-xs text-[#736067]">
+                            <div className="mt-1 flex items-center justify-between text-[#a39a86]">
                               <span>Eligible Partners</span>
-                              <span>{royalty.eligiblePartnerCount}</span>
+                              <span className="text-[#f5f1e6]">{royalty.eligiblePartnerCount}</span>
                             </div>
-                            <div className="flex items-center justify-between text-xs font-medium text-[#5a1838]">
-                              <span>Individual Royalty</span>
-                              <span>₹{royalty.individualRoyaltyCents / 100}</span>
+                            <div className="mt-1.5 flex items-center justify-between border-t border-[rgba(212,175,55,0.1)] pt-1.5 font-medium text-[#d4af37]">
+                              <span>Individual Royalty Share</span>
+                              <span>₹{(royalty.individualRoyaltyCents / 100).toLocaleString()}</span>
                             </div>
                           </div>
                         ))}
                       </div>
-                      <div className="mt-3 flex items-center justify-between text-sm font-medium">
+
+                      <div className="mt-3 flex items-center justify-between text-xs font-medium text-[#f5f1e6] border-t border-[rgba(212,175,55,0.15)] pt-2">
                         <span>Royalty Total</span>
-                        <span>₹{payout.totalTerritoryRoyaltyCents / 100}</span>
+                        <span className="text-[#d4af37]">₹{(payout.totalTerritoryRoyaltyCents / 100).toLocaleString()}</span>
                       </div>
-                      <div className="mt-3 flex items-center justify-between border-t border-[#f2e2e8] pt-3 text-base font-semibold">
+
+                      <div className="mt-4 flex items-center justify-between border-t border-[rgba(212,175,55,0.25)] pt-3 text-sm font-semibold text-[#f5f1e6]">
                         <span>Total Eligible Payout</span>
-                        <span>₹{payout.totalEligiblePayoutCents / 100}</span>
+                        <span className="text-lg font-bold text-[#d4af37]">₹{(payout.totalEligiblePayoutCents / 100).toLocaleString()}</span>
                       </div>
                     </div>
                   ))}
