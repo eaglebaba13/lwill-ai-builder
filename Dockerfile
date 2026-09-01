@@ -18,4 +18,4 @@ ENV PORT=8080
 
 EXPOSE 8080
 
-CMD ["sh", "-c", "pnpm --filter @lwill/database run migrate:deploy && pnpm --filter web start"]
+CMD ["pnpm", "--filter", "web", "start"]
