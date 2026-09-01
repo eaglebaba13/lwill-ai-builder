@@ -35,7 +35,7 @@ async function authorize(permissionCode: string): Promise<ReportAuthorization> {
   if (!decision.allowed) {
     return { outcome: "forbidden" };
   }
-  return { outcome: "authorized", tenantId: context.tenantContext.tenantId };
+  return { outcome: "authorized", tenantId: context.tenantContext.tenantId, userId: context.user.userId };
 }
 
 export function createReportRouteServices(): ReportRouteServices {
