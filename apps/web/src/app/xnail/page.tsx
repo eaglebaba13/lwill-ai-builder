@@ -4103,7 +4103,7 @@ export default function Home() {
                         <div className="flex gap-2">
                           <button
                             onClick={() => updateCustomer(customer.id)}
-                            className="rounded-xl bg-[#5a1838] px-3 py-2 text-sm font-semibold text-white"
+                            className="premium-btn-primary px-3 py-2 text-sm"
                           >
                             Save
                           </button>
@@ -4206,7 +4206,7 @@ export default function Home() {
                         <div className="flex gap-2">
                           <button
                             onClick={() => updateService(service.id)}
-                            className="rounded-xl bg-[#5a1838] px-3 py-2 text-sm font-semibold text-white"
+                            className="premium-btn-primary px-3 py-2 text-sm"
                           >
                             Save
                           </button>
@@ -4291,7 +4291,7 @@ export default function Home() {
                         <div className="flex gap-2">
                           <button
                             onClick={() => updatePackage(pkg.id)}
-                            className="rounded-xl bg-[#5a1838] px-3 py-2 text-sm font-semibold text-white"
+                            className="premium-btn-primary px-3 py-2 text-sm"
                           >
                             Save
                           </button>
@@ -4369,7 +4369,7 @@ export default function Home() {
                         <div className="flex gap-2">
                           <button
                             onClick={() => updateMembership(membership.id)}
-                            className="rounded-xl bg-[#5a1838] px-3 py-2 text-sm font-semibold text-white"
+                            className="premium-btn-primary px-3 py-2 text-sm"
                           >
                             Save
                           </button>
@@ -6796,7 +6796,7 @@ export default function Home() {
                         <div className="flex gap-2">
                           <button
                             onClick={() => updateSetting(setting.id)}
-                            className="rounded-xl bg-[#5a1838] px-3 py-2 text-sm font-semibold text-white"
+                            className="premium-btn-primary px-3 py-2 text-sm"
                           >
                             Save
                           </button>
