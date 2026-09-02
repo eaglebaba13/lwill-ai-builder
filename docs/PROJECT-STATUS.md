@@ -139,6 +139,10 @@ X Nail ERP MVP technical implementation is formally frozen as of 2026-09-01 at c
 | Reports (8 types) | PRODUCTION VERIFIED |
 | Notification Templates | PRODUCTION VERIFIED |
 | Notification Logs | PRODUCTION VERIFIED |
+| Notification Queue | PRODUCTION VERIFIED |
+| Notification Dispatch API | PRODUCTION VERIFIED |
+| Notification Preferences | IMPLEMENTED |
+| Notification Provider Config | IMPLEMENTED |
 | Settings | PRODUCTION VERIFIED |
 | Role Assignment | PRODUCTION VERIFIED |
 | Native Auth | PRODUCTION VERIFIED |
@@ -147,7 +151,7 @@ X Nail ERP MVP technical implementation is formally frozen as of 2026-09-01 at c
 | Franchise commercial rules | BLOCKED (ADR 014) |
 | WhatsApp integration | NOT IMPLEMENTED (external dependency) |
 | Razorpay integration | NOT IMPLEMENTED (external dependency) |
-| Email notifications | NOT IMPLEMENTED (external dependency) |
+| Email notifications | MOCK (provider-neutral adapters implemented; real SMTP/SMS/WhatsApp/Push provider integration requires external credentials) |
 | AI Assistant | OUT OF SCOPE (post-X-Nail) |
 
 ### Remaining Items (Non-Code)
@@ -156,7 +160,7 @@ X Nail ERP MVP technical implementation is formally frozen as of 2026-09-01 at c
 2. Franchise commercial rules — requires ADR 014 business/legal approval
 3. WhatsApp Business API — requires external API credentials procurement
 4. Razorpay payment gateway — requires external API credentials procurement
-5. Email notifications — requires SMTP configuration
+5. Real Email/SMS/WhatsApp/Push delivery — requires SMTP/gateway credentials and provider configuration
 6. AI Assistant — out of X Nail scope per pivot directive
 7. Production browser UAT — requires valid credentials + manual operator
 8. Demo user bootstrap in production — requires running bootstrap CLI
@@ -180,7 +184,7 @@ X Nail ERP MVP technical implementation is formally frozen as of 2026-09-01 at c
 - Reports and business intelligence (franchise overview and payout reports implemented; broader BI remains incomplete).
 - Settings / platform configuration management UI.
 - AI Assistant / generation engine and production AI provider integrations.
-- Notification / WhatsApp automation.
+- Notification / WhatsApp automation — reusable notification engine foundation is implemented; real provider delivery requires external credentials.
 - Platform administration (control-plane super-user management).
 - Full POS / accounting workflows (invoice APIs exist; POS checkout, payments, and general ledger remain incomplete).
 - Inventory stock-management web API/UI layer implemented for Category (list, get, create, update), Product (list, get, create, update), StockItem (list, get, create, update), and StockMovement (list, get, create); current stock information, stock item management, and movement history are exposed in the X Nail Inventory tab. Warehouse, Supplier, Purchase, Transfer, Adjustment, Batch/Expiry, Serial Number, Barcode/QR, Reorder Level, Inventory Valuation, and Inventory Movement Reporting remain NOT SPECIFIED — APPROVAL REQUIRED.
@@ -195,16 +199,52 @@ X Nail ERP MVP technical implementation is formally frozen as of 2026-09-01 at c
 
 - **Current Applications**: `apps/web` only.
 - **Current Packages / Modules / Services**: Shared authentication, authorization, database, Prisma-backed service, and web API modules are implemented in scoped slices; the broader backend/services target remains incomplete.
-- **Database Status**: Prisma database foundation and migration baseline are present in the repository. Production PostgreSQL database (`lwill` schema, `public`) is deployed and verified on the KVM4 VPS; migration `0_init` applied via `prisma migrate deploy`; 13 tables and 19 foreign-key constraints verified.
+- **Database Status**: Prisma database foundation and migration baseline are present in the repository. Production PostgreSQL database (`lwill` schema, `public`) is deployed and verified on the KVM4 VPS; migration `0_init` applied via `prisma migrate deploy`; 13 tables and 19 foreign-key constraints verified. Notification tables (`NotificationTemplate`, `NotificationLog`, `NotificationQueue`, `NotificationProviderConfig`, `NotificationPreference`) are defined in Prisma schema with migrations.
 - **Migration Status**: Initial migration baseline `0_init` exists under `packages/database/prisma/migrations/0_init`; production database applied and up-to-date.
 - **Authentication Status**: Provider-neutral authentication contracts, native email/password login, Prisma-backed session verification, cookie-based refresh, browser refresh/session restoration, server-session revocation, cookie clearing, and generation-safe client revalidation on initial mount, `pageshow`, and history `popstate` are implemented and locally verified. Native JWT issue/verify adapter, RS256 signing, and the four auth routes (`POST /api/auth/login`, `/api/auth/refresh`, `/api/auth/logout`, `/api/auth/logout-all`) are production-verified. Login returns 204 with `HttpOnly`, `Secure`, `SameSite=Lax` cookies; the un-deployed navigation correction requires controlled production browser verification.
 - **Authorization Status**: Provider-neutral authorization contracts are implemented and connected to the production Prisma grant loader. Authorization derives `userId`/`tenantId` exclusively from the verified session; fail-closed on any error. Tenant RBAC with `tenant-admin` role is production-verified for all module permission grants.
-- **Test Status**: Automated Vitest coverage is implemented. `pnpm test` passed with 7 successful workspace tasks; 1017+ tests passing across packages and web app.
+- **Test Status**: Automated Vitest coverage is implemented. `pnpm test` passed with 7 successful workspace tasks; 1116+ tests passing across packages and web app (520 in @lwill/authentication-context-prisma, 596 in web).
 - **TypeScript Status**: Verified passing through the Next.js production build.
 - **Lint Status**: Verified passing with `pnpm lint` (0 errors, 15 warnings).
 - **Build Status**: Verified passing with `pnpm build`.
 - **Docker Status**: Next.js production build with Prisma Client generation integrated into the Docker build; deployed via Coolify.
 - **VPS / Deployment Status**: Repository deployed at `/root/lwill-ai-builder` on the KVM4 VPS (IP 200.234.35.116) via Coolify. Production `builder.lwill.in` is healthy with PostgreSQL container `dq93e4bcrpisalu826spzk5t` (PostgreSQL 18) operational.
+
+## Notification Engine Foundation — Phase 1
+
+### Status: IMPLEMENTED (Reusable Core Service)
+
+### Implemented Components
+- **Models**: `NotificationTemplate`, `NotificationLog`, `NotificationQueue`, `NotificationProviderConfig`, `NotificationPreference` — all tenant-scoped with proper indexes and foreign keys.
+- **Services**: Template CRUD, log CRUD, queue CRUD, dispatcher, provider config, preferences, queue processor.
+- **Channel Adapters**: Provider-neutral abstraction with mock/test adapters for Email, SMS, WhatsApp, Push, and In-App.
+- **Variable Renderer**: `{{variable}}` template rendering with missing-variable detection.
+- **Dispatch API**: `POST /api/notifications/dispatch` with authentication, authorization, tenant isolation, and input validation.
+- **Queue Processor CLI**: `pnpm process:notification-queue` for processing scheduled/retry items without background worker infrastructure.
+- **RBAC**: `notification.read` and `notification.write` permissions bootstrapped for `tenant-admin`.
+- **UI**: Notification template management and log viewing in X Nail dashboard.
+
+### Classification per DOC-028
+| Capability | Status |
+|---|---|
+| Reusable templates | IMPLEMENTED |
+| Configured-channel delivery | MOCK (provider-neutral adapters; real provider integration requires external credentials) |
+| Event triggers | NOT IMPLEMENTED (no event bus/workflow integration) |
+| Scheduling | PARTIAL (scheduledAt stored; processed via CLI, no automated scheduler) |
+| Delivery tracking | IMPLEMENTED (PENDING/SENT/FAILED with sentAt/deliveredAt/readAt) |
+| Retries | PARTIAL (nextAttemptAt stored; processed via CLI, no automated retry worker) |
+| Notification preferences | IMPLEMENTED (per-user per-channel opt-in/opt-out) |
+| Communication history | IMPLEMENTED (notification logs with tenant isolation) |
+| Multilingual templates | NOT IMPLEMENTED |
+| Notification APIs | PARTIAL (dispatch, templates, logs implemented; queue/preferences APIs not yet exposed) |
+| Email/SMS/WhatsApp/Push/In-App | MOCK (adapters exist; real delivery requires provider credentials) |
+
+### Architecture Compliance
+- Follows existing LWILL provider-neutral service pattern.
+- Tenant isolation enforced at service and database layers.
+- No Redis, BullMQ, or background worker infrastructure introduced (per ADR 007).
+- No fake production WhatsApp delivery; mock adapters are clearly identifiable as test behavior.
+- Smallest production-safe reusable foundation; no X Nail-specific hardcoding.
 
 ## Environment & Dependency Requirements
 
