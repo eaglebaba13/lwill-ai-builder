@@ -5,8 +5,8 @@
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
   - **Current Branch**: `phase-1d-native-auth`
-  - **Current HEAD Commit**: `8307fc7` (`fix(invoice): persist tenant branch attribution`)
-  - **Git State**: `phase-1d-native-auth` at `8307fc7`; Invoice.branchId column + FK + index added to production database; service persists authenticated branch context; `/api/franchise/payout` 500 resolved.
+  - **Current HEAD Commit**: `e451dee` (`feat(appointment): persist tenant branch attribution`)
+  - **Git State**: `phase-1d-native-auth` at `e451dee`; Appointment.branchId column + FK + index added to production database; service persists authenticated branch context; `/api/reports/franchise-overview` 500 resolved.
 
 ## Franchise Dashboard — Technical Implementation & Production Delivery — 2026-09-01
 
@@ -2452,8 +2452,8 @@ X Nail Project Progress: **~79%** (unchanged — the franchise agreement findMan
 | Staff | IMPLEMENTED |
 | Attendance | IMPLEMENTED |
 | Branches | IMPLEMENTED — `Branch.territoryId` column + FK + index added; `/api/branches` returns 401 unauth (was 500) |
-| Franchise | IMPLEMENTED — CRUD + reports OK; `/api/franchise/payout` 200 with real data after Invoice.branchId fix |
-| Reports | PARTIAL — 4/5 working; `franchise-overview` 500 due to pre-existing Appointment.branchId schema gap (separate, NOT in Invoice.branchId scope) |
+| Franchise | IMPLEMENTED — CRUD + reports OK; `/api/franchise/payout` 200 with real data |
+| Reports | IMPLEMENTED — all 5 working; `/api/reports/franchise-overview` 200 with real data after Appointment.branchId fix |
 | Settings | IMPLEMENTED |
 | Commission | NOT IMPLEMENTED (BLOCKED by ADR 014) |
 | AI Assistant | PLACEHOLDER (out of scope) |
@@ -2622,10 +2622,119 @@ Per operator approval:
 
 ### Remaining X NAIL Issues (Updated)
 
-1. ~~Invoice.branchId~~ ✅ **IMPLEMENTED (Option A) — `/api/franchise/payout` fixed; `franchise-overview` has separate pre-existing Appointment.branchId gap**
-2. **Appointment.branchId** — pre-existing, separate, NOT-IMPLEMENTED feature (PROJECT-STATUS lines 1391, 2094). Causes `/api/reports/franchise-overview` 500. Requires separate architectural decision.
+1. ~~Invoice.branchId~~ ✅ **IMPLEMENTED (Option A) — `/api/franchise/payout` fixed**
+2. ~~Appointment.branchId~~ ✅ **IMPLEMENTED (Option A) — `/api/reports/franchise-overview` fixed**
 3. **Commission** — NOT IMPLEMENTED, BLOCKED by ADR 014
 4. **AI Assistant** — PLACEHOLDER (out of X NAIL scope)
 5. **MakeMeArtist MiMo review** — PENDING
+
+## Appointment.branchId Architecture Implementation — 2026-09-02
+
+### Status: **IMPLEMENTED & DEPLOYED (approved Option A) — `/api/reports/franchise-overview` 500 resolved; all 5 reports working; no regression on `/api/franchise/payout`**
+
+### Approved Architecture (Option A)
+
+Per operator approval:
+
+- `Appointment.branchId`: nullable UUID
+- Operational branch attribution (NOT tenant boundary)
+- Tenant boundary remains `Appointment.tenantId` (unchanged)
+- Composite FK `(Appointment.tenantId, Appointment.branchId) → (Branch.tenantId, Branch.id)` ON DELETE RESTRICT
+- Composite index `(Appointment.tenantId, Appointment.branchId)`
+- No historical backfill; existing appointment remains `branchId = NULL`
+
+### Database
+
+- **Schema** (`packages/database/prisma/schema.prisma`): added 4 lines to `model Appointment` (`branchId String? @db.Uuid` + composite FK + composite index) and 1 line to `model Branch` (`appointments Appointment[]` back-reference)
+- **Migration**: `20260902120000_add_appointment_branch_attribution/migration.sql` (40 lines, data-preserving)
+  - `ALTER TABLE "Appointment" ADD COLUMN IF NOT EXISTS "branchId" UUID;`
+  - `ADD CONSTRAINT Appointment_tenantId_branchId_fkey FOREIGN KEY ("tenantId","branchId") REFERENCES "Branch"("tenantId","id") ON DELETE RESTRICT ON UPDATE CASCADE;`
+  - `CREATE INDEX Appointment_tenantId_branchId_idx ON "Appointment"("tenantId", "branchId");`
+- **Post-migration production state** (verified via `psql`):
+  - `Appointment.branchId`: column added (UUID, nullable = YES)
+  - `Appointment_tenantId_branchId_fkey`: composite FK present, target = `Branch(tenantId, id)`, `ON DELETE RESTRICT`
+  - `Appointment_tenantId_branchId_idx`: composite index present
+  - Historical appointment `84156d20-...` retains `branchId = NULL` (no backfill)
+  - All other Appointment columns and FKs unchanged
+  - 21 migrations applied (was 20)
+
+### Appointment Creation
+
+- **Service** (`packages/authentication-context-prisma/src/appointment-service.ts`): now persists `branchId: resolvedBranchId ?? null`
+- **Tenant-scope validation**: if `input.branchId` is provided, `tx.branch.findUnique` is called; if branch is null or its `tenantId !== input.tenantId`, throws `"branch must belong to the same tenant"` (matches existing customer/service validation pattern)
+- **Plumbing** (`apps/web/src/lib/crm/appointment-runtime.ts` + `appointment-route-handlers.ts`):
+  - `authorize()` now returns `branchId: context.tenantContext.branchId`
+  - `createAppointment` route services signature now takes `(tenantId, branchId, input)`
+  - `handleCreateAppointment` forwards `authResult.branchId` to the service
+- **Source of branchId**: `authResult.branchId` from the **server-side authenticated context** (`context.tenantContext.branchId`), not from the client request body
+- **Client cannot supply branchId**: `AppointmentWriteInput` has no `branchId` field; value is sourced exclusively from the authenticated session
+- **Authorization preserved**: cross-tenant `branchId` is rejected at the service layer
+
+### Tests
+
+- **3 new focused tests** in `appointment-service.test.ts`:
+  1. `branchId` persisted when branch belongs to the same tenant
+  2. `branchId` persisted as null when no branch context provided
+  3. `branchId` rejected when branch belongs to a different tenant
+- **Updated tests** in `appointment-route-handlers.test.ts`: existing fixtures now include `branchId` in the authorized shape and `createAppointment` mock call expectations
+- **Full test result**: **1108 tests passed, 0 failed** (1105 baseline + 3 new)
+  - `@lwill/authentication-context-prisma`: 55 test files / 486 tests passed
+  - `apps/web`: 54 test files / 589 tests passed
+  - Other packages: 33 tests passed
+- **typecheck**: schema validated via `prisma validate`; build succeeded (which includes `tsc` type-check)
+- **lint**: 0 errors, 19 pre-existing warnings (unchanged)
+- **build**: succeeded
+
+### Production
+
+- **Deployed commit**: `e451dee` (`feat(appointment): persist tenant branch attribution`)
+- **Container**: `oxxffvekc7jz7ozccgtwbtr-080357025817` running `oxxffcvekc7jz7ozccgtwbtr:e451dee...`, Up, healthy
+- **Migration**: applied via `prisma migrate deploy` inside the production container
+- **DB verification**: column + FK + index all present; historical appointment `branchId = NULL`
+- **Authenticated `/api/reports/franchise-overview`** (HDK tenant-admin): **200 OK** (was 500) — returns full franchise overview with real production data:
+  - 1 branch (`X Nail Test Branch`)
+  - 0 sales (1 invoice has NULL branchId, excluded from per-branch)
+  - 0 appointments (1 appointment has NULL branchId, excluded from per-branch)
+  - 2 customers (tenant-wide)
+  - 0 low stock items
+  - Branch performance data
+- **Authenticated `/api/franchise/payout`** (HDK tenant-admin): **200 OK** (no regression) — Invoice.branchId still working
+- **Unauthenticated**: `/api/reports/franchise-overview` → 401; `/api/franchise/payout` → 401 (auth gate fires correctly)
+- **RBAC**: `report.read` required (unchanged)
+- **Tenant isolation**: `Appointment.tenantId` remains authoritative; cross-tenant `branchId` rejected at service layer
+- **Regression**:
+  - `GET /` → 200
+  - `GET /api/auth/me` (unauth) → 401
+  - `GET /api/branches` (unauth) → 401
+  - `GET /api/franchise/agreements` (auth) → 200
+  - `GET /api/franchise/dashboard` (auth) → 200
+  - `GET /api/franchise/payout` (auth) → 200
+  - `GET /api/reports/franchise-overview` (auth) → 200 ← **previously 500, now fixed**
+- **Container logs**: no Prisma errors, no `column does not exist` errors, no Invoice errors, no `Unknown field` errors
+
+### Git
+
+- **Branch**: `phase-1d-native-auth`
+- **Local HEAD**: `e451dee`
+- **Remote HEAD**: `e451dee` (push verified; local = remote)
+- **Commit**: `e451dee` `feat(appointment): persist tenant branch attribution`
+- **Diff vs prior HEAD (`d63e551`)**: 1 commit, 7 files changed, 146 insertions, 11 deletions
+  - `packages/database/prisma/schema.prisma` (+4)
+  - `packages/database/prisma/migrations/20260902120000_add_appointment_branch_attribution/migration.sql` (new, 40 lines)
+  - `packages/authentication-context-prisma/src/appointment-service.ts` (+15)
+  - `packages/authentication-context-prisma/src/appointment-service.test.ts` (+65)
+  - `apps/web/src/lib/crm/appointment-runtime.ts` (+4/-2)
+  - `apps/web/src/lib/crm/appointment-route-handlers.ts` (+10/-2)
+  - `apps/web/src/test/appointment-route-handlers.test.ts` (+8/-2)
+
+### Module Status Update
+
+- **Reports**: IMPLEMENTED — all 5 working; `/api/reports/franchise-overview` 200 with real data after Appointment.branchId fix
+- **Franchise**: IMPLEMENTED — all endpoints 200
+
+### X Nail Project Progress Update
+
+**~82%** (up from 80%): Appointment.branchId column + FK + index added; service persists authenticated branch context; `/api/reports/franchise-overview` 500 resolved; all 5 reports now functional; the approved Option A architecture is fully implemented and deployed. Remaining 18% is operator-blocked (Commission approval), out-of-scope (AI Assistant), and pending review (MakeMeArtist MiMo).
+
 
 
