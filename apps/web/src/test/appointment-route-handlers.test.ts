@@ -75,7 +75,7 @@ describe("appointment route handlers: authentication/authorization gating", () =
 
 describe("appointment route handlers: permission code forwarding", () => {
   it("passes 'appointment.read' to authorize for list and get operations", async () => {
-    const services = createServices({ outcome: "authorized", tenantId: "tenant-1" });
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1", branchId: "branch-1" });
     await handleListAppointments(request(), services);
     expect(services.authorize).toHaveBeenCalledWith("appointment.read");
 
@@ -84,7 +84,7 @@ describe("appointment route handlers: permission code forwarding", () => {
   });
 
   it("passes 'appointment.write' to authorize for create and update operations", async () => {
-    const services = createServices({ outcome: "authorized", tenantId: "tenant-1" });
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1", branchId: "branch-1" });
     await handleCreateAppointment(request(VALID_CREATE_INPUT), services);
     expect(services.authorize).toHaveBeenCalledWith("appointment.write");
 
@@ -164,6 +164,7 @@ describe("appointment-runtime authorize(): authentication vs authorization outco
     expect(await services.authorize("appointment.read")).toEqual({
       outcome: "authorized",
       tenantId: "tenant-1",
+      branchId: "branch-1",
     });
   });
 
@@ -227,7 +228,7 @@ describe("appointment-runtime authorize(): authentication vs authorization outco
 });
 
 describe("appointment route handlers: authorized operations", () => {
-  const authorized: AppointmentAuthorization = { outcome: "authorized", tenantId: "tenant-1" };
+  const authorized: AppointmentAuthorization = { outcome: "authorized", tenantId: "tenant-1", branchId: "branch-1" };
 
   it("authorizes every operation before accessing appointment data", async () => {
     const services = createServices(authorized);
@@ -261,6 +262,7 @@ describe("appointment route handlers: authorized operations", () => {
     expect(validResult.status).toBe(201);
     expect(services.createAppointment).toHaveBeenCalledWith(
       "tenant-1",
+      "branch-1",
       expect.objectContaining({
         customerId: "cust-1",
         serviceId: "svc-1",
@@ -337,6 +339,7 @@ describe("appointment route handlers: authorized operations", () => {
     expect(withNullNotes.status).toBe(201);
     expect(services.createAppointment).toHaveBeenCalledWith(
       "tenant-1",
+      "branch-1",
       expect.objectContaining({ notes: null }),
     );
 
@@ -353,6 +356,7 @@ describe("appointment route handlers: authorized operations", () => {
     expect(withoutNotes.status).toBe(201);
     expect(services.createAppointment).toHaveBeenCalledWith(
       "tenant-1",
+      "branch-1",
       expect.objectContaining({ notes: null }),
     );
   });

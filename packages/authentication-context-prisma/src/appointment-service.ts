@@ -3,6 +3,7 @@ export interface AppointmentRecord {
   readonly tenantId: string;
   readonly customerId: string;
   readonly serviceId: string;
+  readonly branchId: string | null;
   readonly startsAt: Date;
   readonly endsAt: Date;
   readonly status: string;
@@ -15,6 +16,7 @@ export interface AppointmentCreateInput {
   readonly tenantId: string;
   readonly customerId: string;
   readonly serviceId: string;
+  readonly branchId?: string | null;
   readonly startsAt: Date;
   readonly endsAt: Date;
   readonly status: string;
@@ -48,6 +50,9 @@ interface AppointmentPrismaClient {
   readonly service: {
     findUnique: (args: { where: { id: string } }) => Promise<{ id: string; tenantId: string } | null>;
   };
+  readonly branch: {
+    findUnique: (args: { where: { id: string } }) => Promise<{ id: string; tenantId: string } | null>;
+  };
 }
 
 export function createAppointmentService(prisma: AppointmentPrismaClient): AppointmentService {
@@ -60,11 +65,21 @@ export function createAppointmentService(prisma: AppointmentPrismaClient): Appoi
         throw new Error("customer and service must belong to the same tenant");
       }
 
+      let resolvedBranchId: string | null = null;
+      if (input.branchId !== undefined && input.branchId !== null) {
+        const branch = await prisma.branch.findUnique({ where: { id: input.branchId } });
+        if (branch === null || branch.tenantId !== input.tenantId) {
+          throw new Error("branch must belong to the same tenant");
+        }
+        resolvedBranchId = branch.id;
+      }
+
       return prisma.appointment.create({
         data: {
           tenantId: input.tenantId,
           customerId: input.customerId,
           serviceId: input.serviceId,
+          branchId: resolvedBranchId,
           startsAt: input.startsAt,
           endsAt: input.endsAt,
           status: input.status,

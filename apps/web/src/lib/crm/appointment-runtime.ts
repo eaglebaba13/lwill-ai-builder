@@ -35,7 +35,7 @@ async function authorize(permissionCode: string): Promise<AppointmentAuthorizati
   if (!decision.allowed) {
     return { outcome: "forbidden" };
   }
-  return { outcome: "authorized", tenantId: context.tenantContext.tenantId };
+  return { outcome: "authorized", tenantId: context.tenantContext.tenantId, branchId: context.tenantContext.branchId };
 }
 
 export function createAppointmentRouteServices(): AppointmentRouteServices {
@@ -44,8 +44,8 @@ export function createAppointmentRouteServices(): AppointmentRouteServices {
     listAppointments: (tenantId) => appointmentService.listAppointments({ tenantId }),
     getAppointment: (tenantId, appointmentId) =>
       appointmentService.getAppointment({ tenantId, appointmentId }),
-    createAppointment: (tenantId, input) =>
-      appointmentService.createAppointment({ tenantId, ...input }),
+    createAppointment: (tenantId, branchId, input) =>
+      appointmentService.createAppointment({ tenantId, branchId, ...input }),
     updateAppointment: (tenantId, appointmentId, input) =>
       appointmentService.updateAppointment({ tenantId, appointmentId, input }),
   };

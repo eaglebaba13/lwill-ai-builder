@@ -3,7 +3,7 @@ import "server-only";
 export type AppointmentAuthorization =
   | { readonly outcome: "unauthenticated" }
   | { readonly outcome: "forbidden" }
-  | { readonly outcome: "authorized"; readonly tenantId: string };
+  | { readonly outcome: "authorized"; readonly tenantId: string; readonly branchId: string | null };
 
 export interface AppointmentWriteInput {
   readonly customerId: string;
@@ -25,7 +25,7 @@ export interface AppointmentRouteServices {
   readonly authorize: (permissionCode: string) => Promise<AppointmentAuthorization>;
   readonly listAppointments: (tenantId: string) => Promise<readonly unknown[]>;
   readonly getAppointment: (tenantId: string, appointmentId: string) => Promise<unknown | null>;
-  readonly createAppointment: (tenantId: string, input: AppointmentWriteInput) => Promise<unknown>;
+  readonly createAppointment: (tenantId: string, branchId: string | null, input: AppointmentWriteInput) => Promise<unknown>;
   readonly updateAppointment: (
     tenantId: string,
     appointmentId: string,
@@ -44,14 +44,14 @@ function response(status: number, body?: unknown): Response {
 
 function authorizationOutcome(
   authorization: AppointmentAuthorization,
-): { readonly ok: true; readonly tenantId: string } | { readonly ok: false; readonly response: Response } {
+): { readonly ok: true; readonly tenantId: string; readonly branchId: string | null } | { readonly ok: false; readonly response: Response } {
   if (authorization.outcome === "unauthenticated") {
     return { ok: false, response: response(401) };
   }
   if (authorization.outcome === "forbidden") {
     return { ok: false, response: response(403) };
   }
-  return { ok: true, tenantId: authorization.tenantId };
+  return { ok: true, tenantId: authorization.tenantId, branchId: authorization.branchId };
 }
 
 function isNonEmptyString(value: unknown): value is string {
@@ -215,7 +215,7 @@ export async function handleCreateAppointment(
   if (input === null) {
     return response(400);
   }
-  const appointment = await services.createAppointment(authResult.tenantId, input);
+  const appointment = await services.createAppointment(authResult.tenantId, authResult.branchId, input);
   return response(201, { appointment });
 }
 

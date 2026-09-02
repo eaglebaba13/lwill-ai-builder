@@ -132,6 +132,7 @@ model Branch {
   franchiseOutletProfiles   FranchiseOutletProfile[]
   franchiseAgreementOutlets FranchiseAgreementOutlet[]
   invoices Invoice[]
+  appointments Appointment[]
 
   @@unique([tenantId, businessUnitId, id])
   @@unique([tenantId, id])
@@ -309,6 +310,7 @@ model Appointment {
   tenantId     String   @db.Uuid
   customerId   String   @db.Uuid
   serviceId    String   @db.Uuid
+  branchId     String?  @db.Uuid
   startsAt     DateTime
   endsAt       DateTime
   status       String
@@ -319,10 +321,12 @@ model Appointment {
   tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   customer Customer @relation(fields: [tenantId, customerId], references: [tenantId, id], onDelete: Restrict)
   service  Service  @relation(fields: [tenantId, serviceId], references: [tenantId, id], onDelete: Restrict)
+  branch   Branch?  @relation(fields: [tenantId, branchId], references: [tenantId, id], onDelete: Restrict)
 
   @@unique([tenantId, id])
   @@index([tenantId, startsAt])
   @@index([tenantId, status])
+  @@index([tenantId, branchId])
 }
 
 model Package {

@@ -7,6 +7,7 @@ function createFixture() {
     tenantId: string;
     customerId: string;
     serviceId: string;
+    branchId: string | null;
     startsAt: Date;
     endsAt: Date;
     status: string;
@@ -18,6 +19,7 @@ function createFixture() {
     appointments: new Map<string, AppointmentState>(),
     customers: new Map<string, { id: string; tenantId: string }>(),
     services: new Map<string, { id: string; tenantId: string }>(),
+    branches: new Map<string, { id: string; tenantId: string }>(),
   };
   let nextId = 1;
   const prisma = {
@@ -57,6 +59,11 @@ function createFixture() {
     service: {
       findUnique: vi.fn(async ({ where }: { where: { id: string } }) =>
         state.services.get(where.id) ?? null,
+      ),
+    },
+    branch: {
+      findUnique: vi.fn(async ({ where }: { where: { id: string } }) =>
+        state.branches.get(where.id) ?? null,
       ),
     },
   };
@@ -611,5 +618,63 @@ describe("appointment service", () => {
         },
       }),
     ).rejects.toThrow("appointment endsAt must be after startsAt");
+  });
+
+  it("persists branchId when an authenticated branch context is provided and the branch belongs to the same tenant", async () => {
+    const { prisma, state } = createFixture();
+    state.customers.set("cust-1", { id: "cust-1", tenantId: "tenant-1" });
+    state.services.set("svc-1", { id: "svc-1", tenantId: "tenant-1" });
+    state.branches.set("branch-1", { id: "branch-1", tenantId: "tenant-1" });
+    const service = createAppointmentService(prisma as never);
+
+    const result = await service.createAppointment({
+      tenantId: "tenant-1",
+      customerId: "cust-1",
+      serviceId: "svc-1",
+      branchId: "branch-1",
+      startsAt: new Date("2026-09-02T10:00:00.000Z"),
+      endsAt: new Date("2026-09-02T11:00:00.000Z"),
+      status: "confirmed",
+    });
+
+    expect(result.branchId).toBe("branch-1");
+  });
+
+  it("persists branchId as null when no branch context is provided", async () => {
+    const { prisma, state } = createFixture();
+    state.customers.set("cust-1", { id: "cust-1", tenantId: "tenant-1" });
+    state.services.set("svc-1", { id: "svc-1", tenantId: "tenant-1" });
+    const service = createAppointmentService(prisma as never);
+
+    const result = await service.createAppointment({
+      tenantId: "tenant-1",
+      customerId: "cust-1",
+      serviceId: "svc-1",
+      startsAt: new Date("2026-09-02T10:00:00.000Z"),
+      endsAt: new Date("2026-09-02T11:00:00.000Z"),
+      status: "confirmed",
+    });
+
+    expect(result.branchId).toBeNull();
+  });
+
+  it("rejects createAppointment when branchId refers to a branch in a different tenant", async () => {
+    const { prisma, state } = createFixture();
+    state.customers.set("cust-1", { id: "cust-1", tenantId: "tenant-1" });
+    state.services.set("svc-1", { id: "svc-1", tenantId: "tenant-1" });
+    state.branches.set("branch-other", { id: "branch-other", tenantId: "tenant-2" });
+    const service = createAppointmentService(prisma as never);
+
+    await expect(
+      service.createAppointment({
+        tenantId: "tenant-1",
+        customerId: "cust-1",
+        serviceId: "svc-1",
+        branchId: "branch-other",
+        startsAt: new Date("2026-09-02T10:00:00.000Z"),
+        endsAt: new Date("2026-09-02T11:00:00.000Z"),
+        status: "confirmed",
+      }),
+    ).rejects.toThrow("branch must belong to the same tenant");
   });
 });
