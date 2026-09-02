@@ -131,6 +131,7 @@ model Branch {
   stockAdjustments      StockAdjustment[]
   franchiseOutletProfiles   FranchiseOutletProfile[]
   franchiseAgreementOutlets FranchiseAgreementOutlet[]
+  invoices Invoice[]
 
   @@unique([tenantId, businessUnitId, id])
   @@unique([tenantId, id])
@@ -490,6 +491,7 @@ model Invoice {
   id             String   @id @default(uuid()) @db.Uuid
   tenantId       String   @db.Uuid
   customerId     String   @db.Uuid
+  branchId       String?  @db.Uuid
   issuedAt       DateTime
   subtotalCents  Int
   discountCents  Int      @default(0)
@@ -501,11 +503,13 @@ model Invoice {
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   customer Customer @relation(fields: [tenantId, customerId], references: [tenantId, id], onDelete: Restrict)
+  branch Branch? @relation(fields: [tenantId, branchId], references: [tenantId, id], onDelete: Restrict)
   lineItems InvoiceLineItem[]
 
   @@unique([tenantId, id])
   @@index([tenantId, issuedAt])
   @@index([tenantId, customerId])
+  @@index([tenantId, branchId])
 }
 
 model InvoiceLineItem {

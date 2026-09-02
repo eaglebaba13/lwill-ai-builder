@@ -123,6 +123,15 @@ export function createBillingInvoiceService(prisma: InvoicePrismaClient): Invoic
           throw new Error("customer must belong to the same tenant");
         }
 
+        let resolvedBranchId: string | null = null;
+        if (input.branchId !== undefined && input.branchId !== null) {
+          const branch = await tx.branch.findUnique({ where: { id: input.branchId } });
+          if (branch === null || branch.tenantId !== input.tenantId) {
+            throw new Error("branch must belong to the same tenant");
+          }
+          resolvedBranchId = branch.id;
+        }
+
         const normalizedItems = input.items.map((item) => ({
           ...item,
           quantity: Number(item.quantity),
@@ -160,6 +169,7 @@ export function createBillingInvoiceService(prisma: InvoicePrismaClient): Invoic
           data: {
             tenantId: input.tenantId,
             customerId: input.customerId,
+            branchId: resolvedBranchId,
             issuedAt: input.issuedAt,
             subtotalCents: totals.subtotalCents,
             discountCents: totals.discountCents,

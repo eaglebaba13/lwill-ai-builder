@@ -579,4 +579,126 @@ describe("billing invoice service", () => {
     const invoice = await invoiceService.updateInvoice({ tenantId: "tenant-1", invoiceId: "invoice-1", input: { discountCents: 500 } });
     expect(invoice).toBeNull();
   });
+
+  it("persists branchId when an authenticated branch context is provided and the branch belongs to the same tenant", async () => {
+    const createData: Array<Record<string, unknown>> = [];
+    const invoiceService = createBillingInvoiceService({
+      invoice: {
+        create: async ({ data }: { data: Record<string, unknown> }) => {
+          createData.push(data);
+          return { id: "invoice-branch-1", ...data };
+        },
+        findUnique: async () => null,
+        findMany: async () => [],
+      },
+      invoiceLineItem: { create: async () => ({ id: "line-1" }), findMany: async () => [] },
+      customer: { findUnique: async () => ({ id: "customer-1", tenantId: "tenant-1" }) },
+      service: { findUnique: async () => null },
+      package: { findUnique: async () => null },
+      product: { findUnique: async () => null },
+      stockItem: { findFirst: async () => null, create: async () => ({ id: "stock-item-1" }), update: async () => ({ id: "stock-item-1" }) },
+      stockMovement: { create: async () => ({ id: "movement-1" }) },
+      branch: { findUnique: async () => ({ id: "branch-1", tenantId: "tenant-1" }) },
+      $transaction: async (callback: (client: unknown) => Promise<unknown>) => callback({
+        invoice: { create: async ({ data }: { data: Record<string, unknown> }) => { createData.push(data); return { id: "invoice-branch-1", ...data }; }, findUnique: async () => null, findMany: async () => [] },
+        invoiceLineItem: { create: async () => ({ id: "line-1" }), findMany: async () => [] },
+        customer: { findUnique: async () => ({ id: "customer-1", tenantId: "tenant-1" }) },
+        service: { findUnique: async () => null },
+        package: { findUnique: async () => null },
+        product: { findUnique: async () => null },
+        stockItem: { findFirst: async () => null, create: async () => ({ id: "stock-item-1" }), update: async () => ({ id: "stock-item-1" }) },
+        stockMovement: { create: async () => ({ id: "movement-1" }) },
+        branch: { findUnique: async () => ({ id: "branch-1", tenantId: "tenant-1" }) },
+      } as unknown),
+    } as never);
+
+    const invoice = await invoiceService.createInvoice({
+      tenantId: "tenant-1",
+      customerId: "customer-1",
+      branchId: "branch-1",
+      issuedAt: new Date("2026-09-02T10:00:00.000Z"),
+      items: [{ description: "Manicure", serviceId: null, quantity: 1, unitPriceCents: 1000 }],
+    });
+
+    expect(invoice.branchId).toBe("branch-1");
+    expect(createData[0]?.branchId).toBe("branch-1");
+  });
+
+  it("persists branchId as null when no branch context is provided", async () => {
+    const createData: Array<Record<string, unknown>> = [];
+    const invoiceService = createBillingInvoiceService({
+      invoice: {
+        create: async ({ data }: { data: Record<string, unknown> }) => {
+          createData.push(data);
+          return { id: "invoice-no-branch", ...data };
+        },
+        findUnique: async () => null,
+        findMany: async () => [],
+      },
+      invoiceLineItem: { create: async () => ({ id: "line-1" }), findMany: async () => [] },
+      customer: { findUnique: async () => ({ id: "customer-1", tenantId: "tenant-1" }) },
+      service: { findUnique: async () => null },
+      package: { findUnique: async () => null },
+      product: { findUnique: async () => null },
+      stockItem: { findFirst: async () => null, create: async () => ({ id: "stock-item-1" }), update: async () => ({ id: "stock-item-1" }) },
+      stockMovement: { create: async () => ({ id: "movement-1" }) },
+      branch: { findUnique: async () => null },
+      $transaction: async (callback: (client: unknown) => Promise<unknown>) => callback({
+        invoice: { create: async ({ data }: { data: Record<string, unknown> }) => { createData.push(data); return { id: "invoice-no-branch", ...data }; }, findUnique: async () => null, findMany: async () => [] },
+        invoiceLineItem: { create: async () => ({ id: "line-1" }), findMany: async () => [] },
+        customer: { findUnique: async () => ({ id: "customer-1", tenantId: "tenant-1" }) },
+        service: { findUnique: async () => null },
+        package: { findUnique: async () => null },
+        product: { findUnique: async () => null },
+        stockItem: { findFirst: async () => null, create: async () => ({ id: "stock-item-1" }), update: async () => ({ id: "stock-item-1" }) },
+        stockMovement: { create: async () => ({ id: "movement-1" }) },
+        branch: { findUnique: async () => null },
+      } as unknown),
+    } as never);
+
+    const invoice = await invoiceService.createInvoice({
+      tenantId: "tenant-1",
+      customerId: "customer-1",
+      issuedAt: new Date("2026-09-02T10:00:00.000Z"),
+      items: [{ description: "Manicure", serviceId: null, quantity: 1, unitPriceCents: 1000 }],
+    });
+
+    expect(invoice.branchId).toBeNull();
+    expect(createData[0]?.branchId).toBeNull();
+  });
+
+  it("rejects invoice creation when branchId refers to a branch in a different tenant", async () => {
+    const invoiceService = createBillingInvoiceService({
+      invoice: { create: async () => ({ id: "invoice-1" }), findUnique: async () => null, findMany: async () => [] },
+      invoiceLineItem: { create: async () => ({ id: "line-1" }), findMany: async () => [] },
+      customer: { findUnique: async () => ({ id: "customer-1", tenantId: "tenant-1" }) },
+      service: { findUnique: async () => null },
+      package: { findUnique: async () => null },
+      product: { findUnique: async () => null },
+      stockItem: { findFirst: async () => null, create: async () => ({ id: "stock-item-1" }), update: async () => ({ id: "stock-item-1" }) },
+      stockMovement: { create: async () => ({ id: "movement-1" }) },
+      branch: { findUnique: async () => ({ id: "branch-other", tenantId: "tenant-2" }) },
+      $transaction: async (callback: (client: unknown) => Promise<unknown>) => callback({
+        invoice: { create: async () => ({ id: "invoice-1" }), findUnique: async () => null, findMany: async () => [] },
+        invoiceLineItem: { create: async () => ({ id: "line-1" }), findMany: async () => [] },
+        customer: { findUnique: async () => ({ id: "customer-1", tenantId: "tenant-1" }) },
+        service: { findUnique: async () => null },
+        package: { findUnique: async () => null },
+        product: { findUnique: async () => null },
+        stockItem: { findFirst: async () => null, create: async () => ({ id: "stock-item-1" }), update: async () => ({ id: "stock-item-1" }) },
+        stockMovement: { create: async () => ({ id: "movement-1" }) },
+        branch: { findUnique: async () => ({ id: "branch-other", tenantId: "tenant-2" }) },
+      } as unknown),
+    } as never);
+
+    await expect(
+      invoiceService.createInvoice({
+        tenantId: "tenant-1",
+        customerId: "customer-1",
+        branchId: "branch-other",
+        issuedAt: new Date("2026-09-02T10:00:00.000Z"),
+        items: [{ description: "Manicure", serviceId: null, quantity: 1, unitPriceCents: 1000 }],
+      }),
+    ).rejects.toThrow("branch must belong to the same tenant");
+  });
 });
