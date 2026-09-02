@@ -34,6 +34,16 @@ export default function BuilderPage() {
                 </div>
               ),
             )}
+            <div className="my-2 border-t border-[rgba(212,175,55,0.08)]" />
+            <a
+              href="https://xnail.makemeartist.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-between rounded-lg border border-[rgba(212,175,55,0.18)] bg-[rgba(212,175,55,0.06)] px-3 py-2.5 text-sm font-medium text-[#f5f1e6] hover:border-[rgba(212,175,55,0.32)] hover:bg-[rgba(212,175,55,0.12)]"
+            >
+              <span>X NAIL ERP</span>
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-[#d4af37]">Open</span>
+            </a>
           </nav>
         </aside>
 
