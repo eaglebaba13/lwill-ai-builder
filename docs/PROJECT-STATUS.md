@@ -89,6 +89,7 @@ Test user: `hdk-admin-test@xnail.local` / `HdkTest@2026` (HDK `tenant-admin` rol
 2. **ADR 014 commercial-policy gate remains in force.** Royalty, revenue/profit sharing, and franchise settlement implementation must not introduce new rules. Only the three explicitly approved rules (MAX(20%, ₹15,000), 2% royalty additional, equal distribution) are implemented; the remaining NOT SPECIFIED items remain pending business/legal approval.
 3. **Other 80% revenue distribution beneficiaries** (Salon Operations 50%, Product & Marketing 10%, Master Franchise Partner 5%, Company 15%) NOT IMPLEMENTED — only the 20% Franchise Owner share is stored/used. Per ADR 014, awaits business/legal decision.
 4. **MG mathematical discrepancy** (₹15,000 vs 5% × ₹3,10,000 = ₹15,500) flagged in `docs/FRANCHISE-COMMERCIAL-RULES-SPECIFICATION.md` §7.2 — NOT RESOLVED, awaits business/legal decision per ADR 014.
+5. **Commercial-rule approval record**: `docs/FRANCHISE-COMMERCIAL-RULES-APPROVALS.md` is the consolidated approval-tracking document. **27 formal decision IDs** (CX-01..03, MG-01..04, RD-01..04, TR-01..03, INV-01..02, NP-01..02, OM-01..02, HR-01..03, FP-01..03, APPROVALS-FILE): **24 APPROVED, 0 PENDING, 3 DEFERRED**. No commercial-rule implementation, schema change, migration, production DB mutation, API change, UI change, deployment, commit, or push is authorized until the applicable decision IDs carry an explicit APPROVED status recorded in that file. See `docs/FRANCHISE-COMMERCIAL-RULES-APPROVALS.md` §Phase 4 — Implementation Gate.
 
 ### Notes
 
@@ -2736,5 +2737,223 @@ Per operator approval:
 
 **~82%** (up from 80%): Appointment.branchId column + FK + index added; service persists authenticated branch context; `/api/reports/franchise-overview` 500 resolved; all 5 reports now functional; the approved Option A architecture is fully implemented and deployed. Remaining 18% is operator-blocked (Commission approval), out-of-scope (AI Assistant), and pending review (MakeMeArtist MiMo).
 
+## Franchise Commercial-Rules Audit + Approval Gate — 2026-09-02
+
+### Status: **Complete — documentation only; no code, schema, migration, or production changes**
+
+### Deliverables
+
+- `docs/FRANCHISE-COMMERCIAL-RULES-SPECIFICATION.md` v1.1 (Section 0 added with approved decisions)
+- `docs/FRANCHISE-COMMERCIAL-RULES-APPROVALS.md` (558-line approval record with Phase 3 checklist, Phase 4 gate, Sections B/C/D)
+- `docs/FRANCHISE-COMMERCIAL-RULES-BUSINESS-APPROVAL-SHEET.md` (204-line decision cards with owner approval status)
+
+### Approval Summary
+
+| Category | Approved | Pending | Deferred |
+|---|---|---|---|
+| Commercial rules | 24 | 0 | 3 (RD-04, FP-02, FP-03) |
+
+### Formal Decision Register
+
+- **Total formal decision IDs:** 27
+- **APPROVED:** 24 (CX-01, CX-02, CX-03, MG-01, MG-02, MG-03, MG-04, RD-01, RD-02, RD-03, TR-01, TR-02, TR-03, INV-01, INV-02, NP-01, NP-02, OM-01, OM-02, HR-01, HR-02, HR-03, FP-01, APPROVALS-FILE)
+- **PENDING:** 0
+- **DEFERRED:** 3 (RD-04, FP-02, FP-03)
+- **REVIEW:** 0
+
+### Blocking Decisions
+
+- **NP-01 (PARTIAL):** Net Sales = GST excluded is approved. Deductions for discounts, refunds, returns, cancellations remain NOT SPECIFIED. These do NOT block the MVP path.
+- **NP-02 (APPROVED):** Higher-of payout rule = MAX(MG, 30% of Net Sales excluding GST) approved. Scope limited to franchisee payout components.
+
+### Approved ₹10L Commercial Formula
+
+- **MG** = Investment Amount × 3% = ₹30,000 for ₹10L product
+- **Variable Return** = Net Sales excluding GST × 30%
+- **Payout** = MAX(MG, Variable Return)
+
+### MG-01 Hybrid Decision (2026-09-02)
+
+Business directive: "on this product 310000 wale me fixed rahega baki sabhi products me mg formula basis rahega"
+- **Existing ₹3,10,000 product agreements:** Fixed MG of ₹15,000/month (unchanged)
+- **All other/new products (including ₹10L):** Formula-based MG = 3% of Initial Investment
+
+### Implementation Gate
+
+Per `docs/FRANCHISE-COMMERCIAL-RULES-APPROVALS.md` §Phase 4, **no commercial-rule implementation, schema change, migration, production DB mutation, API change, UI change, deployment, commit, or push is authorized** until the applicable decision IDs carry an explicit APPROVED status.
+
+**Unblocked (all required decisions approved):**
+- Fixed-MG calculation for existing ₹3.10L agreements
+- Formula-based MG calculation for new products (3% of Initial Investment)
+- Agreement-level royalty override
+- Sum-to-100% invariant
+- Agreement-level effective-dating snapshot
+- Net Sales = GST excluded
+- Higher-of payout rule = MAX(MG, 30% of Net Sales excluding GST)
+
+**Remaining NOT SPECIFIED (do not block MVP):**
+- Net Sales deduction rules for discounts, refunds, returns, cancellations (NP-01 partial)
+
+### Verification
+
+- Tests: 56 test files, 491 tests passed
+- Prisma schema: validated
+- Prisma Client: generated
+- Lint: passed (0 errors, 19 pre-existing warnings)
+- Build: passed
+- Git diff reviewed
+- Commit: `63bae8d`
+- Push: `origin/phase-1d-native-auth` = `63bae8d`
+
+## Franchise Agreement Commercial Terms Foundation — Phase 1 Implementation — 2026-09-02
+
+### Status: **Complete**
+
+### Commit
+
+- `63bae8d` feat(franchise): add agreement-level commercial terms foundation
+
+### Schema Changes
+
+- `FranchiseAgreement` model extended with 9 new nullable columns:
+  - `minimumGuaranteeCents Int?` — fixed MG for historical agreements
+  - `mgFormulaRateBp Int?` — formula MG rate in basis points (300 = 3%)
+  - `mgFormulaBase String?` — formula base: "INITIAL_INVESTMENT"
+  - `variableReturnRateBp Int?` — variable return rate in basis points (3000 = 30%)
+  - `variableReturnBasis String?` — "NET_SALES"
+  - `payoutRule String?` — "HIGHER_OF_FIXED_AND_VARIABLE"
+  - `termsSnapshot Json?` — historical reproducibility snapshot
+  - `effectiveFrom DateTime?` — terms effective date
+  - `effectiveTo DateTime?` — terms end date (null = current)
+
+### Migration
+
+- `20260902130000_add_franchise_agreement_commercial_terms/migration.sql`
+- Nullable columns, idempotent IF NOT EXISTS guards
+- Backfills existing agreements with historical fixed MG terms
+
+### Application Changes
+
+- `packages/authentication-context-prisma/src/franchise-service.ts`
+  - `FranchiseAgreementRecord` includes commercial terms
+  - `FranchiseAgreementCreateInput` accepts commercial terms
+  - `createAgreement` persists commercial terms
+  - `listAgreements` / `getAgreement` / `getDashboard` return commercial terms
+
+### Tests
+
+- `packages/authentication-context-prisma/src/franchise-service.test.ts`
+  - New X NAIL ₹10L agreement with formula MG (3% of Investment)
+  - Historical ₹3.10L agreement with fixed MG (₹15,000)
+  - Agreement read returns commercial terms
+  - Tenant isolation verified
+  - Terms snapshot preserved independently
+
+### Historical Compatibility
+
+- Existing ₹3.10L agreements retain fixed MG = ₹15,000/month
+- No conversion to formula-based MG for historical agreements
+- Backfill preserves actual known terms
+
+### Net Sales Data Availability
+
+- **NOT SPECIFIED** for discounts, refunds, returns, cancellations
+- Only GST exclusion is approved (NP-01 partial)
+- Data representation established; calculation engine NOT built in this phase
+
+### Remaining Issues
+
+- Full settlement calculation engine NOT implemented (deferred to later phase)
+- Territory royalty override schema NOT added (deferred)
+- Net Sales deduction rules beyond GST remain NOT SPECIFIED
+
+## Franchise Product Model Audit (₹10L Product) — 2026-09-02
+
+### Status: **Complete — documentation only**
+
+### Deliverable
+
+- `docs/FRANCHISE-PRODUCT-MODEL-AUDIT.md` (653 lines)
+
+### Key Findings
+
+- **No franchise product model exists** in the current codebase: no `FranchiseProduct`, `FranchisePlan`, `FranchiseCommission`, or `FranchiseSettlement` entity.
+- Current payout calculation (`report-service.ts`) is hardcoded to a single commercial rule set (MAX(20%, ₹15,000), 2% royalty, equal distribution).
+- The new ₹10L product requires: percentage-based MG, Net Sales basis, higher-of payout rule, and commission structure — none of which are supported by the current schema or logic.
+
+### Architecture Options Evaluated
+
+| Option | Description | Verdict |
+|---|---|---|
+| A | Agreement-level commercial terms on `FranchiseAgreement` | **Recommended** — smallest change, supports both ₹3.10L and ₹10L products |
+| B | New `FranchiseProduct` entity | Requires FP-01 revision (currently APPROVED no-product) |
+| C | New `FranchisePlan` entity | Semantically identical to `FranchiseProduct`; would violate FP-01 |
+
+### Next Decision Required
+
+- If business confirms multi-product need, initiate FP-01 revision before creating any `FranchiseProduct`/`FranchisePlan` entity.
+
+## Franchise Commercial Architecture Decision — 2026-09-02
+
+### Status: **Complete — documentation only**
+
+### Deliverable
+
+- `docs/FRANCHISE-COMMERCIAL-ARCHITECTURE-DECISION.md` (417 lines)
+
+### Decision
+
+- **Option A selected:** Agreement-level commercial terms on `FranchiseAgreement`.
+- No `FranchiseProduct` or `FranchisePlan` entity per approved FP-01.
+- Defined `CommercialRuleEngine` abstraction for future payout calculations.
+
+### Critical Unresolved Items
+
+1. **MG basis for ₹10L product** — PENDING BUSINESS/LEGAL REQUIRED (3% of what? Investment? Net Sales? Gross Sales?)
+2. **Net Sales definition** — NOT SPECIFIED; blocks variable return calculation
+3. **Higher-of payout rule scope** — unconfirmed; blocks settlement calculation design
+4. **Commission model** — NOT SPECIFIED; DOC-025 mentions commission but no rules approved
+
+## MakeMeArtist Reference Repository Audit — 2026-09-02
+
+### Status: **Complete — integration audit recorded**
+
+### Deliverable
+
+- `docs/REFERENCE-MAKEMEARTIST-REUSE-MATRIX.md` (243 lines, commit `d533c96`)
+
+### Finding
+
+The reference repository (`https://github.com/eaglebaba13/makemeartist`) is a **Vite + React 18 + Lovable marketing landing page** with:
+- No backend, no authentication, no database
+- Supabase configured as an empty placeholder (no tables, no RLS, no migrations)
+- All content is static TypeScript data files
+- All forms redirect to WhatsApp via `wa.me` links
+- No business logic to copy
+
+### Reuse Classification
+
+- **A (Reuse directly):** 0 items
+- **B (Adapt into LWILL):** 13 items — all pattern-only, deferred to future phases (Phase 4 Academy, public marketing surfaces, public lead capture)
+- **C (Rebuild using LWILL architecture):** 2 items — lead-capture backend, shadcn/ui (if ever needed)
+- **D (Do not reuse):** 40 items — Supabase, Lovable tooling, hardcoded phone numbers, stock images, recruitment domain, visual identity conflicts, etc.
+
+### Recommendation
+
+**NO-OP for the current X Nail production gate.** No code, schema, or asset from MakeMeArtist should be imported. All reuse-eligible items are deferred to future tasks that explicitly open the corresponding LWILL scope.
+
+## Updated Project Progress
+
+**~90%** (up from 85%): All ₹10L commercial decisions are now formalized and approved. MG-01 (hybrid), MG-02 (3% of Investment), NP-01 (GST excluded), and NP-02 (MAX payout) are all approved. The implementation gate for ₹10L commercial calculations is unblocked. Remaining 10% is blocked on:
+1. Net Sales deduction rules for discounts, refunds, returns, cancellations (NP-01 partial — does not block MVP)
+2. FP-01 revision if multi-product is confirmed
+
+## Exact Next Task
+
+1. **Implement agreement-level commercial terms schema** for fixed MG (existing ₹3.10L) and formula MG (new products: 3% of Initial Investment).
+2. **Implement Net Sales calculation** with GST exclusion (discounts/refunds/returns/cancellations remain NOT SPECIFIED — do not implement deductions for these unless approved).
+3. **Implement higher-of payout rule** = MAX(MG, 30% of Net Sales excluding GST) for franchisee payout components only.
+4. If business confirms multi-product need, initiate FP-01 revision process before creating any `FranchiseProduct` entity.
+5. Implement Commission, Reports, Settings, AI Assistant, Notification/WhatsApp automation, and Platform administration as separate approved phases.
 
 
