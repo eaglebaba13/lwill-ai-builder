@@ -79,6 +79,7 @@ describe("notification dispatch route handlers: successful dispatch", () => {
         queueId: "queue-1",
         logId: "log-1",
         errorMessage: null,
+        deliveryMode: "MOCK",
       },
     );
 
@@ -102,5 +103,34 @@ describe("notification dispatch route handlers: successful dispatch", () => {
       variables: { name: "Alice" },
       scheduledAt: null,
     });
+  });
+
+  it("preserves deliveryMode in API response", async () => {
+    const services = createServices(
+      { outcome: "authorized", tenantId: "tenant-1" },
+      {
+        success: true,
+        status: "SENT",
+        queueId: "queue-1",
+        logId: "log-1",
+        errorMessage: null,
+        deliveryMode: "MOCK",
+      },
+    );
+
+    const result = await handleDispatchNotification(
+      request({
+        templateId: "template-1",
+        recipientId: "user-1",
+        channel: "email",
+        variables: { name: "Alice" },
+      }),
+      services,
+    );
+
+    expect(result.status).toBe(200);
+    const body = await result.json();
+    expect(body).toHaveProperty("dispatch");
+    expect(body.dispatch).toHaveProperty("deliveryMode", "MOCK");
   });
 });

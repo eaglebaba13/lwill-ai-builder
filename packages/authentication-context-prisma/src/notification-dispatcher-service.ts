@@ -20,6 +20,7 @@ export interface NotificationDispatchResult {
   readonly queueId: string;
   readonly logId: string;
   readonly errorMessage: string | null;
+  readonly deliveryMode: "MOCK" | "REAL";
 }
 
 interface NotificationDispatcherPrismaClient {
@@ -124,6 +125,7 @@ export function createNotificationDispatcherService(prisma: NotificationDispatch
           status: "FAILED",
           errorMessage,
           sentAt,
+          deliveryMode: "MOCK",
         };
 
         const log = await logService.createNotificationLog(logInput);
@@ -133,6 +135,7 @@ export function createNotificationDispatcherService(prisma: NotificationDispatch
           queueId: queue.id,
           logId: log.id,
           errorMessage,
+          deliveryMode: "MOCK",
         };
       }
 
@@ -161,6 +164,7 @@ export function createNotificationDispatcherService(prisma: NotificationDispatch
         errorMessage: deliveryResult.errorMessage,
         sentAt: deliveryResult.sentAt ?? sentAt,
         deliveredAt: deliveryResult.deliveredAt,
+        deliveryMode: deliveryResult.deliveryMode,
       };
 
       const log = await logService.createNotificationLog(logInput);
@@ -170,6 +174,7 @@ export function createNotificationDispatcherService(prisma: NotificationDispatch
         queueId: queue.id,
         logId: log.id,
         errorMessage: deliveryResult.errorMessage,
+        deliveryMode: deliveryResult.deliveryMode,
       };
     },
   };

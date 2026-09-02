@@ -10,6 +10,7 @@ export interface NotificationLogRecord {
   readonly sentAt: Date | null;
   readonly deliveredAt: Date | null;
   readonly readAt: Date | null;
+  readonly deliveryMode: string | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }
@@ -25,6 +26,7 @@ export interface NotificationLogCreateInput {
   readonly sentAt?: Date | null;
   readonly deliveredAt?: Date | null;
   readonly readAt?: Date | null;
+  readonly deliveryMode?: "MOCK" | "REAL" | null;
 }
 
 export interface NotificationLogService {
@@ -56,6 +58,7 @@ export function createNotificationLogService(prisma: NotificationLogPrismaClient
           sentAt: input.sentAt ?? null,
           deliveredAt: input.deliveredAt ?? null,
           readAt: input.readAt ?? null,
+          deliveryMode: input.deliveryMode ?? undefined,
         },
       });
     },

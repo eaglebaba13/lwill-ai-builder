@@ -19,6 +19,7 @@ describe("notification channel adapters", () => {
     expect(result.status).toBe("SENT");
     expect(result.errorMessage).toBeNull();
     expect(result.sentAt).toBeInstanceOf(Date);
+    expect(result.deliveryMode).toBe("MOCK");
   });
 
   it("in-app adapter returns successful result", async () => {
@@ -34,6 +35,7 @@ describe("notification channel adapters", () => {
     expect(result.status).toBe("SENT");
     expect(result.errorMessage).toBeNull();
     expect(result.sentAt).toBeInstanceOf(Date);
+    expect(result.deliveryMode).toBe("MOCK");
   });
 
   it("failing adapter returns failed result", async () => {
@@ -49,5 +51,6 @@ describe("notification channel adapters", () => {
     expect(result.status).toBe("FAILED");
     expect(result.errorMessage).toBe("provider error");
     expect(result.sentAt).toBeNull();
+    expect(result.deliveryMode).toBe("MOCK");
   });
 });

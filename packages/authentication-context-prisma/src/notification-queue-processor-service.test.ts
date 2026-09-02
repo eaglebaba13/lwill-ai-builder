@@ -58,6 +58,7 @@ function createPrisma(overrides: {
           sentAt: data.sentAt ?? null,
           deliveredAt: data.deliveredAt ?? null,
           readAt: null,
+          deliveryMode: (data.deliveryMode as string | undefined | null) ?? null,
           createdAt: new Date(),
           updatedAt: new Date(),
         };
@@ -111,6 +112,49 @@ describe("notification queue processor service", () => {
     expect(result.succeeded).toBe(1);
     expect(result.failed).toBe(0);
     expect(queues[0]?.status).toBe("SENT");
+  });
+
+  it("propagates mock deliveryMode to log", async () => {
+    const { prisma, templates, queues } = createPrisma();
+    const processor = createNotificationQueueProcessorService(prisma);
+
+    templates.push({
+      id: "template-1",
+      tenantId: "tenant-1",
+      name: "Welcome",
+      channel: "email",
+      subject: "Welcome",
+      body: "Hello {{name}}",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    queues.push({
+      id: "queue-1",
+      tenantId: "tenant-1",
+      templateId: "template-1",
+      recipientId: "user-1",
+      channel: "email",
+      subject: "Welcome",
+      body: "Hello {{name}}",
+      variables: { name: "Alice" },
+      status: "PENDING",
+      scheduledAt: null,
+      attempts: 0,
+      maxAttempts: 3,
+      lastAttemptAt: null,
+      nextAttemptAt: null,
+      errorMessage: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    await processor({ tenantId: "tenant-1" });
+
+    expect(prisma.notificationLog.create).toHaveBeenCalledTimes(1);
+    const logCall = (prisma.notificationLog.create as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    expect(logCall?.data?.deliveryMode).toBe("MOCK");
   });
 
   it("skips items with future nextAttemptAt", async () => {

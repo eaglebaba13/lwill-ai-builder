@@ -24,6 +24,7 @@ function createPrisma(overrides: {
           sentAt: data.sentAt ?? null,
           deliveredAt: data.deliveredAt ?? null,
           readAt: data.readAt ?? null,
+          deliveryMode: (data.deliveryMode as string | undefined | null) ?? null,
           createdAt: new Date(),
           updatedAt: new Date(),
         };
@@ -58,6 +59,7 @@ describe("notification log service", () => {
       body: "World",
       status: "sent",
       sentAt: new Date(),
+      deliveryMode: "MOCK",
     });
 
     expect(result).toMatchObject({
@@ -67,6 +69,7 @@ describe("notification log service", () => {
       subject: "Hello",
       body: "World",
       status: "sent",
+      deliveryMode: "MOCK",
     });
     expect(prisma.notificationLog.create).toHaveBeenCalledTimes(1);
   });
@@ -94,6 +97,7 @@ describe("notification log service", () => {
           sentAt: new Date(),
           deliveredAt: null,
           readAt: null,
+          deliveryMode: "MOCK",
           createdAt: new Date(),
           updatedAt: new Date(),
         },
@@ -120,6 +124,7 @@ describe("notification log service", () => {
           sentAt: new Date(),
           deliveredAt: null,
           readAt: null,
+          deliveryMode: "MOCK",
           createdAt: new Date(),
           updatedAt: new Date(),
         },
@@ -146,6 +151,7 @@ describe("notification log service", () => {
           sentAt: new Date(),
           deliveredAt: null,
           readAt: null,
+          deliveryMode: "MOCK",
           createdAt: new Date(),
           updatedAt: new Date(),
         },
@@ -161,6 +167,7 @@ describe("notification log service", () => {
           sentAt: new Date(),
           deliveredAt: new Date(),
           readAt: null,
+          deliveryMode: "MOCK",
           createdAt: new Date(),
           updatedAt: new Date(),
         },

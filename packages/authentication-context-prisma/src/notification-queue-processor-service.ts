@@ -146,6 +146,7 @@ export function createNotificationQueueProcessorService(
             status: "FAILED",
             errorMessage,
             sentAt,
+            deliveryMode: "MOCK",
           };
           await logService.createNotificationLog(logInput);
           failed += 1;
@@ -178,6 +179,7 @@ export function createNotificationQueueProcessorService(
           errorMessage: deliveryResult.errorMessage,
           sentAt: deliveryResult.sentAt ?? sentAt,
           deliveredAt: deliveryResult.deliveredAt,
+          deliveryMode: deliveryResult.deliveryMode,
         };
         await logService.createNotificationLog(logInput);
 

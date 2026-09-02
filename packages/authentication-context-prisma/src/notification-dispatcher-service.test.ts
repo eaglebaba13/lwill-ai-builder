@@ -75,6 +75,7 @@ function createPrisma(overrides: {
           sentAt: data.sentAt ?? null,
           deliveredAt: data.deliveredAt ?? null,
           readAt: data.readAt ?? null,
+          deliveryMode: (data.deliveryMode as string | undefined | null) ?? null,
           createdAt: new Date(),
           updatedAt: new Date(),
         };
@@ -116,6 +117,7 @@ describe("notification dispatcher service", () => {
     expect(result.queueId).toBeTruthy();
     expect(result.logId).toBeTruthy();
     expect(result.errorMessage).toBeNull();
+    expect(result.deliveryMode).toBe("MOCK");
   });
 
   it("renders template variables", async () => {
@@ -207,5 +209,6 @@ describe("notification dispatcher service", () => {
     expect(result.success).toBe(false);
     expect(result.status).toBe("FAILED");
     expect(result.errorMessage).toBe("provider error");
+    expect(result.deliveryMode).toBe("MOCK");
   });
 });

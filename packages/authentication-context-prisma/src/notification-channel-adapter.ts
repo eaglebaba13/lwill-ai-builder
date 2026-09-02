@@ -14,6 +14,7 @@ export interface NotificationDeliveryResult {
   readonly errorMessage: string | null;
   readonly sentAt: Date | null;
   readonly deliveredAt: Date | null;
+  readonly deliveryMode: "MOCK" | "REAL";
 }
 
 export function createMockChannelAdapter(): NotificationChannelAdapter {
@@ -27,6 +28,7 @@ export function createMockChannelAdapter(): NotificationChannelAdapter {
         errorMessage: null,
         sentAt,
         deliveredAt: sentAt,
+        deliveryMode: "MOCK",
       };
     },
   };
@@ -43,6 +45,7 @@ export function createInAppChannelAdapter(): NotificationChannelAdapter {
         errorMessage: null,
         sentAt,
         deliveredAt: null,
+        deliveryMode: "MOCK",
       };
     },
   };
@@ -58,6 +61,7 @@ export function createFailingChannelAdapter(errorMessage: string): NotificationC
         errorMessage,
         sentAt: null,
         deliveredAt: null,
+        deliveryMode: "MOCK",
       };
     },
   };

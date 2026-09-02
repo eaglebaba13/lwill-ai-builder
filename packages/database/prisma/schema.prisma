@@ -807,6 +807,7 @@ model NotificationLog {
   sentAt       DateTime?
   deliveredAt  DateTime?
   readAt       DateTime?
+  deliveryMode String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
