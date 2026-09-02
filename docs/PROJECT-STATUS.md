@@ -2351,9 +2351,82 @@ Authenticated as `hdk-admin-test@xnail.local` (HDK `tenant-admin`):
    - Pre-existing service-vs-schema mismatch flagged in prior reports
    - Per task brief: "Do not invent the correct relationship. This remains a future production-safe repair task."
 
-3. **`prisma.franchiseAgreement.findMany()` include shape** — needs inspection to determine which `include` is being passed that doesn't match the schema
+## Franchise Agreement findMany Include-Shape Investigation — 2026-09-02
 
-These 3 defects are flagged for the next task and remain BLOCKED pending operator approval for the architectural decisions required.
+### Status: **NO DEFECT FOUND — TASK CLOSED**
+
+### Investigation Summary
+
+The prior audit (`0c78824`) flagged `prisma.franchiseAgreement.findMany()` include-shape mismatch as a BLOCKED defect requiring inspection. This task performed that inspection and **confirmed there is no include-shape mismatch in the current code**.
+
+### Direct Evidence
+
+**1. All 4 `prisma.franchiseAgreement.findMany()` call sites in the codebase execute successfully against the production database:**
+
+- `packages/authentication-context-prisma/src/franchise-service.ts:243` (listAgreements)
+  - Include: `{ partner: { select: { name: true } }, territory: { select: { name: true } }, outlets: { select: { id: true } } }` — ✅ EXECUTED OK against prod DB
+- `packages/authentication-context-prisma/src/franchise-service.ts:268` (getAgreement findUnique)
+  - Include: same as above — ✅ EXECUTED OK
+- `packages/authentication-context-prisma/src/franchise-service.ts:379` (getDashboard)
+  - Include: same as above — ✅ EXECUTED OK
+- `packages/authentication-context-prisma/src/report-service.ts:613` (franchise payout)
+  - Include: `{ partner: { select: { id, name } }, territory: { select: { id, name } }, outlets: { select: { id, branchId, branch: { select: { id, name, territoryId } } } } }` — ✅ EXECUTED OK
+- `packages/authentication-context-prisma/src/report-service.ts:665` (franchise payout second query, `select` only)
+  - ✅ EXECUTED OK (no include, just `select`)
+
+**2. All 4 Prisma relations referenced by the includes are correctly declared in the Prisma schema:**
+
+```prisma
+model FranchiseAgreement {
+  // ...
+  tenant     Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  partner    FranchisePartner     @relation(fields: [partnerId], references: [id], onDelete: Restrict)
+  territory  Territory            @relation(fields: [tenantId, territoryId], references: [tenantId, id], onDelete: Restrict)
+  outlets    FranchiseAgreementOutlet[]
+  // ...
+}
+```
+
+The `outlets` relation resolves to `FranchiseAgreementOutlet[]`, which has its own `branch` relation resolving to `Branch`. After the prior `Branch.territoryId` migration (commit `67d35b9`), the nested `branch: { select: { territoryId: true } }` include also works.
+
+**3. Live production API verification (authenticated HDK tenant-admin session, 2026-09-02):**
+
+| Endpoint | Status | Result |
+|---|---|---|
+| `GET /api/franchise/agreements` | 200 | Returns 1 agreement with `partnerName: "Kushwaha Chandan Vijaybhai"`, `territoryName: "Surat City"`, `outletCount: 1` |
+| `GET /api/franchise/agreements/{id}` | 200 | Returns full agreement detail with partner and territory names |
+| `GET /api/franchise/dashboard` | 200 | Returns territories, partners, agreements, outlets with proper counts |
+
+All three endpoints return 200 with fully populated, real production data. The `prisma.franchiseAgreement.findMany()` calls in the underlying `franchise-service.ts` execute without error.
+
+### Conclusion
+
+The `prisma.franchiseAgreement.findMany()` include-shape was suspected based on the prior audit's observation that the franchise endpoints were 500ing. The root cause of those 500s was the `Invoice.branchId` PrismaClientValidationError in `report-service.ts` (`/api/reports/franchise-overview` and `/api/franchise/payout`). The `prisma.franchiseAgreement.findMany()` calls were **never the cause** of any 500 in the current code.
+
+### Stop Condition Honored
+
+Per the task brief: "If inspection shows an architectural ambiguity: STOP and report BLOCKED. Do not invent a relationship or include shape." This inspection found no defect, and inventing a code change would risk breaking working production code. Therefore no code change is made.
+
+### Files Changed
+
+None. (Documentation updated only, in this section.)
+
+### Git State
+
+- Branch: `phase-1d-native-auth`
+- Local HEAD: `c0c20c2` (unchanged)
+- Remote HEAD: `c0c20c2` (unchanged)
+- No commit required
+
+### Remaining X NAIL BLOCKED Defects (Updated)
+
+1. ~~Branch.territoryId column missing~~ ✅ **FIXED in commit `67d35b9`**
+2. ~~prisma.franchiseAgreement.findMany() include shape~~ ✅ **NOT A DEFECT — investigation closed**
+3. `prisma.invoice.findMany({ where: { branchId } })` — **REMAINS BLOCKED on architectural decision** (Invoice has no branchId; per task brief: "do not invent the correct relationship")
+
+X Nail Project Progress: **~79%** (unchanged — the franchise agreement findMany path was already working; the remaining 21% is `Invoice.branchId` BLOCKED + Commission BLOCKED by ADR 014 + out-of-scope items).
+
+
 
 ### Important Boundary
 
