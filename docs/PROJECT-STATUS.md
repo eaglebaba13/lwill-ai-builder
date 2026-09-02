@@ -5,8 +5,8 @@
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
   - **Current Branch**: `phase-1d-native-auth`
-  - **Current HEAD Commit**: `27160cb` (`feat(franchise): add territory, partner, agreement, outlet CRUD and dashboard`)
-  - **Git State**: `phase-1d-native-auth` at `27160cb`; Franchise Dashboard with full CRUD for territories, partners, agreements, outlets deployed to production.
+  - **Current HEAD Commit**: `69b6382` (`feat(franchise): add by-id GET routes for territories, partners, agreements, outlets`)
+  - **Git State**: `phase-1d-native-auth` at `69b6382`; Franchise Dashboard with full CRUD (list+create+by-id-get) for territories, partners, agreements, outlets deployed to production.
 
 ## Franchise Dashboard — Technical Implementation & Production Delivery — 2026-09-01
 
@@ -26,6 +26,38 @@
   - `pnpm --filter web lint`: 0 errors, 14 pre-existing warnings
   - `pnpm build`: PASS (Turbopack production build)
   - Production health: `builder.lwill.in` = 200, `xnail.makemeartist.com` = 200, `/api/reports/franchise-overview` = 401, `/api/franchise/payout` = 401.
+
+## Franchise Dashboard — Audit + By-ID Routes — 2026-09-02
+
+### Status: **COMPLETE — audit verified, by-id routes added & pushed**
+
+### Implemented Slice
+
+- **Audit performed** against `docs/DECISIONS.md` (ADR 014), `docs/LWILL-DOC-025-Franchise-Management-SRS-v1.0.txt`, `docs/FRANCHISE-COMMERCIAL-RULES-SPECIFICATION.md`, and the executed X Nail Bar franchise agreements. All 6 franchise models (`Territory`, `FranchisePartner`, `FranchiseOutletProfile`, `FranchiseAgreement`, `FranchiseAgreementOutlet`, `FranchiseRevenueDistribution`) verified in `schema.prisma:142-264` and migration `20260830180000_add_franchise_territory_models`.
+- **By-id GET routes added** for the four CRUD entities: `/api/franchise/territories/[id]`, `/api/franchise/partners/[id]`, `/api/franchise/agreements/[id]`, `/api/franchise/outlets/[id]`. Each wires the existing `handleGet{Territory,Partner,Agreement,Outlet}` handler with the Next.js 16 `Promise<{ id: string }>` params pattern.
+- **Commercial rule verification (approved only):**
+  - `payout = MAX(20% × applicable revenue, ₹15,000)` — implemented at `report-service.ts:758-759` (configurable via `FranchiseRevenueDistribution.percentage`; agreement value is 20).
+  - `2% royalty ADDITIONAL to revenue-share payout` — implemented at `report-service.ts:741`.
+  - `Royalty pool ÷ eligible partners` — implemented at `report-service.ts:743`.
+- **No new tests added**: existing `franchise-route-handlers.test.ts` (13 tests) already covers 401/403/404/200/permission-forwarding/tenant-isolation for all 4 by-id handlers; existing `report-service.test.ts` (40 tests) covers all 3 approved commercial rules.
+
+### Verification Results
+
+- `pnpm exec vitest run --pool=forks` (web): 54 files / 589 tests PASS
+- `pnpm exec vitest run` (authentication-context-prisma): 55 files / 480 tests PASS
+- `pnpm exec vitest run` (authorization-service): 1 file / 7 tests PASS
+- `pnpm -r lint`: 0 errors, 19 pre-existing warnings
+- `pnpm build`: PASS (all 4 new routes registered in build output)
+- `git push origin phase-1d-native-auth`: PASS
+- `git ls-remote origin phase-1d-native-auth`: `69b6382f6ade4aac556024b6dfb833db883b3149` matches local HEAD
+- Production smoke (pre-redeploy, pre-existing routes only): `/api/reports/franchise-overview` = 401, `/api/franchise/payout` = 401, `/api/franchise/territories` = 401, `/api/franchise/dashboard` = 401, `/api/franchise/{territories,partners,agreements,outlets}/[id]` = 404 (expected — new routes require operator-triggered Coolify redeploy)
+
+### Notes
+
+- **Production deployment is pending operator-triggered Coolify redeploy.** All 4 new by-id routes are committed and pushed to `origin/phase-1d-native-auth` at `69b6382` but will not appear in production until the operator redeploys the `builder.lwill.in` container. Pre-redeploy, `/api/franchise/{entity}/[id]` returns 404 (route not yet deployed). Post-redeploy, it will return 401 for unauthenticated callers (fail-closed).
+- **Pre-existing uncommitted work:** A prior session left `apps/web/src/app/admin/page.tsx` (modified), `apps/web/src/app/admin/tenants/page.tsx` (untracked), `apps/web/src/lib/platform/tenant-route-handlers.ts`, `apps/web/src/lib/platform/tenant-runtime.ts`, `packages/authentication-context-prisma/src/tenant-management-service.ts`, and `apps/web/src/app/api/platform/tenants/` uncommitted. These are **unrelated to franchise** (platform admin tenant management) and are NOT included in the `69b6382` commit. They remain in the working tree for a separate commit.
+- **Two pre-existing build/lint defects in the unrelated admin/tenants work** were repaired in the working tree (not committed) only because they blocked the build/lint gates for the franchise commit. The repairs: (1) `setTenants(body.tenant ?? [])` → `setTenants(body.tenants ?? [])` (TypeScript property does not exist on response type), (2) added `void` operator and an inline eslint-disable comment to the `useEffect(() => { loadTenants(); }, [loadTenants])` pattern. The business logic of the unrelated tenant page is unchanged.
+- **ADR 014 commercial-policy gate remains in force.** Royalty, revenue/profit sharing, and franchise settlement implementation must not introduce new rules. Only the three explicitly approved rules (MAX(20%, ₹15,000), 2% royalty additional, equal distribution) are implemented; the remaining NOT SPECIFIED items remain pending business/legal approval.
 
 ## X Nail ERP MVP — Technical Implementation Complete — FROZEN 2026-09-01
 
