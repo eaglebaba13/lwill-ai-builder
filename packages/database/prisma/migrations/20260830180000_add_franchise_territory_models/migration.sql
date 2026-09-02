@@ -101,10 +101,10 @@ END $$;
 
 DO $$
 BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FranchisePartner_tenantId_userId_fkey') THEN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'FranchisePartner_userId_fkey') THEN
         ALTER TABLE "FranchisePartner"
-            ADD CONSTRAINT "FranchisePartner_tenantId_userId_fkey"
-            FOREIGN KEY ("tenantId", "userId") REFERENCES "User"("id") ON DELETE Restrict ON UPDATE CASCADE;
+            ADD CONSTRAINT "FranchisePartner_userId_fkey"
+            FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE Restrict ON UPDATE CASCADE;
     END IF;
 END $$;
 
