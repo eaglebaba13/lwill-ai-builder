@@ -33,6 +33,15 @@ export interface FranchiseAgreementRecord {
   readonly isActive: boolean;
   readonly createdAt: Date;
   readonly updatedAt: Date;
+  readonly minimumGuaranteeCents: number | null;
+  readonly mgFormulaRateBp: number | null;
+  readonly mgFormulaBase: string | null;
+  readonly variableReturnRateBp: number | null;
+  readonly variableReturnBasis: string | null;
+  readonly payoutRule: string | null;
+  readonly termsSnapshot: Record<string, unknown> | null;
+  readonly effectiveFrom: Date | null;
+  readonly effectiveTo: Date | null;
 }
 
 export interface FranchiseOutletProfileRecord {
@@ -70,6 +79,15 @@ export interface FranchiseAgreementCreateInput {
   readonly territoryId: string;
   readonly startDate: Date;
   readonly endDate?: Date | null;
+  readonly minimumGuaranteeCents?: number | null;
+  readonly mgFormulaRateBp?: number | null;
+  readonly mgFormulaBase?: string | null;
+  readonly variableReturnRateBp?: number | null;
+  readonly variableReturnBasis?: string | null;
+  readonly payoutRule?: string | null;
+  readonly termsSnapshot?: Record<string, unknown> | null;
+  readonly effectiveFrom?: Date | null;
+  readonly effectiveTo?: Date | null;
 }
 
 export interface FranchiseOutletProfileCreateInput {
@@ -258,6 +276,15 @@ export function createFranchiseService(prisma: FranchisePrismaClient): Franchise
         isActive: agreement.isActive,
         createdAt: agreement.createdAt,
         updatedAt: agreement.updatedAt,
+        minimumGuaranteeCents: agreement.minimumGuaranteeCents,
+        mgFormulaRateBp: agreement.mgFormulaRateBp,
+        mgFormulaBase: agreement.mgFormulaBase,
+        variableReturnRateBp: agreement.variableReturnRateBp,
+        variableReturnBasis: agreement.variableReturnBasis,
+        payoutRule: agreement.payoutRule,
+        termsSnapshot: (agreement.termsSnapshot ?? null) as Record<string, unknown> | null,
+        effectiveFrom: agreement.effectiveFrom,
+        effectiveTo: agreement.effectiveTo,
         partnerName: (agreement as unknown as Record<string, unknown>).partner ? ((agreement as unknown as Record<string, unknown>).partner as unknown as Record<string, unknown>).name as string : "Unknown",
         territoryName: (agreement as unknown as Record<string, unknown>).territory ? ((agreement as unknown as Record<string, unknown>).territory as unknown as Record<string, unknown>).name as string : "Unknown",
         outletCount: Array.isArray((agreement as unknown as Record<string, unknown>).outlets) ? ((agreement as unknown as Record<string, unknown>).outlets as unknown[]).length : 0,
@@ -286,6 +313,15 @@ export function createFranchiseService(prisma: FranchisePrismaClient): Franchise
         isActive: agreement.isActive,
         createdAt: agreement.createdAt,
         updatedAt: agreement.updatedAt,
+        minimumGuaranteeCents: agreement.minimumGuaranteeCents,
+        mgFormulaRateBp: agreement.mgFormulaRateBp,
+        mgFormulaBase: agreement.mgFormulaBase,
+        variableReturnRateBp: agreement.variableReturnRateBp,
+        variableReturnBasis: agreement.variableReturnBasis,
+        payoutRule: agreement.payoutRule,
+        termsSnapshot: (agreement.termsSnapshot ?? null) as Record<string, unknown> | null,
+        effectiveFrom: agreement.effectiveFrom,
+        effectiveTo: agreement.effectiveTo,
         partnerName: (agreement as unknown as Record<string, unknown>).partner ? ((agreement as unknown as Record<string, unknown>).partner as unknown as Record<string, unknown>).name as string : "Unknown",
         territoryName: (agreement as unknown as Record<string, unknown>).territory ? ((agreement as unknown as Record<string, unknown>).territory as unknown as Record<string, unknown>).name as string : "Unknown",
         outletCount: Array.isArray((agreement as unknown as Record<string, unknown>).outlets) ? ((agreement as unknown as Record<string, unknown>).outlets as unknown[]).length : 0,
@@ -293,14 +329,25 @@ export function createFranchiseService(prisma: FranchisePrismaClient): Franchise
     },
 
     async createAgreement(input) {
+      const data: Record<string, unknown> = {
+        tenantId: input.tenantId,
+        partnerId: input.partnerId,
+        territoryId: input.territoryId,
+        startDate: input.startDate,
+        endDate: input.endDate ?? null,
+      };
+      if (input.minimumGuaranteeCents !== undefined) data.minimumGuaranteeCents = input.minimumGuaranteeCents ?? null;
+      if (input.mgFormulaRateBp !== undefined) data.mgFormulaRateBp = input.mgFormulaRateBp ?? null;
+      if (input.mgFormulaBase !== undefined) data.mgFormulaBase = input.mgFormulaBase ?? null;
+      if (input.variableReturnRateBp !== undefined) data.variableReturnRateBp = input.variableReturnRateBp ?? null;
+      if (input.variableReturnBasis !== undefined) data.variableReturnBasis = input.variableReturnBasis ?? null;
+      if (input.payoutRule !== undefined) data.payoutRule = input.payoutRule ?? null;
+      if (input.termsSnapshot !== undefined) data.termsSnapshot = input.termsSnapshot ?? null;
+      if (input.effectiveFrom !== undefined) data.effectiveFrom = input.effectiveFrom ?? null;
+      if (input.effectiveTo !== undefined) data.effectiveTo = input.effectiveTo ?? null;
+
       return prisma.franchiseAgreement.create({
-        data: {
-          tenantId: input.tenantId,
-          partnerId: input.partnerId,
-          territoryId: input.territoryId,
-          startDate: input.startDate,
-          endDate: input.endDate ?? null,
-        },
+        data,
       });
     },
 
@@ -430,6 +477,15 @@ export function createFranchiseService(prisma: FranchisePrismaClient): Franchise
         isActive: agreement.isActive,
         createdAt: agreement.createdAt,
         updatedAt: agreement.updatedAt,
+        minimumGuaranteeCents: agreement.minimumGuaranteeCents,
+        mgFormulaRateBp: agreement.mgFormulaRateBp,
+        mgFormulaBase: agreement.mgFormulaBase,
+        variableReturnRateBp: agreement.variableReturnRateBp,
+        variableReturnBasis: agreement.variableReturnBasis,
+        payoutRule: agreement.payoutRule,
+        termsSnapshot: (agreement.termsSnapshot ?? null) as Record<string, unknown> | null,
+        effectiveFrom: agreement.effectiveFrom,
+        effectiveTo: agreement.effectiveTo,
         partnerName: (agreement as unknown as Record<string, unknown>).partner ? ((agreement as unknown as Record<string, unknown>).partner as unknown as Record<string, unknown>).name as string : "Unknown",
         territoryName: (agreement as unknown as Record<string, unknown>).territory ? ((agreement as unknown as Record<string, unknown>).territory as unknown as Record<string, unknown>).name as string : "Unknown",
         outletCount: Array.isArray((agreement as unknown as Record<string, unknown>).outlets) ? ((agreement as unknown as Record<string, unknown>).outlets as unknown[]).length : 0,

@@ -208,15 +208,25 @@ model FranchiseOutletProfile {
 }
 
 model FranchiseAgreement {
-  id             String   @id @default(uuid()) @db.Uuid
-  tenantId       String   @db.Uuid
-  partnerId      String   @db.Uuid
-  territoryId    String   @db.Uuid
-  startDate      DateTime
-  endDate        DateTime?
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                      String    @id @default(uuid()) @db.Uuid
+  tenantId                String    @db.Uuid
+  partnerId               String    @db.Uuid
+  territoryId             String    @db.Uuid
+  startDate               DateTime
+  endDate                 DateTime?
+  isActive                Boolean   @default(true)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  minimumGuaranteeCents   Int?
+  mgFormulaRateBp         Int?
+  mgFormulaBase           String?
+  variableReturnRateBp    Int?
+  variableReturnBasis     String?
+  payoutRule              String?
+  termsSnapshot           Json?
+  effectiveFrom           DateTime?
+  effectiveTo             DateTime?
 
   tenant     Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   partner    FranchisePartner     @relation(fields: [partnerId], references: [id], onDelete: Restrict)
