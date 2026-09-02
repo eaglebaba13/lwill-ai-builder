@@ -5,8 +5,8 @@
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
   - **Current Branch**: `phase-1d-native-auth`
-  - **Current HEAD Commit**: `69b6382` (`feat(franchise): add by-id GET routes for territories, partners, agreements, outlets`)
-  - **Git State**: `phase-1d-native-auth` at `69b6382`; Franchise Dashboard with full CRUD (list+create+by-id-get) for territories, partners, agreements, outlets deployed to production.
+  - **Current HEAD Commit**: `67d35b9` (`fix(db): add missing Branch territory relation column`)
+  - **Git State**: `phase-1d-native-auth` at `67d35b9`; Branch.territoryId column + FK + index added to production database; `/api/branches` 500 resolved.
 
 ## Franchise Dashboard — Technical Implementation & Production Delivery — 2026-09-01
 
@@ -2378,7 +2378,7 @@ These 3 defects are flagged for the next task and remain BLOCKED pending operato
 | Purchases | IMPLEMENTED (was 403 to now 200) |
 | Staff | IMPLEMENTED |
 | Attendance | IMPLEMENTED |
-| Branches | PARTIAL — permission OK, schema drift on `Branch.territoryId` |
+| Branches | IMPLEMENTED — `Branch.territoryId` column + FK + index added; `/api/branches` returns 401 unauth (was 500) |
 | Franchise | PARTIAL — CRUD OK, reports 500 on Invoice.branchId mismatch |
 | Reports | PARTIAL — 4/5 working; 1 schema drift on franchise-overview |
 | Settings | IMPLEMENTED |
@@ -2386,4 +2386,71 @@ These 3 defects are flagged for the next task and remain BLOCKED pending operato
 | AI Assistant | PLACEHOLDER (out of scope) |
 
 X Nail Project Progress: **~78%** (up from 60% in the prior report; the 7 newly-fixed endpoints raise the verified production coverage of the core modules). The remaining 22% is operator-blocked (Commission approval, schema-drift architectural decisions) and out-of-scope (AI Assistant, MiMo review of reference matrix).
+
+## Branch.territoryId Schema-Drift Fix — 2026-09-02
+
+### Status: **COMPLETE & DEPLOYED TO PRODUCTION**
+
+### Defect Resolved
+- **Symptom**: `GET /api/branches` returned **500 Internal Server Error** with `PrismaClientKnownRequestError: column "Branch.territoryId" does not exist`.
+- **Root Cause**: The Prisma schema (`packages/database/prisma/schema.prisma`) declared `Branch.territoryId String? @db.Uuid` with composite FK `(tenantId, territoryId) → Territory(tenantId, id) ON DELETE RESTRICT` and index `(tenantId, territoryId)`, but the production database was missing the column.
+- **Schema/Source-of-Truth Match**: Schema and migration are now consistent; production DB matches the Prisma model.
+
+### Migration
+- **File**: `packages/database/prisma/migrations/20260902100000_add_branch_territory_relation/migration.sql`
+- **Operations** (all idempotent via `IF NOT EXISTS` guards):
+  1. `ALTER TABLE "Branch" ADD COLUMN IF NOT EXISTS "territoryId" UUID;`
+  2. `ADD CONSTRAINT Branch_tenantId_territoryId_fkey FOREIGN KEY ("tenantId", "territoryId") REFERENCES "Territory"("tenantId", "id") ON DELETE RESTRICT ON UPDATE CASCADE;`
+  3. `CREATE INDEX Branch_tenantId_territoryId_idx ON "Branch"("tenantId", "territoryId");`
+- **Data Preservation**: Zero data loss. New column is nullable with NULL default; the 1 existing `Branch` row keeps its `NULL` value.
+- **Backfill**: None required (and none performed). Per the Prisma schema, the column is nullable; NULL is the correct initial state.
+
+### Verification
+
+**Local:**
+- `prisma validate`: schema is valid
+- `pnpm test`: 1102 tests passed, 0 failed (54 test files in apps/web: 589 passed; 4 other package suites: 513 passed)
+- `pnpm lint`: 0 errors (only pre-existing warnings, none in touched files)
+- `pnpm build`: succeeded
+
+**Production Pre-Migration State (verified via `psql` against `dc75f475407e`):**
+- `Branch.territoryId`: does NOT exist (confirmed)
+- `Territory` table: exists with `Territory_tenantId_id_key` composite unique index (FK target present)
+- `_prisma_migrations`: 19 applied, none pending
+- `Branch` row count: 1 (no data to migrate)
+
+**Production Migration Deploy:**
+- Coolify auto-built image `oxxffcvekc7jz7ozccgtwbtr:67d35b9087dc1fc99dac2629bba928d0cf9f9bff` and started container `oxxffcvekc7jz7ozccgtwbtr-051737188331` (Up, healthy)
+- `prisma migrate deploy` output: "Applying migration `20260902100000_add_branch_territory_relation`" → "All migrations have been successfully applied" → "Database schema is up to date!"
+
+**Production Post-Migration State (verified via `psql`):**
+- `Branch` columns: 9 total (8 existing + new `territoryId UUID YES`)
+- `Branch` FKs: 3 total (2 existing + new `Branch_tenantId_territoryId_fkey`)
+- `Branch_tenantId_territoryId_idx`: created (btree on `("tenantId", "territoryId")`)
+
+**Production Endpoint Verification:**
+- `GET https://builder.lwill.in/` → 200 (home page OK)
+- `GET https://builder.lwill.in/api/branches` (unauth) → **401** (was 500; now correct auth-gate behavior)
+- `GET https://builder.lwill.in/api/auth/me` (unauth) → 401 (no regression)
+- Container logs: no `column does not exist` errors, no `PrismaClientKnownRequestError` for `territoryId`
+
+### Scope Boundaries (Respected)
+Per the current X NAIL handover constraint, this fix is **strictly scoped** to the missing `Branch.territoryId` column. The following were **deliberately not touched**:
+- `Invoice.branchId` mismatch (BLOCKED on architectural decision — Invoice has no `branchId` in the Prisma schema; "do not invent the correct relationship")
+- `prisma.franchiseAgreement.findMany()` include-shape mismatch (separate defect, requires inspection of franchise route handler include options)
+- `apps/web/src/app/admin/page.tsx`, `admin/tenants/`, `api/platform/tenants/`, `lib/platform/tenant-*.ts`, `Logos/`, `.kilo/`, `.playwright-mcp/`, `builder-current.png`, 30+ SRS `.txt` files, `scripts/` — all pre-existing uncommitted work out of scope
+
+### Git State After This Fix
+- **Branch**: `phase-1d-native-auth`
+- **HEAD commit**: `67d35b9` (`fix(db): add missing Branch territory relation column`)
+- **Diff vs prior HEAD (`0c78824`)**: 1 commit, 1 file added (`migration.sql`, 40 lines)
+- **Local HEAD = Remote HEAD = `67d35b9`** (push verified)
+
+### Module Status Update
+- **Branches**: IMPLEMENTED — schema-drift on `Branch.territoryId` resolved; `/api/branches` now returns 401 unauth (was 500)
+- **Franchise**: PARTIAL — `Invoice.branchId` schema drift and `franchiseAgreement.findMany()` include shape still pending
+- **Reports**: PARTIAL — `franchise-overview` schema drift on `Invoice.branchId` still pending
+
+### X Nail Project Progress Update
+**~79%** (up from 78%): Branch.territoryId column added; the `GET /api/branches` 500 error is resolved. Remaining 21% is operator-blocked (Commission approval), architectural-decision-pending (`Invoice.branchId`, `franchiseAgreement.findMany()` include shape), and out-of-scope (AI Assistant, MiMo review of reference matrix).
 
