@@ -20,7 +20,7 @@ export interface NotificationDispatchResult {
   readonly queueId: string;
   readonly logId: string;
   readonly errorMessage: string | null;
-  readonly deliveryMode: "MOCK" | "REAL";
+  readonly deliveryMode: "MOCK" | "REAL" | null;
 }
 
 interface NotificationDispatcherPrismaClient {
@@ -90,6 +90,34 @@ export function createNotificationDispatcherService(prisma: NotificationDispatch
       };
 
       const queue = await queueService.createNotificationQueue(queueInput);
+
+      const now = new Date();
+      const isScheduled = input.scheduledAt !== undefined && input.scheduledAt !== null && input.scheduledAt > now;
+
+      if (isScheduled) {
+        const logInput: NotificationLogCreateInput = {
+          tenantId: input.tenantId,
+          recipientId: input.recipientId ?? null,
+          channel,
+          subject,
+          body,
+          status: "PENDING",
+          errorMessage: null,
+          sentAt: null,
+          deliveredAt: null,
+          deliveryMode: null,
+        };
+
+        const log = await logService.createNotificationLog(logInput);
+        return {
+          success: false,
+          status: "QUEUED",
+          queueId: queue.id,
+          logId: log.id,
+          errorMessage: null,
+          deliveryMode: null,
+        };
+      }
 
       const adapter = resolveAdapter(channel, input.adapter ?? null);
       const sentAt = new Date();

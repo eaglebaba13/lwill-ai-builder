@@ -133,4 +133,35 @@ describe("notification dispatch route handlers: successful dispatch", () => {
     expect(body).toHaveProperty("dispatch");
     expect(body.dispatch).toHaveProperty("deliveryMode", "MOCK");
   });
+
+  it("returns QUEUED status for future scheduled notification", async () => {
+    const services = createServices(
+      { outcome: "authorized", tenantId: "tenant-1" },
+      {
+        success: false,
+        status: "QUEUED",
+        queueId: "queue-1",
+        logId: "log-1",
+        errorMessage: null,
+        deliveryMode: null,
+      },
+    );
+
+    const futureDate = new Date(Date.now() + 60 * 60 * 1000);
+    const result = await handleDispatchNotification(
+      request({
+        templateId: "template-1",
+        recipientId: "user-1",
+        channel: "email",
+        scheduledAt: futureDate.toISOString(),
+      }),
+      services,
+    );
+
+    expect(result.status).toBe(200);
+    const body = await result.json();
+    expect(body.dispatch.status).toBe("QUEUED");
+    expect(body.dispatch.deliveryMode).toBeNull();
+    expect(body.dispatch.queueId).toBe("queue-1");
+  });
 });

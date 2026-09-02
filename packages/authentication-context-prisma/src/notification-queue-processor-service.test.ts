@@ -188,6 +188,37 @@ describe("notification queue processor service", () => {
     expect(result.failed).toBe(0);
   });
 
+  it("skips items with future scheduledAt", async () => {
+    const { prisma, queues } = createPrisma();
+    const processor = createNotificationQueueProcessorService(prisma);
+
+    queues.push({
+      id: "queue-1",
+      tenantId: "tenant-1",
+      templateId: "template-1",
+      recipientId: "user-1",
+      channel: "email",
+      subject: "Welcome",
+      body: "Hello",
+      variables: null,
+      status: "PENDING",
+      scheduledAt: new Date(Date.now() + 60 * 60 * 1000),
+      attempts: 0,
+      maxAttempts: 3,
+      lastAttemptAt: null,
+      nextAttemptAt: null,
+      errorMessage: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const result: NotificationQueueProcessorResult = await processor({ tenantId: "tenant-1" });
+
+    expect(result.processed).toBe(0);
+    expect(result.succeeded).toBe(0);
+    expect(result.failed).toBe(0);
+  });
+
   it("marks failed when template is missing", async () => {
     const { prisma, queues } = createPrisma();
     const processor = createNotificationQueueProcessorService(prisma);

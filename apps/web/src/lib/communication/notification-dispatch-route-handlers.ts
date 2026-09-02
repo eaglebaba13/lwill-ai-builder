@@ -20,6 +20,7 @@ export interface NotificationDispatchRouteServices {
     readonly queueId: string;
     readonly logId: string;
     readonly errorMessage: string | null;
+    readonly deliveryMode: "MOCK" | "REAL" | null;
   }>;
 }
 

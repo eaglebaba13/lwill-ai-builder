@@ -211,4 +211,73 @@ describe("notification dispatcher service", () => {
     expect(result.errorMessage).toBe("provider error");
     expect(result.deliveryMode).toBe("MOCK");
   });
+
+  it("queues future scheduled notification without calling adapter", async () => {
+    const { prisma, templates, queues, logs } = createPrisma();
+    const service = createNotificationDispatcherService(prisma as never);
+
+    templates.push({
+      id: "template-1",
+      tenantId: "tenant-1",
+      name: "Welcome",
+      channel: "email",
+      subject: "Welcome",
+      body: "Hello {{name}}",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const futureDate = new Date(Date.now() + 60 * 60 * 1000);
+    const result = await service.dispatchNotification({
+      tenantId: "tenant-1",
+      templateId: "template-1",
+      recipientId: "user-1",
+      variables: { name: "Alice" },
+      scheduledAt: futureDate,
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.status).toBe("QUEUED");
+    expect(result.queueId).toBeTruthy();
+    expect(result.logId).toBeTruthy();
+    expect(result.errorMessage).toBeNull();
+    expect(result.deliveryMode).toBeNull();
+    expect(queues[0]?.status).toBe("PENDING");
+    expect(queues[0]?.scheduledAt).toEqual(futureDate);
+    expect(queues[0]?.nextAttemptAt).toEqual(futureDate);
+    expect(logs[0]?.status).toBe("PENDING");
+    expect(logs[0]?.sentAt).toBeNull();
+    expect(logs[0]?.deliveredAt).toBeNull();
+  });
+
+  it("executes immediate dispatch when scheduledAt is in the past", async () => {
+    const { prisma, templates } = createPrisma();
+    const service = createNotificationDispatcherService(prisma as never);
+
+    templates.push({
+      id: "template-1",
+      tenantId: "tenant-1",
+      name: "Welcome",
+      channel: "email",
+      subject: "Welcome",
+      body: "Hello {{name}}",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const pastDate = new Date(Date.now() - 60 * 60 * 1000);
+    const result = await service.dispatchNotification({
+      tenantId: "tenant-1",
+      templateId: "template-1",
+      recipientId: "user-1",
+      variables: { name: "Alice" },
+      scheduledAt: pastDate,
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.status).toBe("SENT");
+    expect(result.deliveryMode).toBe("MOCK");
+  });
 });
