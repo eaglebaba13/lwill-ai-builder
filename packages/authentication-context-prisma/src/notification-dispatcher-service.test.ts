@@ -280,4 +280,64 @@ describe("notification dispatcher service", () => {
     expect(result.status).toBe("SENT");
     expect(result.deliveryMode).toBe("MOCK");
   });
+
+  it("uses centralized maxAttempts when creating queue", async () => {
+    const { prisma, templates } = createPrisma();
+    const service = createNotificationDispatcherService(prisma as never);
+
+    templates.push({
+      id: "template-1",
+      tenantId: "tenant-1",
+      name: "Welcome",
+      channel: "email",
+      subject: "Welcome",
+      body: "Hello {{name}}",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    await service.dispatchNotification({
+      tenantId: "tenant-1",
+      templateId: "template-1",
+      recipientId: "user-1",
+      variables: { name: "Alice" },
+    });
+
+    expect(prisma.notificationQueue.create).toHaveBeenCalledTimes(1);
+    const queueCall = (prisma.notificationQueue.create as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    expect(queueCall?.data?.maxAttempts).toBe(3);
+  });
+
+  it("uses centralized retry delay when delivery fails", async () => {
+    const { prisma, templates } = createPrisma();
+    const service = createNotificationDispatcherService(prisma as never);
+
+    templates.push({
+      id: "template-1",
+      tenantId: "tenant-1",
+      name: "Welcome",
+      channel: "email",
+      subject: "Welcome",
+      body: "Hello",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const result = await service.dispatchNotification({
+      tenantId: "tenant-1",
+      templateId: "template-1",
+      adapter: createFailingChannelAdapter("provider error"),
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.status).toBe("FAILED");
+    expect(prisma.notificationQueue.update).toHaveBeenCalledTimes(1);
+    const updateCall = (prisma.notificationQueue.update as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    const nextAttemptAt = updateCall?.data?.nextAttemptAt as Date | null;
+    expect(nextAttemptAt).toBeInstanceOf(Date);
+    expect(nextAttemptAt?.getTime()).toBeGreaterThan(Date.now());
+    expect(nextAttemptAt?.getTime()).toBeLessThanOrEqual(Date.now() + 60_000);
+  });
 });

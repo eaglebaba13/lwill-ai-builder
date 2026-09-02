@@ -3,6 +3,7 @@ import { createNotificationLogService, type NotificationLogCreateInput } from ".
 import { createNotificationTemplateService, type NotificationTemplateRecord } from "./notification-template-service";
 import { createMockChannelAdapter, createInAppChannelAdapter, type NotificationChannelAdapter, type NotificationDeliveryResult } from "./notification-channel-adapter";
 import { renderVariables } from "./notification-variable-renderer";
+import { createNotificationRetryPolicy } from "./notification-retry-policy";
 
 export interface NotificationQueueProcessorInput {
   readonly tenantId?: string;
@@ -28,6 +29,7 @@ export function createNotificationQueueProcessorService(
   const templateService = createNotificationTemplateService(prisma as never);
   const queueService = createNotificationQueueService(prisma as never);
   const logService = createNotificationLogService(prisma as never);
+  const retryPolicy = createNotificationRetryPolicy().policy;
 
   function resolveAdapter(channel: string): NotificationChannelAdapter {
     const normalized = channel.toLowerCase();
@@ -124,7 +126,7 @@ export function createNotificationQueueProcessorService(
           });
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : "adapter failed";
-          const nextAttemptAt = queueItem.attempts + 1 < queueItem.maxAttempts ? new Date(Date.now() + 60_000) : null;
+          const nextAttemptAt = queueItem.attempts + 1 < retryPolicy.maxAttempts ? new Date(Date.now() + retryPolicy.retryDelayMs) : null;
           await queueService.updateNotificationQueue({
             tenantId: queueItem.tenantId,
             queueId: queueItem.id,
@@ -155,7 +157,7 @@ export function createNotificationQueueProcessorService(
         }
 
         const status = deliveryResult.success ? "SENT" : "FAILED";
-        const nextAttemptAt = deliveryResult.success ? null : new Date(Date.now() + 60_000);
+        const nextAttemptAt = deliveryResult.success ? null : new Date(Date.now() + retryPolicy.retryDelayMs);
 
         await queueService.updateNotificationQueue({
           tenantId: queueItem.tenantId,

@@ -250,4 +250,35 @@ describe("notification queue processor service", () => {
     expect(result.errors[0]?.error).toBe("template not found");
     expect(queues[0]?.status).toBe("FAILED");
   });
+
+  it("skips items that have reached max attempts", async () => {
+    const { prisma, queues } = createPrisma();
+    const processor = createNotificationQueueProcessorService(prisma);
+
+    queues.push({
+      id: "queue-1",
+      tenantId: "tenant-1",
+      templateId: "template-1",
+      recipientId: "user-1",
+      channel: "email",
+      subject: "Welcome",
+      body: "Hello",
+      variables: null,
+      status: "FAILED",
+      scheduledAt: null,
+      attempts: 3,
+      maxAttempts: 3,
+      lastAttemptAt: null,
+      nextAttemptAt: null,
+      errorMessage: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const result: NotificationQueueProcessorResult = await processor({ tenantId: "tenant-1" });
+
+    expect(result.processed).toBe(0);
+    expect(result.succeeded).toBe(0);
+    expect(result.failed).toBe(0);
+  });
 });

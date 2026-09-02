@@ -3,6 +3,7 @@ import { createNotificationLogService, type NotificationLogCreateInput } from ".
 import { createNotificationTemplateService, type NotificationTemplateRecord } from "./notification-template-service";
 import { createMockChannelAdapter, createInAppChannelAdapter, createFailingChannelAdapter, type NotificationChannelAdapter, type NotificationDeliveryResult } from "./notification-channel-adapter";
 import { renderVariables } from "./notification-variable-renderer";
+import { createNotificationRetryPolicy } from "./notification-retry-policy";
 
 export interface NotificationDispatchInput {
   readonly tenantId: string;
@@ -37,6 +38,7 @@ export function createNotificationDispatcherService(prisma: NotificationDispatch
   const templateService = createNotificationTemplateService(prisma as never);
   const queueService = createNotificationQueueService(prisma as never);
   const logService = createNotificationLogService(prisma as never);
+  const retryPolicy = createNotificationRetryPolicy().policy;
 
   function resolveAdapter(channel: string, providedAdapter: NotificationChannelAdapter | null | undefined): NotificationChannelAdapter {
     if (providedAdapter !== null && providedAdapter !== undefined) {
@@ -85,7 +87,7 @@ export function createNotificationDispatcherService(prisma: NotificationDispatch
         variables: input.variables ?? null,
         status: "PENDING",
         scheduledAt: input.scheduledAt ?? null,
-        maxAttempts: 3,
+        maxAttempts: retryPolicy.maxAttempts,
         nextAttemptAt: input.scheduledAt ?? new Date(),
       };
 
@@ -168,7 +170,7 @@ export function createNotificationDispatcherService(prisma: NotificationDispatch
       }
 
       const status = deliveryResult.success ? "SENT" : "FAILED";
-      const nextAttemptAt = deliveryResult.success ? null : new Date(Date.now() + 60_000);
+      const nextAttemptAt = deliveryResult.success ? null : new Date(Date.now() + retryPolicy.retryDelayMs);
 
       await queueService.updateNotificationQueue({
         tenantId: input.tenantId,

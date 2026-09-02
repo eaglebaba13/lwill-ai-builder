@@ -1,3 +1,5 @@
+import { createNotificationRetryPolicy } from "./notification-retry-policy";
+
 export interface NotificationQueueRecord {
   readonly id: string;
   readonly tenantId: string;
@@ -57,6 +59,8 @@ interface NotificationQueuePrismaClient {
 }
 
 export function createNotificationQueueService(prisma: NotificationQueuePrismaClient): NotificationQueueService {
+  const retryPolicy = createNotificationRetryPolicy().policy;
+
   return {
     async createNotificationQueue(input) {
       return prisma.notificationQueue.create({
@@ -70,7 +74,7 @@ export function createNotificationQueueService(prisma: NotificationQueuePrismaCl
           variables: input.variables ?? undefined,
           status: input.status ?? "PENDING",
           scheduledAt: input.scheduledAt ?? undefined,
-          maxAttempts: input.maxAttempts ?? 3,
+          maxAttempts: input.maxAttempts ?? retryPolicy.maxAttempts,
           nextAttemptAt: input.nextAttemptAt ?? undefined,
         },
       });
