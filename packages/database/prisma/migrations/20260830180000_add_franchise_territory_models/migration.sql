@@ -311,6 +311,13 @@ CREATE TABLE IF NOT EXISTS "FranchiseAgreementOutlet" (
 
 DO $$
 BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'FranchiseAgreementOutlet_tenantId_id_key') THEN
+        CREATE UNIQUE INDEX "FranchiseAgreementOutlet_tenantId_id_key" ON "FranchiseAgreementOutlet"("tenantId", "id");
+    END IF;
+END $$;
+
+DO $$
+BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'FranchiseAgreementOutlet_tenantId_agreementId_branchId_key') THEN
         CREATE UNIQUE INDEX "FranchiseAgreementOutlet_tenantId_agreementId_branchId_key" ON "FranchiseAgreementOutlet"("tenantId", "agreementId", "branchId");
     END IF;
