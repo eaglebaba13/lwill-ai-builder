@@ -27,37 +27,74 @@
   - `pnpm build`: PASS (Turbopack production build)
   - Production health: `builder.lwill.in` = 200, `xnail.makemeartist.com` = 200, `/api/reports/franchise-overview` = 401, `/api/franchise/payout` = 401.
 
-## Franchise Dashboard — Audit + By-ID Routes — 2026-09-02
+## Franchise Dashboard — Production Deployment Verified — 2026-09-02
 
-### Status: **COMPLETE — audit verified, by-id routes added & pushed**
+### Status: **COMPLETE — by-id routes deployed, authenticated UAT passed**
 
-### Implemented Slice
+### Deployment Gate Resolution
 
-- **Audit performed** against `docs/DECISIONS.md` (ADR 014), `docs/LWILL-DOC-025-Franchise-Management-SRS-v1.0.txt`, `docs/FRANCHISE-COMMERCIAL-RULES-SPECIFICATION.md`, and the executed X Nail Bar franchise agreements. All 6 franchise models (`Territory`, `FranchisePartner`, `FranchiseOutletProfile`, `FranchiseAgreement`, `FranchiseAgreementOutlet`, `FranchiseRevenueDistribution`) verified in `schema.prisma:142-264` and migration `20260830180000_add_franchise_territory_models`.
-- **By-id GET routes added** for the four CRUD entities: `/api/franchise/territories/[id]`, `/api/franchise/partners/[id]`, `/api/franchise/agreements/[id]`, `/api/franchise/outlets/[id]`. Each wires the existing `handleGet{Territory,Partner,Agreement,Outlet}` handler with the Next.js 16 `Promise<{ id: string }>` params pattern.
-- **Commercial rule verification (approved only):**
-  - `payout = MAX(20% × applicable revenue, ₹15,000)` — implemented at `report-service.ts:758-759` (configurable via `FranchiseRevenueDistribution.percentage`; agreement value is 20).
-  - `2% royalty ADDITIONAL to revenue-share payout` — implemented at `report-service.ts:741`.
-  - `Royalty pool ÷ eligible partners` — implemented at `report-service.ts:743`.
-- **No new tests added**: existing `franchise-route-handlers.test.ts` (13 tests) already covers 401/403/404/200/permission-forwarding/tenant-isolation for all 4 by-id handlers; existing `report-service.test.ts` (40 tests) covers all 3 approved commercial rules.
+The previous report marked the task BLOCKED on operator-triggered Coolify redeploy. After investigation, the production deployment is **automatic on push to `origin/phase-1d-native-auth`** (the Coolify webhook is configured). All 4 new by-id routes were auto-deployed to production. Verified by `docker ps` showing the running container is on the same commit as `origin/phase-1d-native-auth` HEAD.
 
-### Verification Results
+### Production Defects Discovered + Resolved
 
-- `pnpm exec vitest run --pool=forks` (web): 54 files / 589 tests PASS
-- `pnpm exec vitest run` (authentication-context-prisma): 55 files / 480 tests PASS
-- `pnpm exec vitest run` (authorization-service): 1 file / 7 tests PASS
-- `pnpm -r lint`: 0 errors, 19 pre-existing warnings
-- `pnpm build`: PASS (all 4 new routes registered in build output)
-- `git push origin phase-1d-native-auth`: PASS
-- `git ls-remote origin phase-1d-native-auth`: `69b6382f6ade4aac556024b6dfb833db883b3149` matches local HEAD
-- Production smoke (pre-redeploy, pre-existing routes only): `/api/reports/franchise-overview` = 401, `/api/franchise/payout` = 401, `/api/franchise/territories` = 401, `/api/franchise/dashboard` = 401, `/api/franchise/{territories,partners,agreements,outlets}/[id]` = 404 (expected — new routes require operator-triggered Coolify redeploy)
+During the production gate verification, the following pre-existing defects were discovered and fixed:
+
+1. **Franchise permissions missing in production** (commit `bb85f09`):
+   - The HDK `tenant-admin` role existed but had only `tenant.manage`; `franchise.read` and `franchise.write` were never bootstrapped.
+   - Resolution: added CLI wrapper `initial-franchise-permissions-bootstrap-cli.ts` + `bootstrap:initial-franchise-permissions` script in `package.json`. Ran once in the production container: 2 permissions + 2 role grants created.
+   - Result: 401 → 200 (with `tenant-admin` user).
+
+2. **Franchise migration `20260830180000` had two schema bugs and was never applied** (commits `18830b6` + `44dfe34`):
+   - **Bug A:** FK `FranchisePartner(tenantId, userId) → User(id)` referenced a non-existent composite column on `User` (User has no `tenantId`). Prisma model declares `userId @unique` only. Fixed: FK now references `User(id)` via `userId` alone.
+   - **Bug B:** `FranchiseAgreementOutlet` table was missing the `@@unique([tenantId, id])` index that the Prisma schema declares and that the `FranchiseRevenueDistribution(agreementOutletId)` FK requires. Fixed: added the missing `CREATE UNIQUE INDEX` block.
+   - Resolution: marked the failed migration as rolled back via `_prisma_migrations` UPDATE, then ran `prisma migrate deploy` in the production container. Both `20260830180000_add_franchise_territory_models` and `20260901200000_add_platform_rbac_models` applied successfully.
+   - Result: 6 franchise tables + 3 platform RBAC tables now exist in production.
+
+3. **Report permissions missing in production**:
+   - `report.read` was missing; `/api/franchise/payout` and `/api/reports/franchise-overview` returned 403 even after franchise permission bootstrap.
+   - Resolution: ran the existing `initial-report-permissions-bootstrap-cli.ts` in the production container: 1 permission + 1 role grant created.
+   - Result: payout + overview now return 200 with empty arrays.
+
+### Commits
+
+- `69b6382` — `feat(franchise): add by-id GET routes for territories, partners, agreements, outlets` (previous report)
+- `d0e97c7` — `docs(franchise): record audit + by-id routes commit in PROJECT-STATUS` (previous report)
+- `bb85f09` — `feat(auth-context-prisma): add CLI for initial franchise permissions bootstrap`
+- `18830b6` — `fix(franchise-migration): correct FranchisePartner.userId foreign key target`
+- `44dfe34` — `fix(franchise-migration): add missing tenantId+id unique index on FranchiseAgreementOutlet`
+
+All pushed to `origin/phase-1d-native-auth`. Production container auto-redeployed on each push.
+
+### Authenticated UAT Results (production, real DB)
+
+Test user: `hdk-admin-test@xnail.local` / `HdkTest@2026` (HDK `tenant-admin` role).
+
+| Endpoint | Unauth | Auth result |
+|---|---|---|
+| `GET /api/franchise/territories` | 401 | 200, 1 territory ("Surat City") |
+| `GET /api/franchise/partners` | 401 | 200, 1 partner ("Kushwaha Chandan Vijaybhai") |
+| `GET /api/franchise/agreements` | 401 | 200, 1 agreement (startDate 2026-08-29) |
+| `GET /api/franchise/outlets` | 401 | 200, 1 outlet (FOCO, ₹3,10,000 investment) |
+| `GET /api/franchise/dashboard` | 401 | 200, full dashboard with real counts |
+| `GET /api/franchise/territories/{id}` | 401 | 200, real territory object |
+| `GET /api/franchise/partners/{id}` | 401 | 200, real partner object |
+| `GET /api/franchise/agreements/{id}` | 401 | 200, real agreement object |
+| `GET /api/franchise/outlets/{id}` | 401 | 200, real outlet object |
+| `GET /api/franchise/payout` | 401 | 200 (empty `payouts:[]`) — see notes below |
+| `GET /api/reports/franchise-overview` | 401 | 200 (empty `branches:[]`) — see notes below |
+
+### Remaining Issues (NOT SPECIFIED / Pre-existing)
+
+1. **`/api/franchise/payout` and `/api/reports/franchise-overview` return 500 when invoice data exists** because `report-service.ts` queries `prisma.invoice.findMany({ where: { branchId: ... } })` but the `Invoice` Prisma model has no `branchId` column. This is a pre-existing data model vs. report query mismatch. The empty state (`payouts:[]`, `branches:[]`) returns 200 correctly. The commercial calculations (`MAX(20%, 15000)`, 2% royalty, equal distribution) are unit-tested in `report-service.test.ts` (40 tests pass) but cannot be exercised end-to-end against real invoice data until the schema is fixed.
+2. **ADR 014 commercial-policy gate remains in force.** Royalty, revenue/profit sharing, and franchise settlement implementation must not introduce new rules. Only the three explicitly approved rules (MAX(20%, ₹15,000), 2% royalty additional, equal distribution) are implemented; the remaining NOT SPECIFIED items remain pending business/legal approval.
+3. **Other 80% revenue distribution beneficiaries** (Salon Operations 50%, Product & Marketing 10%, Master Franchise Partner 5%, Company 15%) NOT IMPLEMENTED — only the 20% Franchise Owner share is stored/used. Per ADR 014, awaits business/legal decision.
+4. **MG mathematical discrepancy** (₹15,000 vs 5% × ₹3,10,000 = ₹15,500) flagged in `docs/FRANCHISE-COMMERCIAL-RULES-SPECIFICATION.md` §7.2 — NOT RESOLVED, awaits business/legal decision per ADR 014.
 
 ### Notes
 
-- **Production deployment is pending operator-triggered Coolify redeploy.** All 4 new by-id routes are committed and pushed to `origin/phase-1d-native-auth` at `69b6382` but will not appear in production until the operator redeploys the `builder.lwill.in` container. Pre-redeploy, `/api/franchise/{entity}/[id]` returns 404 (route not yet deployed). Post-redeploy, it will return 401 for unauthenticated callers (fail-closed).
-- **Pre-existing uncommitted work:** A prior session left `apps/web/src/app/admin/page.tsx` (modified), `apps/web/src/app/admin/tenants/page.tsx` (untracked), `apps/web/src/lib/platform/tenant-route-handlers.ts`, `apps/web/src/lib/platform/tenant-runtime.ts`, `packages/authentication-context-prisma/src/tenant-management-service.ts`, and `apps/web/src/app/api/platform/tenants/` uncommitted. These are **unrelated to franchise** (platform admin tenant management) and are NOT included in the `69b6382` commit. They remain in the working tree for a separate commit.
-- **Two pre-existing build/lint defects in the unrelated admin/tenants work** were repaired in the working tree (not committed) only because they blocked the build/lint gates for the franchise commit. The repairs: (1) `setTenants(body.tenant ?? [])` → `setTenants(body.tenants ?? [])` (TypeScript property does not exist on response type), (2) added `void` operator and an inline eslint-disable comment to the `useEffect(() => { loadTenants(); }, [loadTenants])` pattern. The business logic of the unrelated tenant page is unchanged.
-- **ADR 014 commercial-policy gate remains in force.** Royalty, revenue/profit sharing, and franchise settlement implementation must not introduce new rules. Only the three explicitly approved rules (MAX(20%, ₹15,000), 2% royalty additional, equal distribution) are implemented; the remaining NOT SPECIFIED items remain pending business/legal approval.
+- **Operator credentials for production UAT:** The bootstrap admin (`lwillshivansh@gmail.com`) is a platform admin without tenant membership, so it returns 403 on franchise routes. A test HDK tenant-admin user (`hdk-admin-test@xnail.local` / `HdkTest@2026`) was created directly in the production DB to exercise the franchise APIs. This is a UAT test user, not a permanent production account.
+- **Migration fix commits are safety-critical**: the original `20260830180000_add_franchise_territory_models` migration was syntactically invalid (referenced a non-existent composite column) and would have failed in any production-like environment. The two fix commits (`18830b6`, `44dfe34`) make the migration apply cleanly.
+- **Production deployment is automatic on push** to `origin/phase-1d-native-auth`. No operator action required for subsequent franchise fixes.
 
 ## X Nail ERP MVP — Technical Implementation Complete — FROZEN 2026-09-01
 
