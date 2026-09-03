@@ -46,6 +46,7 @@ model Tenant {
   notificationQueue     NotificationQueue[]
   notificationProviderConfigs NotificationProviderConfig[]
   notificationPreferences     NotificationPreference[]
+  eventSubscriptions          EventSubscription[]
   warehouses            Warehouse[]
   suppliers             Supplier[]
   reorderRules          ReorderRule[]
@@ -786,8 +787,9 @@ model NotificationTemplate {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant      Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  queueItems  NotificationQueue[]
+  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  queueItems         NotificationQueue[]
+  eventSubscriptions EventSubscription[]
 
   @@unique([tenantId, id])
   @@unique([tenantId, name])
