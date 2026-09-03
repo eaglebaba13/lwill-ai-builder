@@ -69,6 +69,17 @@ function isOptionalDate(value: unknown): value is Date | null | undefined {
   return false;
 }
 
+function toDate(value: Date | string | null | undefined): Date | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (value instanceof Date) {
+    return value;
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 function isOptionalObject(value: unknown): value is Record<string, unknown> | null | undefined {
   if (value === undefined || value === null) {
     return true;
@@ -124,7 +135,7 @@ export async function handleDispatchNotification(
     templateId: record.templateId,
     recipientId: isOptionalString(record.recipientId) ? (record.recipientId ?? null) : null,
     variables: isOptionalObject(record.variables) ? (record.variables ?? null) : null,
-    scheduledAt: isOptionalDate(record.scheduledAt) ? (record.scheduledAt ?? null) : null,
+    scheduledAt: isOptionalDate(record.scheduledAt) ? toDate(record.scheduledAt) : null,
     channel: isOptionalString(record.channel) ? (record.channel ?? null) : null,
   };
 

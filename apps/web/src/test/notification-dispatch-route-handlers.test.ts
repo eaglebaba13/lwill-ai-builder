@@ -164,4 +164,88 @@ describe("notification dispatch route handlers: successful dispatch", () => {
     expect(body.dispatch.deliveryMode).toBeNull();
     expect(body.dispatch.queueId).toBe("queue-1");
   });
+
+  it("normalizes scheduledAt string to Date before passing to dispatcher", async () => {
+    const services = createServices(
+      { outcome: "authorized", tenantId: "tenant-1" },
+      {
+        success: false,
+        status: "QUEUED",
+        queueId: "queue-1",
+        logId: "log-1",
+        errorMessage: null,
+        deliveryMode: null,
+      },
+    );
+
+    const futureDate = new Date(Date.now() + 60 * 60 * 1000);
+    await handleDispatchNotification(
+      request({
+        templateId: "template-1",
+        recipientId: "user-1",
+        scheduledAt: futureDate.toISOString(),
+      }),
+      services,
+    );
+
+    expect(services.dispatchNotification).toHaveBeenCalledTimes(1);
+    const callArg = vi.mocked(services.dispatchNotification).mock.calls[0]?.[0];
+    expect(callArg?.scheduledAt).toBeInstanceOf(Date);
+    expect(callArg?.scheduledAt?.getTime()).toBe(futureDate.getTime());
+  });
+
+  it("passes null scheduledAt when not provided", async () => {
+    const services = createServices(
+      { outcome: "authorized", tenantId: "tenant-1" },
+      {
+        success: true,
+        status: "SENT",
+        queueId: "queue-1",
+        logId: "log-1",
+        errorMessage: null,
+        deliveryMode: "MOCK",
+      },
+    );
+
+    await handleDispatchNotification(
+      request({
+        templateId: "template-1",
+        recipientId: "user-1",
+      }),
+      services,
+    );
+
+    expect(services.dispatchNotification).toHaveBeenCalledTimes(1);
+    const callArg = vi.mocked(services.dispatchNotification).mock.calls[0]?.[0];
+    expect(callArg?.scheduledAt).toBeNull();
+  });
+
+  it("normalizes past scheduledAt string to Date", async () => {
+    const services = createServices(
+      { outcome: "authorized", tenantId: "tenant-1" },
+      {
+        success: true,
+        status: "SENT",
+        queueId: "queue-1",
+        logId: "log-1",
+        errorMessage: null,
+        deliveryMode: "MOCK",
+      },
+    );
+
+    const pastDate = new Date(Date.now() - 60 * 60 * 1000);
+    await handleDispatchNotification(
+      request({
+        templateId: "template-1",
+        recipientId: "user-1",
+        scheduledAt: pastDate.toISOString(),
+      }),
+      services,
+    );
+
+    expect(services.dispatchNotification).toHaveBeenCalledTimes(1);
+    const callArg = vi.mocked(services.dispatchNotification).mock.calls[0]?.[0];
+    expect(callArg?.scheduledAt).toBeInstanceOf(Date);
+    expect(callArg?.scheduledAt?.getTime()).toBe(pastDate.getTime());
+  });
 });
