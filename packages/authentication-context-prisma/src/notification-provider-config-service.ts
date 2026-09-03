@@ -9,6 +9,16 @@ export interface NotificationProviderConfigRecord {
   readonly updatedAt: Date;
 }
 
+export interface NotificationProviderConfigPublicDTO {
+  readonly id: string;
+  readonly tenantId: string;
+  readonly channel: string;
+  readonly provider: string;
+  readonly isActive: boolean;
+  readonly createdAt: Date;
+  readonly updatedAt: Date;
+}
+
 export interface NotificationProviderConfigCreateInput {
   readonly tenantId: string;
   readonly channel: string;
@@ -32,6 +42,7 @@ export interface NotificationProviderConfigService {
     channel: string;
     input: NotificationProviderConfigUpdateInput;
   }): Promise<NotificationProviderConfigRecord | null>;
+  toPublicDTO(record: NotificationProviderConfigRecord): NotificationProviderConfigPublicDTO;
 }
 
 interface NotificationProviderConfigPrismaClient {
@@ -46,6 +57,11 @@ interface NotificationProviderConfigPrismaClient {
 export function createNotificationProviderConfigService(
   prisma: NotificationProviderConfigPrismaClient,
 ): NotificationProviderConfigService {
+  function toPublicDTO(record: NotificationProviderConfigRecord): NotificationProviderConfigPublicDTO {
+    const { config, ...rest } = record;
+    return rest;
+  }
+
   return {
     async createNotificationProviderConfig(input) {
       return prisma.notificationProviderConfig.create({
@@ -86,5 +102,6 @@ export function createNotificationProviderConfigService(
         data,
       });
     },
+    toPublicDTO,
   };
 }

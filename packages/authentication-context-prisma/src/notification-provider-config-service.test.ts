@@ -130,4 +130,58 @@ describe("notification provider config service", () => {
     expect(result?.provider).toBe("sendgrid");
     expect(result?.isActive).toBe(false);
   });
+
+  it("toPublicDTO strips raw config from public serialization", () => {
+    const { prisma } = createPrisma();
+    const service = createNotificationProviderConfigService(prisma);
+
+    const record = {
+      id: "config-1",
+      tenantId: "tenant-1",
+      channel: "email",
+      provider: "smtp",
+      isActive: true,
+      config: { apiKey: "SECRET", token: "TOKEN", password: "PASSWORD", webhookSecret: "WEBHOOK_SECRET" },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as const;
+
+    const dto = service.toPublicDTO(record as never);
+
+    expect(dto).toMatchObject({
+      id: "config-1",
+      tenantId: "tenant-1",
+      channel: "email",
+      provider: "smtp",
+      isActive: true,
+    });
+    expect(dto).not.toHaveProperty("config");
+    expect((dto as unknown as Record<string, unknown>).config).toBeUndefined();
+  });
+
+  it("toPublicDTO preserves non-sensitive metadata", () => {
+    const { prisma } = createPrisma();
+    const service = createNotificationProviderConfigService(prisma);
+
+    const record = {
+      id: "config-1",
+      tenantId: "tenant-1",
+      channel: "sms",
+      provider: "twilio",
+      isActive: false,
+      config: { accountSid: "AC123" },
+      createdAt: new Date("2024-01-01T00:00:00.000Z"),
+      updatedAt: new Date("2024-01-02T00:00:00.000Z"),
+    } as const;
+
+    const dto = service.toPublicDTO(record as never);
+
+    expect(dto.id).toBe("config-1");
+    expect(dto.tenantId).toBe("tenant-1");
+    expect(dto.channel).toBe("sms");
+    expect(dto.provider).toBe("twilio");
+    expect(dto.isActive).toBe(false);
+    expect(dto.createdAt).toEqual(new Date("2024-01-01T00:00:00.000Z"));
+    expect(dto.updatedAt).toEqual(new Date("2024-01-02T00:00:00.000Z"));
+  });
 });
