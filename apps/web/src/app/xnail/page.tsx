@@ -4806,6 +4806,7 @@ export default function Home() {
         ) : null}
 
         {activeTab === "Inventory" ? (
+          <>
           <section className="mt-6 space-y-6">
             <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
               <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
@@ -5577,10 +5578,9 @@ export default function Home() {
                     </div>
                   </div>
                 ))}
-              </div>
+               </div>
             </div>
           </section>
-        ) : null}
 
         <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
           <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
@@ -5806,6 +5806,8 @@ export default function Home() {
             </div>
           </div>
         </section>
+        </>
+        ) : null}
 
         {activeTab === "Billing" ? (
           <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
