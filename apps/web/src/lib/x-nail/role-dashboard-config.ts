@@ -89,7 +89,6 @@ const FRANCHISE_TABS = [
   "Inventory",
   "Appointments",
   "Customers",
-  "Users & Access",
 ] as const;
 
 export const ROLE_DASHBOARD_CONFIGS: readonly RoleDashboardConfig[] = [
