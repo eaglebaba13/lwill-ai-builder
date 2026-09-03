@@ -4,25 +4,29 @@
 
 -- 1. Create notification_provider_config table
 CREATE TABLE "NotificationProviderConfig" (
-  "id" UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  "id" UUID NOT NULL,
   "tenantId" UUID NOT NULL,
   "channel" TEXT NOT NULL,
   "provider" TEXT NOT NULL,
   "isActive" BOOLEAN NOT NULL DEFAULT true,
   "config" JSONB,
   "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
-  "updatedAt" TIMESTAMP NOT NULL DEFAULT now()
+  "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
+
+  CONSTRAINT "NotificationProviderConfig_pkey" PRIMARY KEY ("id")
 );
 
 -- 2. Create notification_preference table
 CREATE TABLE "NotificationPreference" (
-  "id" UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  "id" UUID NOT NULL,
   "tenantId" UUID NOT NULL,
   "userId" TEXT NOT NULL,
   "channel" TEXT NOT NULL,
   "isEnabled" BOOLEAN NOT NULL DEFAULT true,
   "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
-  "updatedAt" TIMESTAMP NOT NULL DEFAULT now()
+  "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
+
+  CONSTRAINT "NotificationPreference_pkey" PRIMARY KEY ("id")
 );
 
 -- 3. Foreign keys

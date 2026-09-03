@@ -7,7 +7,7 @@
 
 -- 1. Create notification_queue table
 CREATE TABLE "NotificationQueue" (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID NOT NULL,
   "tenantId" UUID NOT NULL,
   "templateId" UUID NOT NULL,
   "recipientId" UUID,
@@ -23,7 +23,9 @@ CREATE TABLE "NotificationQueue" (
   "nextAttemptAt" TIMESTAMP,
   "errorMessage" TEXT,
   "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
-  "updatedAt" TIMESTAMP NOT NULL DEFAULT now()
+  "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
+
+  CONSTRAINT "NotificationQueue_pkey" PRIMARY KEY ("id")
 );
 
 -- 2. Foreign keys
