@@ -8,9 +8,12 @@ function parseArgs(): { tenantId?: string; batchSize?: number } {
   const args = process.argv.slice(2);
   const parsed: { tenantId?: string; batchSize?: number } = {};
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === "--tenant-id" && args[i + 1]) {
-      parsed.tenantId = args[i + 1];
-      i += 1;
+    if (args[i] === "--tenant-id") {
+      const next = args[i + 1];
+      if (next) {
+        parsed.tenantId = next;
+        i += 1;
+      }
     } else if (args[i] === "--batch-size" && args[i + 1]) {
       const size = Number.parseInt(args[i + 1] ?? "", 10);
       if (!Number.isNaN(size) && size > 0) {
