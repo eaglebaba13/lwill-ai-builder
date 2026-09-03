@@ -167,7 +167,7 @@ function KpiCard({ definition, context }: { readonly definition: RoleDashboardCo
   );
 }
 
-const ALL_TABS = ["Overview", "Customers", "Services", "Packages", "Memberships", "Inventory", "Staff", "Attendance", "Appointments", "Billing", "Branches", "Reports", "Settings", "Notifications", "Franchise Overview", "Financials", "Territories", "Partners", "Agreements", "Outlets"] as const;
+const ALL_TABS = ["Overview", "Customers", "Services", "Packages", "Memberships", "Inventory", "Staff", "Attendance", "Appointments", "Billing", "Branches", "Reports", "Settings", "Notifications", "Users & Access", "Franchise Overview", "Financials", "Territories", "Partners", "Agreements", "Outlets"] as const;
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<(typeof ALL_TABS)[number]>("Overview");
@@ -1761,7 +1761,7 @@ export default function Home() {
   }, [authenticated, activeTab]);
 
   useEffect(() => {
-    if (authenticated !== true || activeTab !== "Settings") {
+    if (authenticated !== true || activeTab !== "Users & Access") {
       return;
     }
 
@@ -6864,107 +6864,115 @@ export default function Home() {
                 </button>
               </div>
             </div>
+          </section>
+        ) : null}
 
-            {permissionCodes.includes("tenant.manage") ? (
-              <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
-                <h2 className="text-xl font-semibold">Assign role</h2>
-                <div className="mt-4 space-y-3">
-                  {isLoadingRoleAssignmentUsers || isLoadingRoleAssignmentRoles ? (
-                    <div className="text-sm text-[#a39a86]">Loading users and roles...</div>
-                  ) : null}
-                  {roleAssignmentError ? (
-                    <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{roleAssignmentError}</div>
-                  ) : null}
-                  {roleAssignmentSuccess ? (
-                    <div className="rounded-xl border border-[rgba(63,174,106,0.3)] bg-[rgba(63,174,106,0.12)] p-3 text-sm text-[#3fae6a]">{roleAssignmentSuccess}</div>
-                  ) : null}
-                  <label className="block text-sm font-medium text-[#5a3b48]" htmlFor="role-user">User</label>
-                  <select
-                    id="role-user"
-                    value={roleAssignmentUserId}
-                    onChange={(event) => setRoleAssignmentUserId(event.target.value)}
-                    className="w-full rounded-xl border border-[rgba(212,175,55,0.15)] bg-[#17150f] px-3 py-2.5 text-sm"
-                  >
-                    <option value="">Select user</option>
-                    {roleAssignmentUsers.map((user) => (
-                      <option key={user.membershipId} value={user.id}>
-                        {user.displayName ?? user.email ?? `User ${user.id}`} {!user.isActive ? "(inactive)" : ""}
-                      </option>
-                    ))}
-                  </select>
-                  <label className="block text-sm font-medium text-[#5a3b48]" htmlFor="role-role">Role</label>
-                  <select
-                    id="role-role"
-                    value={roleAssignmentRoleId}
-                    onChange={(event) => setRoleAssignmentRoleId(event.target.value)}
-                    className="w-full rounded-xl border border-[rgba(212,175,55,0.15)] bg-[#17150f] px-3 py-2.5 text-sm"
-                  >
-                    <option value="">Select role</option>
-                    {roleAssignmentRoles.map((role) => (
-                      <option key={role.id} value={role.id}>
-                        {role.name} ({role.code})
-                      </option>
-                    ))}
-                  </select>
-                  <label className="block text-sm font-medium text-[#5a3b48]" htmlFor="role-scope">Scope</label>
-                  <select
-                    id="role-scope"
-                    value={roleAssignmentScopeKind}
-                    onChange={(event) => setRoleAssignmentScopeKind(event.target.value as "tenant" | "business-unit" | "branch")}
-                    className="w-full rounded-xl border border-[rgba(212,175,55,0.15)] bg-[#17150f] px-3 py-2.5 text-sm"
-                  >
-                    <option value="tenant">Tenant scope</option>
-                    <option value="business-unit">Business unit scope</option>
-                    <option value="branch">Branch scope</option>
-                  </select>
-                  {(roleAssignmentScopeKind === "business-unit" || roleAssignmentScopeKind === "branch") && (
-                    <>
-                      <label className="block text-sm font-medium text-[#5a3b48]" htmlFor="role-business-unit">Business unit</label>
-                      <select
-                        id="role-business-unit"
-                        value={roleAssignmentBusinessUnitId}
-                        onChange={(event) => setRoleAssignmentBusinessUnitId(event.target.value)}
-                        className="w-full rounded-xl border border-[rgba(212,175,55,0.15)] bg-[#17150f] px-3 py-2.5 text-sm"
-                      >
-                        <option value="">Select business unit</option>
-                        {businessUnits.map((bu) => (
-                          <option key={bu.id} value={bu.id}>
-                            {bu.name}
+        {activeTab === "Users & Access" ? (
+          <section className="mt-6 space-y-6">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="font-serif text-2xl font-bold bg-gradient-to-r from-[#9c7a1e] via-[#d4af37] to-[#f1d78c] bg-clip-text text-transparent">
+                Users & Access
+              </h2>
+            </div>
+
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+              <h2 className="text-xl font-semibold">Assign role</h2>
+              <div className="mt-4 space-y-3">
+                {isLoadingRoleAssignmentUsers || isLoadingRoleAssignmentRoles ? (
+                  <div className="text-sm text-[#a39a86]">Loading users and roles...</div>
+                ) : null}
+                {roleAssignmentError ? (
+                  <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{roleAssignmentError}</div>
+                ) : null}
+                {roleAssignmentSuccess ? (
+                  <div className="rounded-xl border border-[rgba(63,174,106,0.3)] bg-[rgba(63,174,106,0.12)] p-3 text-sm text-[#3fae6a]">{roleAssignmentSuccess}</div>
+                ) : null}
+                <label className="block text-sm font-medium text-[#5a3b48]" htmlFor="role-user">User</label>
+                <select
+                  id="role-user"
+                  value={roleAssignmentUserId}
+                  onChange={(event) => setRoleAssignmentUserId(event.target.value)}
+                  className="w-full rounded-xl border border-[rgba(212,175,55,0.15)] bg-[#17150f] px-3 py-2.5 text-sm"
+                >
+                  <option value="">Select user</option>
+                  {roleAssignmentUsers.map((user) => (
+                    <option key={user.membershipId} value={user.id}>
+                      {user.displayName ?? user.email ?? `User ${user.id}`} {!user.isActive ? "(inactive)" : ""}
+                    </option>
+                  ))}
+                </select>
+                <label className="block text-sm font-medium text-[#5a3b48]" htmlFor="role-role">Role</label>
+                <select
+                  id="role-role"
+                  value={roleAssignmentRoleId}
+                  onChange={(event) => setRoleAssignmentRoleId(event.target.value)}
+                  className="w-full rounded-xl border border-[rgba(212,175,55,0.15)] bg-[#17150f] px-3 py-2.5 text-sm"
+                >
+                  <option value="">Select role</option>
+                  {roleAssignmentRoles.map((role) => (
+                    <option key={role.id} value={role.id}>
+                      {role.name} ({role.code})
+                    </option>
+                  ))}
+                </select>
+                <label className="block text-sm font-medium text-[#5a3b48]" htmlFor="role-scope">Scope</label>
+                <select
+                  id="role-scope"
+                  value={roleAssignmentScopeKind}
+                  onChange={(event) => setRoleAssignmentScopeKind(event.target.value as "tenant" | "business-unit" | "branch")}
+                  className="w-full rounded-xl border border-[rgba(212,175,55,0.15)] bg-[#17150f] px-3 py-2.5 text-sm"
+                >
+                  <option value="tenant">Tenant scope</option>
+                  <option value="business-unit">Business unit scope</option>
+                  <option value="branch">Branch scope</option>
+                </select>
+                {(roleAssignmentScopeKind === "business-unit" || roleAssignmentScopeKind === "branch") && (
+                  <>
+                    <label className="block text-sm font-medium text-[#5a3b48]" htmlFor="role-business-unit">Business unit</label>
+                    <select
+                      id="role-business-unit"
+                      value={roleAssignmentBusinessUnitId}
+                      onChange={(event) => setRoleAssignmentBusinessUnitId(event.target.value)}
+                      className="w-full rounded-xl border border-[rgba(212,175,55,0.15)] bg-[#17150f] px-3 py-2.5 text-sm"
+                    >
+                      <option value="">Select business unit</option>
+                      {businessUnits.map((bu) => (
+                        <option key={bu.id} value={bu.id}>
+                          {bu.name}
+                        </option>
+                      ))}
+                    </select>
+                  </>
+                )}
+                {roleAssignmentScopeKind === "branch" && (
+                  <>
+                    <label className="block text-sm font-medium text-[#5a3b48]" htmlFor="role-branch">Branch</label>
+                    <select
+                      id="role-branch"
+                      value={roleAssignmentBranchId}
+                      onChange={(event) => setRoleAssignmentBranchId(event.target.value)}
+                      className="w-full rounded-xl border border-[rgba(212,175,55,0.15)] bg-[#17150f] px-3 py-2.5 text-sm"
+                    >
+                      <option value="">Select branch</option>
+                      {branches
+                        .filter((branch) => roleAssignmentBusinessUnitId ? branch.businessUnitId === roleAssignmentBusinessUnitId : true)
+                        .map((branch) => (
+                          <option key={branch.id} value={branch.id}>
+                            {branch.name}
                           </option>
                         ))}
-                      </select>
-                    </>
-                  )}
-                  {roleAssignmentScopeKind === "branch" && (
-                    <>
-                      <label className="block text-sm font-medium text-[#5a3b48]" htmlFor="role-branch">Branch</label>
-                      <select
-                        id="role-branch"
-                        value={roleAssignmentBranchId}
-                        onChange={(event) => setRoleAssignmentBranchId(event.target.value)}
-                        className="w-full rounded-xl border border-[rgba(212,175,55,0.15)] bg-[#17150f] px-3 py-2.5 text-sm"
-                      >
-                        <option value="">Select branch</option>
-                        {branches
-                          .filter((branch) => roleAssignmentBusinessUnitId ? branch.businessUnitId === roleAssignmentBusinessUnitId : true)
-                          .map((branch) => (
-                            <option key={branch.id} value={branch.id}>
-                              {branch.name}
-                            </option>
-                          ))}
-                      </select>
-                    </>
-                  )}
-                  <button
-                    onClick={assignRole}
-                    disabled={isAssigningRole}
-                    className="premium-btn-primary w-full py-2.5 text-sm disabled:opacity-60"
-                  >
-                    {isAssigningRole ? "Assigning..." : "Assign role"}
-                  </button>
-                </div>
+                    </select>
+                  </>
+                )}
+                <button
+                  onClick={assignRole}
+                  disabled={isAssigningRole}
+                  className="premium-btn-primary w-full py-2.5 text-sm disabled:opacity-60"
+                >
+                  {isAssigningRole ? "Assigning..." : "Assign role"}
+                </button>
               </div>
-            ) : null}
+            </div>
           </section>
         ) : null}
 
@@ -6973,7 +6981,7 @@ export default function Home() {
             <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
               <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
                 <h2 className="text-xl font-semibold">Notification Templates</h2>
-              <div className="mt-4 space-y-3">
+                <div className="mt-4 space-y-3">
                 {isLoadingNotificationTemplates ? <div className="text-sm text-[#a39a86]">Loading notification templates...</div> : null}
                 {!isLoadingNotificationTemplates && notificationTemplateError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{notificationTemplateError}</div> : null}
                 {!isLoadingNotificationTemplates && !notificationTemplateError && notificationTemplates.length === 0 ? <div className="text-sm text-[#a39a86]">No notification templates yet.</div> : null}

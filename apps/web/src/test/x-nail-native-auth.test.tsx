@@ -580,23 +580,28 @@ describe("X Nail native authentication integration", () => {
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
       .mockResolvedValueOnce(Response.json({ roles: [{ id: "role-1", code: "tenant-admin", name: "Admin", scope: { kind: "tenant" }, permissions: [] }], permissionCodes: ["tenant.manage"] }))
       .mockResolvedValueOnce(Response.json({ customers: [{ id: "cust-1", name: "Test Customer", tenantId: "tenant-xnail", phone: "555-0100", email: null, notes: null, isActive: true }] }))
-      .mockResolvedValueOnce(Response.json({ services: [{ id: "svc-1", name: "Test Service", tenantId: "tenant-xnail", durationMinutes: 30, priceCents: 1500, description: null, isActive: true }] }))
-      .mockResolvedValueOnce(Response.json({ settings: [] }))
-      .mockResolvedValueOnce(Response.json({ users: [{ id: "user-1", membershipId: "m-1", email: "admin@test.com", displayName: "Admin", isActive: true }] }))
-      .mockResolvedValueOnce(Response.json({ roles: [{ id: "role-1", code: "tenant-admin", name: "Admin" }] }))
-      .mockResolvedValueOnce(Response.json({ appointments: [] }))
-      .mockResolvedValueOnce(Response.json({
-        appointment: {
-          id: "apt-new",
-          tenantId: "tenant-xnail",
-          customerId: "cust-1",
-          serviceId: "svc-1",
-          startsAt: "2026-08-12T10:30:00.000Z",
-          endsAt: "2026-08-12T11:15:00.000Z",
-          status: "Booked",
-          notes: null,
-        },
-      }));
+      .mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === "string" ? input : input.toString();
+        const method = init?.method ?? (typeof input === "object" && "method" in input ? (input as Request).method : "GET");
+        if (url === "/api/services") return Response.json({ services: [{ id: "svc-1", name: "Test Service", tenantId: "tenant-xnail", durationMinutes: 30, priceCents: 1500, description: null, isActive: true }] });
+        if (url === "/api/settings") return Response.json({ settings: [] });
+        if (url === "/api/users") return Response.json({ users: [{ id: "user-1", membershipId: "m-1", email: "admin@test.com", displayName: "Admin", isActive: true }] });
+        if (url === "/api/roles") return Response.json({ roles: [{ id: "role-1", code: "tenant-admin", name: "Admin" }] });
+        if (url === "/api/appointments" && method === "GET") return Response.json({ appointments: [] });
+        if (url === "/api/appointments" && method === "POST") return Response.json({
+          appointment: {
+            id: "apt-new",
+            tenantId: "tenant-xnail",
+            customerId: "cust-1",
+            serviceId: "svc-1",
+            startsAt: "2026-08-12T10:30:00.000Z",
+            endsAt: "2026-08-12T11:15:00.000Z",
+            status: "Booked",
+            notes: null,
+          },
+        });
+        return new Response(null, { status: 404 });
+      });
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
 
@@ -624,7 +629,7 @@ describe("X Nail native authentication integration", () => {
     expect(screen.getByText("Booked")).toBeInTheDocument();
   });
 
-  it("Settings tab loads services and Appointments tab does not re-trigger services fetch", async () => {
+  it("Settings tab loads services and Users & Access tab loads users/roles", async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
@@ -646,6 +651,10 @@ describe("X Nail native authentication integration", () => {
 
     await user.click(screen.getByRole("button", { name: "Settings" }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/services", expect.anything()));
+
+    await user.click(screen.getByRole("button", { name: "Users & Access" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/users", expect.anything()));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/roles", expect.anything()));
 
     await user.click(screen.getByRole("button", { name: "Appointments" }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/appointments", expect.anything()));
@@ -775,7 +784,7 @@ describe("X Nail native authentication integration", () => {
     expect(screen.getByText("₹80")).toBeInTheDocument();
   });
 
-  it("shows role assignment form in Settings tab when authenticated", async () => {
+  it("shows role assignment form in Users & Access tab when authenticated", async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
@@ -794,27 +803,26 @@ describe("X Nail native authentication integration", () => {
     await user.click(screen.getByRole("button", { name: "Sign in" }));
     expect(await screen.findByText("Admin dashboard")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Settings" }));
+    await user.click(screen.getByRole("button", { name: "Users & Access" }));
     expect(screen.getByRole("heading", { name: "Assign role" })).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "User" })).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "Role" })).toBeInTheDocument();
   });
 
-  it("assigns a role through the Settings tab form", async () => {
+  it("assigns a role through the Users & Access tab form", async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
       .mockResolvedValueOnce(Response.json({ roles: [{ id: "role-1", code: "tenant-admin", name: "Admin", scope: { kind: "tenant" }, permissions: [] }], permissionCodes: ["tenant.manage"] }))
       .mockResolvedValueOnce(Response.json({ customers: [] }))
-      .mockResolvedValueOnce(Response.json({ services: [] }))
-      .mockResolvedValueOnce(Response.json({ settings: [] }))
-      .mockResolvedValueOnce(Response.json({ users: [{ id: "user-1", membershipId: "m-1", email: "admin@test.com", displayName: "Admin", isActive: true }] }))
-      .mockResolvedValueOnce(Response.json({ roles: [{ id: "role-1", code: "branch-manager", name: "Branch Manager" }] }))
-      .mockResolvedValueOnce(Response.json({ assignment: { id: "assign-1", membershipId: "m-1", roleId: "role-1", scope: { kind: "tenant" } } }))
-      .mockResolvedValueOnce(Response.json({ roles: [{ id: "role-1", code: "tenant-admin", name: "Admin", scope: { kind: "tenant" }, permissions: [] }], permissionCodes: ["tenant.manage"] }))
       .mockImplementation(async (input: RequestInfo | URL) => {
         const url = typeof input === "string" ? input : input.toString();
+        if (url === "/api/users") return Response.json({ users: [{ id: "user-1", membershipId: "m-1", email: "admin@test.com", displayName: "Admin", isActive: true }] });
+        if (url === "/api/roles") return Response.json({ roles: [{ id: "role-1", code: "branch-manager", name: "Branch Manager" }] });
+        if (url === "/api/membership-roles") return Response.json({ assignment: { id: "assign-1", membershipId: "m-1", roleId: "role-1", scope: { kind: "tenant" } } });
+        if (url === "/api/auth/me") return Response.json({ roles: [{ id: "role-1", code: "tenant-admin", name: "Admin", scope: { kind: "tenant" }, permissions: [] }], permissionCodes: ["tenant.manage"] });
         if (url === "/api/services") return Response.json({ services: [] });
+        if (url === "/api/settings") return Response.json({ settings: [] });
         return new Response(null, { status: 404 });
       });
     vi.stubGlobal("fetch", fetchMock);
@@ -826,7 +834,8 @@ describe("X Nail native authentication integration", () => {
     await user.click(screen.getByRole("button", { name: "Sign in" }));
     expect(await screen.findByText("Admin dashboard")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Settings" }));
+    await user.click(screen.getByRole("button", { name: "Users & Access" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/users", expect.anything()));
     await user.selectOptions(screen.getByRole("combobox", { name: "User" }), "user-1");
     await user.selectOptions(screen.getByRole("combobox", { name: "Role" }), "role-1");
     await user.click(screen.getByRole("button", { name: "Assign role" }));
@@ -848,10 +857,14 @@ describe("X Nail native authentication integration", () => {
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
       .mockResolvedValueOnce(Response.json({ roles: [{ id: "role-1", code: "tenant-admin", name: "Admin", scope: { kind: "tenant" }, permissions: [] }], permissionCodes: ["tenant.manage"] }))
       .mockResolvedValueOnce(Response.json({ customers: [] }))
-      .mockResolvedValueOnce(Response.json({ services: [] }))
-      .mockResolvedValueOnce(Response.json({ settings: [] }))
-      .mockResolvedValueOnce(new Response(null, { status: 403 }))
-      .mockResolvedValueOnce(new Response(null, { status: 403 }));
+      .mockImplementation(async (input: RequestInfo | URL) => {
+        const url = typeof input === "string" ? input : input.toString();
+        if (url === "/api/users") return new Response(null, { status: 403 });
+        if (url === "/api/roles") return new Response(null, { status: 403 });
+        if (url === "/api/services") return Response.json({ services: [] });
+        if (url === "/api/settings") return Response.json({ settings: [] });
+        return new Response(null, { status: 404 });
+      });
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
 
@@ -861,19 +874,17 @@ describe("X Nail native authentication integration", () => {
     await user.click(screen.getByRole("button", { name: "Sign in" }));
     expect(await screen.findByText("Admin dashboard")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Settings" }));
+    await user.click(screen.getByRole("button", { name: "Users & Access" }));
     expect(await screen.findByText("You are not authorized to assign roles.")).toBeInTheDocument();
   });
 
-  it("hides role assignment form without tenant.manage permission", async () => {
+  it("hides Users & Access tab without tenant.manage permission", async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
-      .mockResolvedValueOnce(Response.json({ roles: [], permissionCodes: [] }))
+      .mockResolvedValueOnce(Response.json({ roles: [], permissionCodes: ["customer.read"] }))
       .mockResolvedValueOnce(Response.json({ customers: [] }))
-      .mockResolvedValueOnce(Response.json({ settings: [] }))
-      .mockResolvedValueOnce(Response.json({ users: [] }))
-      .mockResolvedValueOnce(Response.json({ roles: [] }));
+      .mockResolvedValueOnce(Response.json({ settings: [] }));
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
 
@@ -883,10 +894,7 @@ describe("X Nail native authentication integration", () => {
     await user.click(screen.getByRole("button", { name: "Sign in" }));
     expect(await screen.findByText("Operations dashboard")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Settings" }));
-    expect(screen.queryByRole("heading", { name: "Assign role" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("combobox", { name: "User" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("combobox", { name: "Role" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Users & Access" })).not.toBeInTheDocument();
   });
 
   it("shows admin navigation when authenticated as tenant-admin", async () => {
@@ -1009,17 +1017,25 @@ describe("X Nail native authentication integration", () => {
   });
 
   it("refreshes profile after role assignment", async () => {
+    let authMeCallCount = 0;
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
-      .mockResolvedValueOnce(Response.json({ roles: [{ id: "role-1", code: "tenant-admin", name: "Admin", scope: { kind: "tenant" }, permissions: [] }], permissionCodes: ["tenant.manage"] }))
-      .mockResolvedValueOnce(Response.json({ customers: [] }))
-      .mockResolvedValueOnce(Response.json({ services: [] }))
-      .mockResolvedValueOnce(Response.json({ settings: [] }))
-      .mockResolvedValueOnce(Response.json({ users: [{ id: "user-1", membershipId: "m-1", email: "admin@test.com", displayName: "Admin", isActive: true }] }))
-      .mockResolvedValueOnce(Response.json({ roles: [{ id: "role-1", code: "branch-manager", name: "Branch Manager" }] }))
-      .mockResolvedValueOnce(Response.json({ assignment: { id: "assign-1", membershipId: "m-1", roleId: "role-1", scope: { kind: "tenant" } } }))
-      .mockResolvedValueOnce(Response.json({ roles: [{ id: "role-1", code: "branch-manager", name: "Branch Manager" }], permissionCodes: ["tenant.manage"] }));
+      .mockImplementation(async (input: RequestInfo | URL) => {
+        const url = typeof input === "string" ? input : input.toString();
+        if (url === "/api/auth/me") {
+          authMeCallCount++;
+          if (authMeCallCount > 1) return Response.json({ roles: [{ id: "role-1", code: "branch-manager", name: "Branch Manager" }], permissionCodes: ["tenant.manage"] });
+          return Response.json({ roles: [{ id: "role-1", code: "tenant-admin", name: "Admin", scope: { kind: "tenant" }, permissions: [] }], permissionCodes: ["tenant.manage"] });
+        }
+        if (url === "/api/users") return Response.json({ users: [{ id: "user-1", membershipId: "m-1", email: "admin@test.com", displayName: "Admin", isActive: true }] });
+        if (url === "/api/roles") return Response.json({ roles: [{ id: "role-1", code: "branch-manager", name: "Branch Manager" }] });
+        if (url === "/api/membership-roles") return Response.json({ assignment: { id: "assign-1", membershipId: "m-1", roleId: "role-1", scope: { kind: "tenant" } } });
+        if (url === "/api/services") return Response.json({ services: [] });
+        if (url === "/api/settings") return Response.json({ settings: [] });
+        if (url === "/api/customers") return Response.json({ customers: [] });
+        return new Response(null, { status: 404 });
+      });
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
 
@@ -1029,7 +1045,8 @@ describe("X Nail native authentication integration", () => {
     await user.click(screen.getByRole("button", { name: "Sign in" }));
     expect(await screen.findByText("Admin dashboard")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Settings" }));
+    await user.click(screen.getByRole("button", { name: "Users & Access" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/users", expect.anything()));
     await user.selectOptions(screen.getByRole("combobox", { name: "User" }), "user-1");
     await user.selectOptions(screen.getByRole("combobox", { name: "Role" }), "role-1");
     await user.click(screen.getByRole("button", { name: "Assign role" }));

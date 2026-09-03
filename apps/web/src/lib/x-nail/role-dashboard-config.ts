@@ -39,6 +39,7 @@ const ALL_TABS = [
   "Reports",
   "Settings",
   "Notifications",
+  "Users & Access",
   "Franchise Overview",
   "Financials",
   "Territories",
@@ -88,6 +89,7 @@ const FRANCHISE_TABS = [
   "Inventory",
   "Appointments",
   "Customers",
+  "Users & Access",
 ] as const;
 
 export const ROLE_DASHBOARD_CONFIGS: readonly RoleDashboardConfig[] = [
@@ -191,6 +193,7 @@ export function deriveTabsFromPermissions(permissionCodes: readonly string[]): r
   if (has("report.read")) tabs.push("Reports");
   if (has("setting.read") || has("setting.write")) tabs.push("Settings");
   if (has("notification.read") || has("notification.write")) tabs.push("Notifications");
+  if (has("tenant.manage")) tabs.push("Users & Access");
   if (has("franchise.read") || has("franchise.write") || has("report.read")) {
     tabs.push("Franchise Overview");
     tabs.push("Financials");
