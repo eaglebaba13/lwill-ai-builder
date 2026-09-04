@@ -218,6 +218,7 @@ export default function Home() {
   const [invoices, setInvoices] = useState<Array<{
     id: string;
     customerId: string;
+    branchId?: string | null;
     issuedAt: string;
     subtotalCents: number;
     discountCents: number;
@@ -228,6 +229,7 @@ export default function Home() {
   const [isLoadingInvoices, setIsLoadingInvoices] = useState(false);
   const [invoiceError, setInvoiceError] = useState<string | null>(null);
   const [invoiceCustomerId, setInvoiceCustomerId] = useState("");
+  const [invoiceBranchId, setInvoiceBranchId] = useState("");
   const [invoiceNotes, setInvoiceNotes] = useState("");
   const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
   const [editingInvoiceDiscountCents, setEditingInvoiceDiscountCents] = useState("0");
@@ -2938,6 +2940,7 @@ export default function Home() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         customerId: invoiceCustomerId,
+        branchId: invoiceBranchId || null,
         issuedAt: new Date().toISOString(),
         items: cartItems.map((item) => ({
           description: item.description,
@@ -5890,6 +5893,17 @@ export default function Home() {
                           <div>
                             <div className="font-medium">{customerMap.get(invoice.customerId) ?? `Customer ${invoice.customerId}`}</div>
                             <div className="text-sm text-[#a39a86]">{invoice.issuedAt}</div>
+                            {invoice.branchId ? (() => {
+                              const branch = branches.find((b) => b.id === invoice.branchId);
+                              const outlet = outlets.find((o) => o.branchId === invoice.branchId);
+                              return (
+                                <div className="text-xs text-[#a39a86]">
+                                  <span className="text-[#d4af37]">Outlet:</span> {branch?.name ?? "Unknown"}{outlet?.partnerName ? ` — ${outlet.partnerName}` : " — Company Owned"}
+                                </div>
+                              );
+                            })() : (
+                              <div className="text-xs text-[#a39a86]"><span className="text-[#d4af37]">Outlet:</span> Not attributed</div>
+                            )}
                           </div>
                           <div className="flex items-center gap-2">
                             <div className="text-right text-sm text-[#a39a86]">
@@ -5960,6 +5974,34 @@ export default function Home() {
                     <option key={customer.id} value={customer.id}>{customer.name}</option>
                   ))}
                 </select>
+                <select
+                  value={invoiceBranchId}
+                  onChange={(event) => setInvoiceBranchId(event.target.value)}
+                  className="premium-input"
+                >
+                  <option value="">Select billing outlet</option>
+                  {branches.filter((b) => b.isActive).map((branch) => {
+                    const outlet = outlets.find((o) => o.branchId === branch.id);
+                    const partnerName = outlet?.partnerName;
+                    return (
+                      <option key={branch.id} value={branch.id}>
+                        {branch.name}{partnerName ? ` — ${partnerName}` : " — Company Owned"}
+                      </option>
+                    );
+                  })}
+                </select>
+                {invoiceBranchId ? (() => {
+                  const selectedOutlet = outlets.find((o) => o.branchId === invoiceBranchId);
+                  return selectedOutlet ? (
+                    <div className="rounded-lg border border-[rgba(212,175,55,0.1)] bg-[#17150f] px-3 py-2 text-xs text-[#a39a86]">
+                      <span className="text-[#d4af37]">Franchise Partner:</span> {selectedOutlet.partnerName} ({selectedOutlet.outletType ?? "FOCO"})
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-[rgba(212,175,55,0.1)] bg-[#17150f] px-3 py-2 text-xs text-[#a39a86]">
+                      <span className="text-[#d4af37]">Type:</span> Company Owned
+                    </div>
+                  );
+                })() : null}
                 <select
                   value={cartItemType}
                   onChange={(event) => { setCartItemType(event.target.value as "product" | "service" | "package"); setCartItemId(""); }}

@@ -21,6 +21,7 @@ export interface InvoiceWriteInput {
   readonly discountCents?: number;
   readonly gstCents?: number;
   readonly notes?: string | null;
+  readonly branchId?: string | null;
 }
 
 export interface InvoiceUpdateInput {
@@ -122,7 +123,7 @@ function parseCreateInput(input: unknown): InvoiceWriteInput | null {
     return null;
   }
   const record = input as Record<string, unknown>;
-  const allowedKeys = new Set(["customerId", "issuedAt", "items", "discountCents", "gstCents", "notes"]);
+  const allowedKeys = new Set(["customerId", "issuedAt", "items", "discountCents", "gstCents", "notes", "branchId"]);
   if (Object.keys(record).some((key) => !allowedKeys.has(key))) {
     return null;
   }
@@ -156,6 +157,7 @@ function parseCreateInput(input: unknown): InvoiceWriteInput | null {
     ...(record.discountCents !== undefined && { discountCents: record.discountCents }),
     ...(record.gstCents !== undefined && { gstCents: record.gstCents }),
     notes: record.notes ?? null,
+    branchId: record.branchId !== undefined ? (record.branchId as string | null) : null,
   };
 }
 
@@ -220,7 +222,8 @@ export async function handleCreateInvoice(
   if (input === null) {
     return response(400);
   }
-  const invoice = await services.createInvoice(authResult.tenantId, authResult.branchId, input);
+  const branchId = authResult.branchId ?? input.branchId ?? null;
+  const invoice = await services.createInvoice(authResult.tenantId, branchId, input);
   return response(201, { invoice });
 }
 
