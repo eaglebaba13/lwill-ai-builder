@@ -32,6 +32,7 @@
     "bootstrap:initial-stock-adjustment-permissions": "tsx src/initial-stock-adjustment-permissions-bootstrap-cli.ts",
     "bootstrap:initial-franchise-permissions": "tsx src/initial-franchise-permissions-bootstrap-cli.ts",
     "bootstrap:demo-users": "tsx src/demo-user-bootstrap-cli.ts",
+    "bootstrap:platform-admin": "tsx src/platform-admin-bootstrap-cli.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
