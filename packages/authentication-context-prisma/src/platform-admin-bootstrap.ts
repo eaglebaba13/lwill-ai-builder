@@ -134,7 +134,7 @@ export async function bootstrapPlatformAdmin(
 
     // Assign permissions to role
     const assignedCodes = new Set(
-      role.permissions.map(({ permission }) => permission.code),
+      (role.permissions ?? []).map(({ permission }) => permission.code),
     );
     let rolePermissionsCreated = 0;
     for (let i = 0; i < PLATFORM_PERMISSION_CODES.length; i++) {
