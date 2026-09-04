@@ -374,4 +374,135 @@ This file records key architectural decisions made for **LWILL AI BUILDER v1**.
 - **Consequences**:
   - The initial approved hostname can be verified without schema or migration changes and without weakening login resolution.
   - Future self-service domain verification still requires a separate approved ownership-challenge design and authenticated management boundary.
-  - The CLI must be run manually in the deployed application environment; it is not wired into startup, deployment, or a public endpoint.
+   - The CLI must be run manually in the deployed application environment; it is not wired into startup, deployment, or a public endpoint.
+
+---
+
+## ADR 016: Reusable Payment & Gateway Core Architecture
+
+- **Status**: Accepted — Architecture documented; implementation requires staged design approval
+- **Context**: The LWILL AI BUILDER platform serves multiple business entities (LWILL platform, HDK/X NAIL, MakeMeArtist) that each need payment processing. Each entity owns its own payment gateway credentials. The SRS documents (DOC-017, DOC-019, DOC-023) specify Razorpay as an integration target but do not mandate it as the architecture. ADR-006 requires provider-neutral abstraction layers. The existing Payment model is a minimal tenant-scoped invoice-payment recorder with no gateway integration.
+- **Decision**:
+  - Payment & Gateway functionality shall be implemented as a reusable **LWILL Core platform module** consumed by all business entities.
+  - **Gateway ownership is entity-scoped**: LWILL, HDK/X NAIL, and MakeMeArtist each own separate gateway configurations with isolated credentials. No global or shared gateway configuration shall exist.
+  - **Provider abstraction is mandatory**: The Payment Core shall define a provider-neutral gateway interface. Provider implementations (Razorpay, future providers) shall be adapters behind this interface. Razorpay must not become the domain abstraction.
+  - **Customer Payment is separate from settlement**: Customer payment against invoices is a distinct domain from franchise partner settlement, marketplace vendor settlement, gateway settlement, and bank reconciliation. These shall not be merged.
+  - The existing `Payment` model and payment recording APIs (`POST /api/payments`, `GET /api/invoices/[id]/payments`) remain valid production functionality and shall not be removed.
+  - No gateway provider shall be hard-coded into the Payment domain model.
+- **Architecture**:
+  ```
+  LWILL Core
+  └── Payment & Gateway
+        ├── Payment Domain (existing: Payment, Invoice → Payment)
+        ├── Gateway Abstraction (provider-neutral interface)
+        ├── Gateway Account / Configuration (entity-scoped credentials)
+        ├── Provider Adapter Layer (Razorpay, future providers)
+        ├── Webhook Processing (async payment confirmation)
+        ├── Transaction Tracking (gateway-level transaction records)
+        ├── Refund Capability (future)
+        ├── Settlement / Reconciliation Boundaries (separate from customer payment)
+        └── Audit / Domain Event Integration
+
+  Consumers:
+    LWILL platform → LWILL Gateway Account
+    HDK / X NAIL → HDK Gateway Account
+    MakeMeArtist → MakeMeArtist Gateway Account
+  ```
+- **Gateway Ownership**:
+  - Each business entity (LWILL, HDK/X NAIL, MakeMeArtist) owns its own gateway configuration.
+  - Gateway credentials are isolated by entity. No cross-entity credential sharing.
+  - The exact technical ownership model (Tenant-level, Application-level, Organization-level) is an implementation design decision that must respect the repository's existing Tenant/Application architecture.
+  - **NOT SPECIFIED — IMPLEMENTATION DESIGN REQUIRED**: Whether GatewayAccount belongs to Tenant, Application, or another entity.
+- **Provider Abstraction**:
+  - Payment Core → Provider-neutral Gateway Interface → Provider Adapter → Gateway Provider
+  - The interface shall support: create payment intent, confirm payment, handle webhook, process refund (future).
+  - ADR-006 (provider-neutral integrations) governs this abstraction.
+- **Multi-Tenancy**:
+  - Multiple tenants may use different gateway accounts.
+  - Multiple gateway accounts per tenant: **NOT SPECIFIED — APPROVAL REQUIRED**.
+  - Branch-level gateway accounts: **NOT SPECIFIED — APPROVAL REQUIRED**.
+  - Cross-entity gateway usage (e.g., MakeMeArtist using X NAIL gateway): **NOT PERMITTED** per business decision.
+- **Security**:
+  - Gateway credentials shall never be exposed to clients.
+  - Gateway secrets shall remain server-side.
+  - Gateway configurations shall be isolated by owner entity.
+  - Production and test credentials shall not be mixed.
+  - Secrets shall not be committed to Git.
+  - Specific encryption/key-management technology: **NOT SPECIFIED — APPROVAL REQUIRED**.
+- **Webhooks**:
+  - Gateway Provider → Webhook Endpoint → Webhook Validation / Idempotency → Gateway Transaction → Payment State Update → Domain Event → downstream consumers.
+  - Webhook idempotency mechanism: **IMPLEMENTATION DESIGN REQUIRED**.
+  - Webhook integration shall use the existing DomainEventBus infrastructure.
+- **Payment Lifecycle Boundary**:
+  - Payment status model (PAID/PARTIAL/OUTSTANDING/REFUNDED): **NOT SPECIFIED — APPROVAL REQUIRED**.
+  - Invoice payment-state derivation: **NOT SPECIFIED — APPROVAL REQUIRED**.
+  - Overpayment policy: **NOT SPECIFIED — APPROVAL REQUIRED**.
+  - Payment method taxonomy: **NOT SPECIFIED — APPROVAL REQUIRED**. Current implementation uses free-text `method` field.
+- **Refund Boundary**:
+  - Refund capability is a future Payment Core feature.
+  - Full refund, partial refund, gateway-initiated refund: **NOT SPECIFIED — APPROVAL REQUIRED**.
+  - Accounting impact of refunds: **NOT SPECIFIED — APPROVAL REQUIRED**.
+- **Settlement Boundary**:
+  - Customer Payment ≠ Gateway Settlement ≠ Franchise Partner Settlement ≠ Marketplace Vendor Settlement.
+  - DOC-023 bank reconciliation is a separate Finance capability.
+  - Franchise partner settlement (MG/variable return/payout/royalty) exists in the franchise commercial architecture and shall not be merged with customer payment processing.
+- **X NAIL Integration**:
+  - X NAIL POS → Invoice → Reusable Payment Core → HDK/X NAIL Gateway Account → Provider Adapter → Gateway → Webhook → Payment Core → X NAIL Billing.
+  - Existing franchise relationship remains: Invoice → Branch → Franchise Outlet → Franchise Partner. Franchise partner ownership does not determine gateway ownership.
+- **LWILL Integration**:
+  - LWILL platform payments (SaaS subscriptions, AI Builder billing) shall consume the same reusable Payment Core.
+  - SaaS subscription billing requirements: **NOT SPECIFIED — APPROVAL REQUIRED**.
+- **MakeMeArtist Integration**:
+  - MakeMeArtist shall consume the same reusable Payment Core.
+  - DOC-019 specifies Razorpay integration and future vendor marketplace capability.
+  - Marketplace vendor settlement is a separate domain from customer payment.
+  - CC-010 (vendor marketplace) is listed as future.
+- **Domain Separation**:
+
+  | Concept | SRS Support | Status |
+  |---|---|---|
+  | Payment (customer → invoice) | DOC-023 FIN-005 | IMPLEMENTED |
+  | Gateway Account | NOT SPECIFIED | NOT IMPLEMENTED |
+  | Payment Intent | NOT SPECIFIED | NOT IMPLEMENTED |
+  | Gateway Transaction | NOT SPECIFIED | NOT IMPLEMENTED |
+  | Payment Method | DOC-023 FIN-005 | PARTIAL (free-text field) |
+  | Webhook Event | NOT SPECIFIED | NOT IMPLEMENTED |
+  | Refund | NOT SPECIFIED | NOT IMPLEMENTED |
+  | Gateway Settlement | NOT SPECIFIED | NOT IMPLEMENTED |
+  | Bank Reconciliation | DOC-023 FIN-006 | NOT IMPLEMENTED |
+  | Franchise Partner Settlement | Franchise SRS | SEPARATE DOMAIN |
+  | Marketplace Vendor Settlement | DOC-019 CC-010 | NOT IMPLEMENTED (future) |
+
+- **Consequences**:
+  - The reusable Payment Core establishes a single payment engine for all LWILL platform consumers.
+  - Gateway credentials remain isolated per entity, satisfying the business separation requirement.
+  - Provider-neutral abstraction prevents vendor lock-in per ADR-006.
+  - The existing Payment model serves as the foundation and remains valid.
+  - Implementation can proceed in stages: first GatewayAccount + provider adapter, then webhooks, then refunds.
+  - Franchise partner settlement and marketplace vendor settlement remain separate domains.
+- **Risks**:
+  - Payment status model is unspecified — implementing gateway integration without agreed statuses may require refactoring.
+  - Payment method taxonomy is unspecified — free-text `method` field may need evolution.
+  - Credential encryption/key management is unspecified — storing gateway API keys requires a security decision.
+  - Webhook idempotency is unspecified — duplicate webhook delivery could cause duplicate payments.
+- **Deferred Decisions**:
+  - Payment status values (PAID/PARTIAL/OUTSTANDING/REFUNDED)
+  - Invoice payment-state derivation
+  - Overpayment policy
+  - Payment method enum
+  - Refund workflow
+  - Credential encryption approach
+  - Webhook idempotency mechanism
+  - Gateway account ownership entity (Tenant vs Application)
+  - Multi-gateway per tenant
+  - Gateway test/sandbox mode
+  - SaaS subscription billing workflow
+  - Marketplace vendor settlement workflow
+- **Implementation Constraints**:
+  - ADR-007 (lean infrastructure) applies — no Redis/BullMQ until load demands.
+  - ADR-006 (provider-neutral) applies — gateway interface must be abstract.
+  - Existing Payment model and APIs must remain functional throughout implementation.
+  - No gateway provider hard-coded into domain model.
+  - Customer payment must remain separate from all settlement types.
+
+- **Approved for implementation staging**: The architecture is documented and approved. Individual implementation stages (GatewayAccount, provider adapter, webhooks) require separate design and approval before coding.
