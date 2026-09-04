@@ -5,8 +5,8 @@
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
   - **Current Branch**: `phase-1d-native-auth`
-  - **Current HEAD Commit**: `f36d1d7` (`feat(franchise): read MG from agreement minimumGuaranteeCents instead of hardcoded constant`)
-  - **Git State**: `phase-1d-native-auth` at `f36d1d7`; Franchise MG now reads from agreement-level `minimumGuaranteeCents` column (backfilled to ₹15,000 for existing agreements). Franchise payout API returns real production data. Payment, Gateway Account, and Settings foundations production-verified.
+  - **Current HEAD Commit**: `3580846` (`feat(franchise): exclude GST from Net Sales per NP-01 approved rule`)
+  - **Git State**: `phase-1d-native-auth` at `3580846`; Franchise MG agreement-level override and NP-01 Net Sales GST exclusion implemented and production-verified. Payment, Gateway Account, and Settings foundations production-verified.
 
 ## Franchise Dashboard — Technical Implementation & Production Delivery — 2026-09-01
 
@@ -3422,7 +3422,6 @@ Replaced the hardcoded `1500000` with `agreement.minimumGuaranteeCents ?? 150000
 The following rules were approved on 2026-09-02 but are NOT YET coded in `report-service.ts`:
 
 - **MG-02**: Formula-based MG for new products: `investmentCents × 3%` (requires `FranchiseOutletProfile.investmentCents` lookup + `mgFormulaRateBp` from agreement). Schema columns exist (`mgFormulaRateBp`, `mgFormulaBase`, `investmentCents`).
-- **NP-01**: Net Sales = GST excluded (requires changing invoice sum from `totalCents` to `totalCents - gstCents`).
 - **NP-02**: Higher-of payout rule: `MAX(MG, 30% of Net Sales excluding GST)` (requires changing the MG comparison from fixed floor to computed higher-of).
 - **TR-01/TR-02**: Agreement-level royalty rate (requires `territoryRoyaltyRateBp` column on `FranchiseAgreement`; currently hardcoded to `0.02` / 2%).
 - **HR-02**: Agreement-level effective-dating snapshot (schema column `termsSnapshot` exists; not yet populated).
@@ -3434,6 +3433,39 @@ The following rules were approved on 2026-09-02 but are NOT YET coded in `report
 - 80% other revenue distribution beneficiaries (Salon Operations, Product & Marketing, Master Franchise Partner, Company).
 - Performance targets, scoring, and consequences.
 - Support service levels, response targets, escalation, and remedies.
+
+## Franchise Net Sales GST Exclusion (NP-01) — 2026-09-04
+
+### Status: IMPLEMENTED — PRODUCTION VERIFIED
+
+- **Commit**: `3580846` (`feat(franchise): exclude GST from Net Sales per NP-01 approved rule`)
+- **ADR reference**: ADR 014, FRANCHISE-COMMERCIAL-RULES-APPROVALS.md NP-01 (approved 2026-09-02)
+- **Production deploy commit**: `3580846`
+- **Production verification date**: 2026-09-04
+
+### Problem
+
+`report-service.ts` computed per-branch and per-territory sales using `invoice.totalCents`, which includes GST. Per NP-01 (approved 2026-09-02), Net Sales should exclude GST: `totalCents - gstCents`.
+
+### Resolution
+
+Added `gstCents` to both invoice queries (partner branches and all-territory branches). Changed both sales map calculations to compute `netSalesCents = invoice.totalCents - invoice.gstCents` and sum that instead of `totalCents`.
+
+### Changes
+
+- `packages/authentication-context-prisma/src/report-service.ts`:
+  - Both invoice `select` clauses now include `gstCents`.
+  - `branchSalesMap` sums `totalCents - gstCents` per branch.
+  - `allTerritoryBranchSalesMap` sums `totalCents - gstCents` per branch.
+- `packages/authentication-context-prisma/src/report-service.test.ts`:
+  - Updated `createFranchisePrisma` invoice type to accept optional `gstCents`.
+  - Added test: "excludes GST from sales (Net Sales = totalCents - gstCents)" — verifies `grossRevenueCents: 8500000` (₹100K - ₹15K GST), `revenueShareCents: 1700000` (20% of ₹85K), `eligibleRevenueSharePayoutCents: 1700000` (> ₹15K MG floor).
+
+### Production Verification
+
+- ✅ Franchise payout API returns real production data.
+- ✅ For existing production invoices (where `gstCents` may be0 or not set), the calculation correctly computes `totalCents - gstCents`.
+- ✅ Regression: all endpoints return200.
 
 
 
