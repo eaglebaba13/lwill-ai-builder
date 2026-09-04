@@ -37,6 +37,7 @@ model Tenant {
   memberships      Membership[]
   invoices         Invoice[]
   invoiceLineItems InvoiceLineItem[]
+  payments         Payment[]
   categories       Category[]
   products         Product[]
   stockItems       StockItem[]
