@@ -578,7 +578,7 @@ describe("X Nail native authentication integration", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
-      .mockResolvedValueOnce(Response.json({ roles: [{ id: "role-1", code: "tenant-admin", name: "Admin", scope: { kind: "tenant" }, permissions: [] }], permissionCodes: ["tenant.manage"] }))
+      .mockResolvedValueOnce(Response.json({ roles: [{ id: "role-1", code: "tenant-admin", name: "Admin", scope: { kind: "tenant" }, permissions: [] }], permissionCodes: ["tenant.manage", "setting.read", "setting.write"] }))
       .mockResolvedValueOnce(Response.json({ customers: [{ id: "cust-1", name: "Test Customer", tenantId: "tenant-xnail", phone: "555-0100", email: null, notes: null, isActive: true }] }))
       .mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = typeof input === "string" ? input : input.toString();
@@ -633,7 +633,7 @@ describe("X Nail native authentication integration", () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
-      .mockResolvedValueOnce(Response.json({ roles: [{ id: "role-1", code: "tenant-admin", name: "Admin", scope: { kind: "tenant" }, permissions: [] }], permissionCodes: ["tenant.manage"] }))
+      .mockResolvedValueOnce(Response.json({ roles: [{ id: "role-1", code: "tenant-admin", name: "Admin", scope: { kind: "tenant" }, permissions: [] }], permissionCodes: ["tenant.manage", "setting.read", "setting.write"] }))
       .mockResolvedValueOnce(Response.json({ customers: [] }))
       .mockResolvedValueOnce(Response.json({ services: [] }))
       .mockResolvedValueOnce(Response.json({ settings: [] }))

@@ -725,7 +725,7 @@ export default function Home() {
   }, [authenticated]);
 
   useEffect(() => {
-    if (authenticated !== true || activeTab !== "Settings" || !permissionCodes.includes("tenant.manage")) {
+    if (authenticated !== true || activeTab !== "Settings" || (!permissionCodes.includes("setting.read") && !permissionCodes.includes("setting.write"))) {
       return;
     }
 
