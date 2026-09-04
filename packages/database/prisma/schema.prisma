@@ -48,6 +48,7 @@ model Tenant {
   notificationProviderConfigs NotificationProviderConfig[]
   notificationPreferences     NotificationPreference[]
   eventSubscriptions          EventSubscription[]
+  gatewayAccounts             GatewayAccount[]
   warehouses            Warehouse[]
   suppliers             Supplier[]
   reorderRules          ReorderRule[]
@@ -576,6 +577,23 @@ model Payment {
   @@unique([tenantId, id])
   @@index([tenantId, invoiceId])
   @@index([tenantId, paidAt])
+}
+
+model GatewayAccount {
+  id             String                   @id @default(uuid()) @db.Uuid
+  tenantId       String                   @db.Uuid
+  provider       String
+  label          String?
+  isActive       Boolean                  @default(true)
+  config         Json?
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, id])
+  @@index([tenantId, provider])
+  @@index([tenantId, isActive])
 }
 
 model AuditLog {
