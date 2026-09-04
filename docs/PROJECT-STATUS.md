@@ -3113,5 +3113,30 @@ The `renderVariables()` function already handles missing variables gracefully by
 - Lint: 0 errors, 15 warnings
 - Build: PASS
 
+## Notification Queue Concurrency Fix — 2026-09-04
+
+### Production Finding
+The notification queue processor had no atomic claim mechanism. If two processor instances ran concurrently, both could read the same PENDING/FAILED items and process them, causing duplicate notification delivery.
+
+### Root Cause
+The processor used `listNotificationQueues()` (non-atomic `findMany`) to read eligible items, then processed them sequentially without claiming. No row locking, no status transition before processing, no concurrent worker protection.
+
+### Fix
+1. **Queue service**: Added `claimNotificationQueue(tenantId, queueId)` — atomically updates status from PENDING/FAILED to PROCESSING using `updateMany` with WHERE clause. Returns true if claimed, false if already claimed by another processor.
+2. **Queue service**: Added `resetStuckProcessing(tenantId?)` — resets PROCESSING items stuck for >5 minutes back to PENDING (recovery for crashed processors).
+3. **Processor**: Calls `resetStuckProcessing()` at start of each run, then `claimNotificationQueue()` before processing each item. Skips items that can't be claimed.
+
+### Safety
+- No schema change required — uses existing `status` and `updatedAt` fields
+- No Redis/BullMQ/external dependencies — pure Prisma `updateMany` atomic operation
+- Preserves existing retry policy, tenant isolation, delivery behavior
+- Stuck PROCESSING items automatically recover after 5 minutes
+
+### Tests
+- 65 files / 551 notification tests: PASS
+- 58 files / 657 web tests: PASS
+- Lint: 0 errors, 15 warnings
+- Build: PASS
+
 
 
