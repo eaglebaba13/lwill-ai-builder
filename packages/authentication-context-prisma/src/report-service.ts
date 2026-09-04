@@ -661,7 +661,7 @@ export function createReportService(prisma: ReportPrismaClient): ReportService {
               lt: monthEnd,
             },
           },
-          select: { branchId: true, totalCents: true },
+          select: { branchId: true, totalCents: true, gstCents: true },
         }),
         prisma.franchiseAgreement.findMany({
           where: {
@@ -706,17 +706,19 @@ export function createReportService(prisma: ReportPrismaClient): ReportService {
             lt: monthEnd,
           },
         },
-        select: { branchId: true, totalCents: true },
+        select: { branchId: true, totalCents: true, gstCents: true },
       });
 
       const branchSalesMap = new Map<string, number>();
       for (const invoice of invoices) {
-        branchSalesMap.set(invoice.branchId, (branchSalesMap.get(invoice.branchId) ?? 0) + invoice.totalCents);
+        const netSalesCents = invoice.totalCents - invoice.gstCents;
+        branchSalesMap.set(invoice.branchId, (branchSalesMap.get(invoice.branchId) ?? 0) + netSalesCents);
       }
 
       const allTerritoryBranchSalesMap = new Map<string, number>();
       for (const invoice of allTerritoryInvoices) {
-        allTerritoryBranchSalesMap.set(invoice.branchId, (allTerritoryBranchSalesMap.get(invoice.branchId) ?? 0) + invoice.totalCents);
+        const netSalesCents = invoice.totalCents - invoice.gstCents;
+        allTerritoryBranchSalesMap.set(invoice.branchId, (allTerritoryBranchSalesMap.get(invoice.branchId) ?? 0) + netSalesCents);
       }
 
       const territorySalesMap = new Map<string, number>();

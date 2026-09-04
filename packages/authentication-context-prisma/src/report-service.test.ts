@@ -662,7 +662,7 @@ describe("report service: getFranchisePayout", () => {
         branch: { id: string; name: string; territoryId: string | null };
       }>;
     }>;
-    invoices: Array<{ branchId: string; totalCents: number; issuedAt: Date }>;
+    invoices: Array<{ branchId: string; totalCents: number; issuedAt: Date; gstCents?: number }>;
     distributions?: Array<{ agreementOutletId: string; percentage: number }>;
   }) {
     const territoryFindMany = vi.fn(async (args: { where?: Record<string, unknown> }) => {
@@ -1086,6 +1086,49 @@ describe("report service: getFranchisePayout", () => {
 
     expect(result.payouts[0]!.agreementPayouts[0]).toMatchObject({
       eligibleRevenueSharePayoutCents: 1500000,
+    });
+  });
+
+  it("excludes GST from sales (Net Sales = totalCents - gstCents)", async () => {
+    const prisma = createFranchisePrisma({
+      partners: [{ id: "partner-1", userId: "user-1", name: "Kushwaha" }],
+      territories: [{ id: "territory-1", name: "Surat" }],
+      branches: [{ id: "branch-1", name: "Main", territoryId: "territory-1" }],
+      agreements: [
+        {
+          id: "agreement-1",
+          tenantId: "tenant-1",
+          partnerId: "partner-1",
+          territoryId: "territory-1",
+          startDate: baseDate(1),
+          endDate: null,
+          partner: { id: "partner-1", name: "Kushwaha" },
+          territory: { id: "territory-1", name: "Surat" },
+          outlets: [
+            {
+              id: "outlet-1",
+              branchId: "branch-1",
+              branch: { id: "branch-1", name: "Main", territoryId: "territory-1" },
+            },
+          ],
+        },
+      ],
+      invoices: [
+        { branchId: "branch-1", totalCents: 10000000, issuedAt: baseDate(5), gstCents: 1500000 },
+      ],
+      distributions: [
+        { agreementOutletId: "outlet-1", percentage: 20 },
+      ],
+    });
+    const service = createReportService(prisma);
+
+    const result = await service.getFranchisePayout({ tenantId: "tenant-1", year: 2026, month: 8 });
+
+    expect(result.payouts).toHaveLength(1);
+    expect(result.payouts[0]!.agreementPayouts[0]).toMatchObject({
+      grossRevenueCents: 8500000,
+      revenueShareCents: 1700000,
+      eligibleRevenueSharePayoutCents: 1700000,
     });
   });
 
