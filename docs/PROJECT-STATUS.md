@@ -3072,5 +3072,46 @@ The `renderVariables()` function already handles missing variables gracefully by
 - Missing template variables produce a warning log instead of a silent failure
 - Event handler errors are now observable in server logs
 
+## EventSubscription REST API — 2026-09-04
+
+### Status: **IMPLEMENTED — READY FOR PRODUCTION VERIFICATION**
+
+### API Endpoints
+- `GET /api/event-subscriptions` — List subscriptions (optional `?eventType=` filter)
+- `GET /api/event-subscriptions/[id]` — Get subscription by ID
+- `POST /api/event-subscriptions` — Create subscription
+- `PATCH /api/event-subscriptions/[id]` — Update subscription
+- `DELETE /api/event-subscriptions/[id]` — Delete subscription
+
+### Authorization
+- Read operations: `notification.read` permission
+- Write operations: `notification.write` permission
+- Server-side enforcement via `authorizeFromContext()`
+- Fail-closed: unauthenticated → 401, unauthorized → 403
+
+### Tenant Isolation
+- All operations use server-derived `tenantId` from authenticated context
+- Cross-tenant access rejected (returns null/404)
+- Client-supplied `tenantId` is ignored
+
+### Validation
+- `eventType`: required, non-empty string
+- `notificationTemplateId`: optional, must be string or null
+- `isEnabled`: optional boolean
+- Extra fields rejected
+- Invalid JSON rejected
+
+### Reuses
+- `EventSubscriptionService` (existing)
+- `EventSubscription` Prisma model (existing)
+- `notification.read`/`notification.write` permissions (existing)
+- Same API conventions as notification templates/logs/preferences
+
+### Tests
+- 19 focused route handler tests: PASS
+- 58 files / 657 web tests: PASS
+- Lint: 0 errors, 15 warnings
+- Build: PASS
+
 
 
