@@ -523,6 +523,7 @@ model Invoice {
   customer Customer @relation(fields: [tenantId, customerId], references: [tenantId, id], onDelete: Restrict)
   branch Branch? @relation(fields: [tenantId, branchId], references: [tenantId, id], onDelete: Restrict)
   lineItems InvoiceLineItem[]
+  payments   Payment[]
 
   @@unique([tenantId, id])
   @@index([tenantId, issuedAt])
@@ -555,6 +556,25 @@ model InvoiceLineItem {
   @@index([tenantId, serviceId])
   @@index([tenantId, packageId])
   @@index([tenantId, productId])
+}
+
+model Payment {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @db.Uuid
+  invoiceId      String   @db.Uuid
+  amountCents    Int
+  method         String   @default("offline")
+  paidAt         DateTime @default(now())
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  invoice Invoice @relation(fields: [tenantId, invoiceId], references: [tenantId, id], onDelete: Restrict)
+
+  @@unique([tenantId, id])
+  @@index([tenantId, invoiceId])
+  @@index([tenantId, paidAt])
 }
 
 model AuditLog {

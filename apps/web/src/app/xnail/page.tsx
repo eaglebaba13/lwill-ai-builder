@@ -225,6 +225,7 @@ export default function Home() {
     gstCents: number;
     totalCents: number;
     notes: string | null;
+    paidCents?: number;
   }>>([]);
   const [isLoadingInvoices, setIsLoadingInvoices] = useState(false);
   const [invoiceError, setInvoiceError] = useState<string | null>(null);
@@ -240,6 +241,12 @@ export default function Home() {
   const [cartItemQuantity, setCartItemQuantity] = useState("1");
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [payingInvoiceId, setPayingInvoiceId] = useState<string | null>(null);
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("offline");
+  const [paymentNotes, setPaymentNotes] = useState("");
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [isRecordingPayment, setIsRecordingPayment] = useState(false);
   const [products, setProducts] = useState<Array<{ id: string; name: string; sku: string; priceCents: number; isActive: boolean }>>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   const [productError, setProductError] = useState<string | null>(null);
@@ -2974,6 +2981,49 @@ export default function Home() {
     setCartItems([]);
     setInvoiceNotes("");
     setIsCheckingOut(false);
+  };
+
+  const recordPayment = async () => {
+    if (!payingInvoiceId || !paymentAmount.trim()) return;
+    const amountCents = Math.round(Number(paymentAmount) * 100);
+    if (!Number.isFinite(amountCents) || amountCents <= 0) {
+      setPaymentError("Enter a valid positive amount.");
+      return;
+    }
+    setPaymentError(null);
+    setIsRecordingPayment(true);
+    const result = await fetch("/api/payments", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        invoiceId: payingInvoiceId,
+        amountCents,
+        method: paymentMethod,
+        notes: paymentNotes || null,
+      }),
+    });
+    if (result.status === 401) { setAuthenticated(false); setIsRecordingPayment(false); return; }
+    if (result.status === 403) { setPaymentError("You are not authorized to record payments."); setIsRecordingPayment(false); return; }
+    if (result.status === 404) { setPaymentError("Invoice not found."); setIsRecordingPayment(false); return; }
+    if (!result.ok) {
+      const body = await result.json().catch(() => ({}));
+      setPaymentError(body?.error ?? "Payment could not be recorded.");
+      setIsRecordingPayment(false);
+      return;
+    }
+    const paymentResult = await result.json() as { payment: { amountCents: number } };
+    setInvoices((current) =>
+      current.map((inv) =>
+        inv.id === payingInvoiceId
+          ? { ...inv, paidCents: (inv.paidCents ?? 0) + paymentResult.payment.amountCents }
+          : inv,
+      ),
+    );
+    setPayingInvoiceId(null);
+    setPaymentAmount("");
+    setPaymentNotes("");
+    setIsRecordingPayment(false);
   };
 
   const addProduct = async () => {
@@ -5908,18 +5958,34 @@ export default function Home() {
                           <div className="flex items-center gap-2">
                             <div className="text-right text-sm text-[#a39a86]">
                               <div>Total ₹{invoice.totalCents / 100}</div>
+                              {invoice.paidCents !== undefined && invoice.paidCents > 0 ? (
+                                <div className="text-[#3fae6a]">Paid ₹{(invoice.paidCents / 100).toFixed(2)}</div>
+                              ) : null}
                               <div>{invoice.notes ?? "—"}</div>
                             </div>
-                            <button
-                              onClick={() => {
-                                setEditingInvoiceId(invoice.id);
-                                setEditingInvoiceDiscountCents(String(invoice.discountCents));
-                                setEditingInvoiceNotes(invoice.notes ?? "");
-                              }}
-                              className="premium-btn-secondary px-3 py-1.5 text-xs"
-                            >
-                              Edit
-                            </button>
+                            <div className="flex flex-col gap-1">
+                              <button
+                                onClick={() => {
+                                  setEditingInvoiceId(invoice.id);
+                                  setEditingInvoiceDiscountCents(String(invoice.discountCents));
+                                  setEditingInvoiceNotes(invoice.notes ?? "");
+                                }}
+                                className="premium-btn-secondary px-3 py-1.5 text-xs"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setPayingInvoiceId(invoice.id);
+                                  setPaymentAmount("");
+                                  setPaymentNotes("");
+                                  setPaymentError(null);
+                                }}
+                                className="rounded-lg border border-[rgba(63,174,106,0.3)] bg-[rgba(63,174,106,0.08)] px-3 py-1.5 text-xs font-medium text-[#3fae6a] hover:bg-[rgba(63,174,106,0.15)]"
+                              >
+                                Pay
+                              </button>
+                            </div>
                           </div>
                         </div>
                       ) : (
@@ -6086,6 +6152,58 @@ export default function Home() {
                 </button>
               </div>
             </div>
+
+            {payingInvoiceId ? (
+              <div className="rounded-2xl border border-[rgba(63,174,106,0.2)] bg-[#12110f] p-5">
+                <h2 className="text-xl font-semibold">Record Payment</h2>
+                <div className="mt-4 space-y-3">
+                  {paymentError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{paymentError}</div> : null}
+                  <div className="text-sm text-[#a39a86]">
+                    Invoice: {invoices.find((inv) => inv.id === payingInvoiceId)?.totalCents !== undefined
+                      ? `₹${invoices.find((inv) => inv.id === payingInvoiceId)!.totalCents / 100}`
+                      : payingInvoiceId}
+                  </div>
+                  <input
+                    value={paymentAmount}
+                    onChange={(event) => setPaymentAmount(event.target.value)}
+                    placeholder="Amount (e.g. 1500.00)"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    className="premium-input"
+                  />
+                  <select
+                    value={paymentMethod}
+                    onChange={(event) => setPaymentMethod(event.target.value)}
+                    className="premium-input"
+                  >
+                    <option value="offline">Offline</option>
+                    <option value="online">Online</option>
+                  </select>
+                  <input
+                    value={paymentNotes}
+                    onChange={(event) => setPaymentNotes(event.target.value)}
+                    placeholder="Notes (optional)"
+                    className="premium-input"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={recordPayment}
+                      disabled={isRecordingPayment}
+                      className="premium-btn-primary w-full py-2.5 text-sm disabled:opacity-60"
+                    >
+                      {isRecordingPayment ? "Recording..." : "Record Payment"}
+                    </button>
+                    <button
+                      onClick={() => { setPayingInvoiceId(null); setPaymentError(null); }}
+                      className="rounded-xl bg-[#f0dfe6] px-4 py-2.5 text-sm font-semibold text-[#d4af37]"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </section>
         ) : null}
 
