@@ -3380,7 +3380,7 @@ Result:
 ### Notes
 
 - No code changes, no schema changes, no migrations. Operations-only fix.
-- The Settings UI data-loading effect (`page.tsx:728`) gates on `tenant.manage` rather than `setting.read`. This is a minor code-level inconsistency (a user with `setting.read` but not `tenant.manage` would see the Settings tab but get no data). This does not affect `tenant-admin` users who have both permissions. A code fix to align the gate with `setting.read` is deferred.
+- The Settings UI data-loading effect (`page.tsx:728`) now correctly gates on `setting.read || setting.write` (fixed in commit `ba27b19`). The previous gate used `tenant.manage`, which was a code-level inconsistency with the tab visibility gate in `role-dashboard-config.ts:193`.
 
 
 
