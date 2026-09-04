@@ -6841,6 +6841,7 @@ export default function Home() {
               </div>
             </div>
 
+            {permissionCodes.includes("setting.write") ? (
             <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
               <h2 className="text-xl font-semibold">Add setting</h2>
               <div className="mt-4 space-y-3">
@@ -6864,6 +6865,7 @@ export default function Home() {
                 </button>
               </div>
             </div>
+            ) : null}
           </section>
         ) : null}
 
