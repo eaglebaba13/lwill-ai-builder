@@ -47,6 +47,8 @@ export interface NotificationQueueService {
   getNotificationQueue(args: { tenantId: string; queueId: string }): Promise<NotificationQueueRecord | null>;
   listNotificationQueues(args: { tenantId: string; status?: string }): Promise<readonly NotificationQueueRecord[]>;
   updateNotificationQueue(args: { tenantId: string; queueId: string; input: NotificationQueueUpdateInput }): Promise<NotificationQueueRecord | null>;
+  claimNotificationQueue(tenantId: string, queueId: string): Promise<boolean>;
+  resetStuckProcessing(tenantId?: string): Promise<number>;
 }
 
 interface NotificationQueuePrismaClient {
@@ -55,6 +57,7 @@ interface NotificationQueuePrismaClient {
     findUnique: (args: { where: { id: string } }) => Promise<NotificationQueueRecord | null>;
     findMany: (args: { where?: Record<string, unknown>; orderBy?: Record<string, unknown> }) => Promise<NotificationQueueRecord[]>;
     update: (args: { data: Record<string, unknown>; where: { id: string } }) => Promise<NotificationQueueRecord>;
+    updateMany: (args: { where: Record<string, unknown>; data: Record<string, unknown> }) => Promise<{ count: number }>;
   };
 }
 
@@ -108,6 +111,34 @@ export function createNotificationQueueService(prisma: NotificationQueuePrismaCl
       if (input.nextAttemptAt !== undefined) data.nextAttemptAt = input.nextAttemptAt;
       if (input.errorMessage !== undefined) data.errorMessage = input.errorMessage;
       return prisma.notificationQueue.update({ where: { id: queueId }, data });
+    },
+
+    async claimNotificationQueue(tenantId: string, queueId: string): Promise<boolean> {
+      const result = await prisma.notificationQueue.updateMany({
+        where: {
+          id: queueId,
+          tenantId,
+          status: { in: ["PENDING", "FAILED"] },
+        },
+        data: { status: "PROCESSING" },
+      });
+      return result.count > 0;
+    },
+
+    async resetStuckProcessing(tenantId?: string): Promise<number> {
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+      const where: Record<string, unknown> = {
+        status: "PROCESSING",
+        updatedAt: { lt: fiveMinutesAgo },
+      };
+      if (tenantId !== undefined && tenantId !== null && tenantId !== "") {
+        where.tenantId = tenantId;
+      }
+      const result = await prisma.notificationQueue.updateMany({
+        where,
+        data: { status: "PENDING" },
+      });
+      return result.count;
     },
   };
 }

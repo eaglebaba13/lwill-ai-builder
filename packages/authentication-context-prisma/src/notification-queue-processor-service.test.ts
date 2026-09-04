@@ -43,6 +43,26 @@ function createPrisma(overrides: {
         queues[index] = updated;
         return updated;
       }),
+      updateMany: vi.fn(async ({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
+        let count = 0;
+        for (let i = 0; i < queues.length; i++) {
+          const q = queues[i];
+          if (where.id && q.id !== where.id) continue;
+          if (where.tenantId && q.tenantId !== where.tenantId) continue;
+          if (where.status) {
+            if (typeof where.status === "string" && q.status !== where.status) continue;
+            if (typeof where.status === "object" && (where.status as Record<string, unknown>).in) {
+              if (!(where.status as Record<string, unknown>).in.includes(q.status)) continue;
+            }
+          }
+          if (where.updatedAt && (where.updatedAt as Record<string, unknown>).lt) {
+            if (q.updatedAt >= (where.updatedAt as Record<string, unknown>).lt) continue;
+          }
+          queues[i] = { ...q, ...data, updatedAt: new Date() } as NotificationQueueRecord;
+          count++;
+        }
+        return { count };
+      }),
     },
     notificationLog: {
       create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {

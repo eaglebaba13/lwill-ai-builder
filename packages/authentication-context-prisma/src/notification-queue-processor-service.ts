@@ -46,6 +46,8 @@ export function createNotificationQueueProcessorService(
     const batchSize = input.batchSize ?? 50;
     const now = new Date();
 
+    await queueService.resetStuckProcessing(input.tenantId);
+
     const statuses = ["PENDING", "FAILED"];
     const allItems: NotificationQueueRecord[] = [];
     for (const status of statuses) {
@@ -73,6 +75,11 @@ export function createNotificationQueueProcessorService(
     const errors: Array<{ queueId: string; error: string }> = [];
 
     for (const queueItem of batch) {
+      const claimed = await queueService.claimNotificationQueue(queueItem.tenantId, queueItem.id);
+      if (!claimed) {
+        continue;
+      }
+
       try {
         const template = await templateService.getNotificationTemplate({
           tenantId: queueItem.tenantId,
