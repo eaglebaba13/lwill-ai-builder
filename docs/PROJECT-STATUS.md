@@ -5,8 +5,8 @@
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
   - **Current Branch**: `phase-1d-native-auth`
-  - **Current HEAD Commit**: `f6a63db` (`docs: mark payment and gateway foundations production verified`)
-  - **Git State**: `phase-1d-native-auth` at `f6a63db`; Payment and Gateway Account foundations production-verified. Settings permission bootstrap run in production — `setting.read` and `setting.write` now granted to `tenant-admin`.
+  - **Current HEAD Commit**: `f36d1d7` (`feat(franchise): read MG from agreement minimumGuaranteeCents instead of hardcoded constant`)
+  - **Git State**: `phase-1d-native-auth` at `f36d1d7`; Franchise MG now reads from agreement-level `minimumGuaranteeCents` column (backfilled to ₹15,000 for existing agreements). Franchise payout API returns real production data. Payment, Gateway Account, and Settings foundations production-verified.
 
 ## Franchise Dashboard — Technical Implementation & Production Delivery — 2026-09-01
 
@@ -3381,6 +3381,59 @@ Result:
 
 - No code changes, no schema changes, no migrations. Operations-only fix.
 - The Settings UI data-loading effect (`page.tsx:728`) now correctly gates on `setting.read || setting.write` (fixed in commit `ba27b19`). The previous gate used `tenant.manage`, which was a code-level inconsistency with the tab visibility gate in `role-dashboard-config.ts:193`.
+
+## Franchise MG Agreement-Level Override — 2026-09-04
+
+### Status: IMPLEMENTED — PRODUCTION VERIFIED
+
+- **Commit**: `f36d1d7` (`feat(franchise): read MG from agreement minimumGuaranteeCents instead of hardcoded constant`)
+- **ADR reference**: ADR 014, FRANCHISE-COMMERCIAL-RULES-APPROVALS.md MG-01/MG-02 (approved 2026-09-02)
+- **Production deploy commit**: `f36d1d7`
+- **Production verification date**: 2026-09-04
+
+### Problem
+
+`report-service.ts:759` hardcoded the Minimum Guarantee (MG) floor as `1500000` (₹15,000). Per MG-01/MG-02 (approved 2026-09-02), MG should be read from the agreement-level `minimumGuaranteeCents` column, with formula-based MG (`investmentCents × 3%`) available for new products.
+
+### Resolution
+
+Replaced the hardcoded `1500000` with `agreement.minimumGuaranteeCents ?? 1500000` in `report-service.ts:759`. The `minimumGuaranteeCents` column was backfilled to `1500000` for existing agreements by migration `20260902130000_add_franchise_agreement_commercial_terms`. Updated the `ReportPrismaClient` interface to include `minimumGuaranteeCents` in the `franchiseAgreement.findMany` return type.
+
+### Changes
+
+- `packages/authentication-context-prisma/src/report-service.ts`:
+  - Updated `ReportPrismaClient.franchiseAgreement.findMany` return type to include `minimumGuaranteeCents: number | null`.
+  - Replaced `revenueShareCents > 1500000 ? revenueShareCents : 1500000` with `revenueShareCents > minimumGuaranteeCents ? revenueShareCents : minimumGuaranteeCents` where `minimumGuaranteeCents = agreement.minimumGuaranteeCents ?? 1500000`.
+- `packages/authentication-context-prisma/src/report-service.test.ts`:
+  - Updated `createFranchisePrisma` agreement type to accept optional `minimumGuaranteeCents`.
+  - Added test: "uses agreement-level minimumGuaranteeCents when set" (₹20K MG with `minimumGuaranteeCents=2000000`).
+  - Added test: "falls back to 1500000 MG when minimumGuaranteeCents is null".
+
+### Production Verification
+
+- ✅ Franchise payout API returns real production data for partner "Kushwaha Chandan Vijaybhai".
+- ✅ `eligibleRevenueSharePayoutCents: 1500000` (₹15K MG read from `minimumGuaranteeCents` column, correctly applied when revenue share < MG).
+- ✅ `totalRevenueSharePayoutCents: 1500000` (MG floor correctly applied).
+- ✅ Territory royalty calculation: `royaltyPoolCents`, `eligiblePartnerCount`, `individualRoyaltyCents` all computed correctly.
+- ✅ Regression: Settings, Gateway Accounts, Invoice Payments, Auth/me all return 200.
+
+### Remaining Approved But Not Yet Implemented
+
+The following rules were approved on 2026-09-02 but are NOT YET coded in `report-service.ts`:
+
+- **MG-02**: Formula-based MG for new products: `investmentCents × 3%` (requires `FranchiseOutletProfile.investmentCents` lookup + `mgFormulaRateBp` from agreement). Schema columns exist (`mgFormulaRateBp`, `mgFormulaBase`, `investmentCents`).
+- **NP-01**: Net Sales = GST excluded (requires changing invoice sum from `totalCents` to `totalCents - gstCents`).
+- **NP-02**: Higher-of payout rule: `MAX(MG, 30% of Net Sales excluding GST)` (requires changing the MG comparison from fixed floor to computed higher-of).
+- **TR-01/TR-02**: Agreement-level royalty rate (requires `territoryRoyaltyRateBp` column on `FranchiseAgreement`; currently hardcoded to `0.02` / 2%).
+- **HR-02**: Agreement-level effective-dating snapshot (schema column `termsSnapshot` exists; not yet populated).
+
+### Remaining NOT SPECIFIED — APPROVAL REQUIRED
+
+- Net Sales deduction rules for discounts, refunds, returns, cancellations (NP-01 partial).
+- Settlement period, process, approval, payment, reconciliation, dispute handling.
+- 80% other revenue distribution beneficiaries (Salon Operations, Product & Marketing, Master Franchise Partner, Company).
+- Performance targets, scoring, and consequences.
+- Support service levels, response targets, escalation, and remedies.
 
 
 
