@@ -5,12 +5,29 @@ import { createAuthorizationService } from "@lwill/authorization-service/src/aut
 import { loadPermissionGrants } from "@lwill/authorization-prisma/src/load-permission-grants";
 import { prisma } from "../../../../../packages/database/src/client";
 import { createAppointmentService } from "../../../../../packages/authentication-context-prisma/src/appointment-service";
+import { createAppointmentEventEmitter } from "../../../../../packages/authentication-context-prisma/src/appointment-event-emitter";
+import { createDomainEventBus } from "../../../../../packages/authentication-context-prisma/src/domain-event-bus";
+import { createNotificationEventHandler } from "../../../../../packages/authentication-context-prisma/src/notification-event-handler";
+import { createEventSubscriptionService } from "../../../../../packages/authentication-context-prisma/src/event-subscription-service";
+import { createNotificationDispatcherService } from "../../../../../packages/authentication-context-prisma/src/notification-dispatcher-service";
 import type {
   AppointmentAuthorization,
   AppointmentRouteServices,
 } from "./appointment-route-handlers";
 
-const appointmentService = createAppointmentService(prisma as never);
+const baseAppointmentService = createAppointmentService(prisma as never);
+
+const eventBus = createDomainEventBus();
+const subscriptionService = createEventSubscriptionService(prisma as never);
+const dispatcherService = createNotificationDispatcherService(prisma as never);
+
+const notificationHandler = createNotificationEventHandler({
+  subscriptionService,
+  dispatcher: dispatcherService,
+});
+eventBus.subscribe("appointment.created", notificationHandler);
+
+const appointmentService = createAppointmentEventEmitter(baseAppointmentService, eventBus);
 
 const authService = createAuthorizationService({
   loadPermissionGrants,
