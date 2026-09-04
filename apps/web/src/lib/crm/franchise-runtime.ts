@@ -47,6 +47,7 @@ export function createFranchiseRouteServices(): FranchiseRouteServices {
     listPartners: (tenantId) => franchiseService.listPartners({ tenantId }),
     getPartner: (tenantId, partnerId) => franchiseService.getPartner({ tenantId, partnerId }),
     createPartner: (tenantId, data) => franchiseService.createPartner({ tenantId, ...data } as never),
+    updatePartner: (tenantId, partnerId, data) => franchiseService.updatePartner({ tenantId, partnerId, input: data } as never),
     listAgreements: (tenantId) => franchiseService.listAgreements({ tenantId }),
     getAgreement: (tenantId, agreementId) => franchiseService.getAgreement({ tenantId, agreementId }),
     createAgreement: (tenantId, data) => franchiseService.createAgreement({ tenantId, ...data } as never),

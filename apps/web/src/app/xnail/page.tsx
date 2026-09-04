@@ -506,6 +506,14 @@ export default function Home() {
   const [partners, setPartners] = useState<Array<{ id: string; name: string; email: string | null; phone: string | null; isActive: boolean; outletCount: number; agreementCount: number }>>([]);
   const [isLoadingPartners, setIsLoadingPartners] = useState(false);
   const [partnersError, setPartnersError] = useState<string | null>(null);
+  const [showAddPartner, setShowAddPartner] = useState(false);
+  const [editingPartnerId, setEditingPartnerId] = useState<string | null>(null);
+  const [partnerFormName, setPartnerFormName] = useState("");
+  const [partnerFormEmail, setPartnerFormEmail] = useState("");
+  const [partnerFormPhone, setPartnerFormPhone] = useState("");
+  const [partnerFormAddress, setPartnerFormAddress] = useState("");
+  const [partnerFormError, setPartnerFormError] = useState<string | null>(null);
+  const [partnerFormLoading, setPartnerFormLoading] = useState(false);
 
   const [agreements, setAgreements] = useState<Array<{ id: string; partnerId: string; territoryId: string; partnerName: string; territoryName: string; startDate: string; endDate: string | null; isActive: boolean; outletCount: number }>>([]);
   const [isLoadingAgreements, setIsLoadingAgreements] = useState(false);
@@ -2330,6 +2338,64 @@ export default function Home() {
       .finally(() => { if (mounted) { window.clearTimeout(loadingTimer); setIsLoadingPartners(false); } });
     return () => { mounted = false; window.clearTimeout(loadingTimer); };
   }, [authenticated, activeTab]);
+
+  const createPartner = async () => {
+    if (!partnerFormName.trim()) { setPartnerFormError("Name is required."); return; }
+    setPartnerFormError(null);
+    setPartnerFormLoading(true);
+    const result = await fetch("/api/franchise/partners", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: partnerFormName.trim(), email: partnerFormEmail.trim() || null, phone: partnerFormPhone.trim() || null, address: partnerFormAddress.trim() || null }),
+    });
+    if (result.status === 401) { setAuthenticated(false); setPartnerFormLoading(false); return; }
+    if (result.status === 403) { setPartnerFormError("You are not authorized to create partners."); setPartnerFormLoading(false); return; }
+    if (!result.ok) { const body = await result.json().catch(() => ({})); setPartnerFormError(body?.error ?? "Partner could not be created."); setPartnerFormLoading(false); return; }
+    const body = await result.json() as { partner: typeof partners[number] };
+    setPartners((current) => [...current, { ...body.partner, outletCount: 0, agreementCount: 0 }]);
+    setPartnerFormName(""); setPartnerFormEmail(""); setPartnerFormPhone(""); setPartnerFormAddress("");
+    setShowAddPartner(false);
+    setPartnerFormLoading(false);
+  };
+
+  const updatePartner = async (partnerId: string) => {
+    if (!partnerFormName.trim()) { setPartnerFormError("Name is required."); return; }
+    setPartnerFormError(null);
+    setPartnerFormLoading(true);
+    const result = await fetch(`/api/franchise/partners/${partnerId}`, {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: partnerFormName.trim(), email: partnerFormEmail.trim() || null, phone: partnerFormPhone.trim() || null, address: partnerFormAddress.trim() || null }),
+    });
+    if (result.status === 401) { setAuthenticated(false); setPartnerFormLoading(false); return; }
+    if (result.status === 403) { setPartnerFormError("You are not authorized to update partners."); setPartnerFormLoading(false); return; }
+    if (result.status === 404) { setPartnerFormError("Partner not found."); setPartnerFormLoading(false); return; }
+    if (!result.ok) { const body = await result.json().catch(() => ({})); setPartnerFormError(body?.error ?? "Partner could not be updated."); setPartnerFormLoading(false); return; }
+    const body = await result.json() as { partner: typeof partners[number] };
+    setPartners((current) => current.map((p) => (p.id === partnerId ? { ...p, ...body.partner } : p)));
+    setPartnerFormName(""); setPartnerFormEmail(""); setPartnerFormPhone(""); setPartnerFormAddress("");
+    setEditingPartnerId(null);
+    setPartnerFormLoading(false);
+  };
+
+  const startEditPartner = (partner: typeof partners[number]) => {
+    setEditingPartnerId(partner.id);
+    setPartnerFormName(partner.name);
+    setPartnerFormEmail(partner.email ?? "");
+    setPartnerFormPhone(partner.phone ?? "");
+    setPartnerFormAddress("");
+    setPartnerFormError(null);
+    setShowAddPartner(false);
+  };
+
+  const cancelPartnerForm = () => {
+    setShowAddPartner(false);
+    setEditingPartnerId(null);
+    setPartnerFormName(""); setPartnerFormEmail(""); setPartnerFormPhone(""); setPartnerFormAddress("");
+    setPartnerFormError(null);
+  };
 
   useEffect(() => {
     if (authenticated !== true || activeTab !== "Agreements") {
@@ -6476,8 +6542,31 @@ export default function Home() {
           <section className="mt-6 space-y-6">
             <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
               <h2 className="font-serif text-2xl font-bold bg-gradient-to-r from-[#9c7a1e] via-[#d4af37] to-[#f1d78c] bg-clip-text text-transparent">Franchise Partners</h2>
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(212,175,55,0.3)] bg-[#17150f] px-3 py-1 text-xs font-medium text-[#d4af37]">{partners.length} registered</span>
+              <div className="flex items-center gap-3">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(212,175,55,0.3)] bg-[#17150f] px-3 py-1 text-xs font-medium text-[#d4af37]">{partners.length} registered</span>
+                {permissionCodes.includes("franchise.write") ? (
+                  <button onClick={() => { cancelPartnerForm(); setShowAddPartner(true); }} className="premium-btn-primary px-4 py-2 text-sm">+ Add Partner</button>
+                ) : null}
+              </div>
             </div>
+
+            {(showAddPartner || editingPartnerId) ? (
+              <div className="rounded-2xl border border-[rgba(212,175,55,0.2)] bg-[#121110] p-5">
+                <h3 className="text-lg font-semibold text-[#f5f1e6]">{editingPartnerId ? "Edit Partner" : "Add New Partner"}</h3>
+                <div className="mt-4 space-y-3">
+                  {partnerFormError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{partnerFormError}</div> : null}
+                  <input value={partnerFormName} onChange={(e) => setPartnerFormName(e.target.value)} placeholder="Partner name *" className="premium-input" />
+                  <input value={partnerFormEmail} onChange={(e) => setPartnerFormEmail(e.target.value)} placeholder="Email" className="premium-input" />
+                  <input value={partnerFormPhone} onChange={(e) => setPartnerFormPhone(e.target.value)} placeholder="Phone" className="premium-input" />
+                  <input value={partnerFormAddress} onChange={(e) => setPartnerFormAddress(e.target.value)} placeholder="Address" className="premium-input" />
+                  <div className="flex gap-2">
+                    <button onClick={() => editingPartnerId ? updatePartner(editingPartnerId) : createPartner()} disabled={partnerFormLoading} className="premium-btn-primary px-4 py-2 text-sm disabled:opacity-60">{partnerFormLoading ? "Saving..." : editingPartnerId ? "Update Partner" : "Create Partner"}</button>
+                    <button onClick={cancelPartnerForm} className="rounded-xl bg-[#f0dfe6] px-4 py-2 text-sm font-semibold text-[#d4af37]">Cancel</button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
             {isLoadingPartners ? <div className="text-sm text-[#a39a86]">Loading partners...</div> : null}
             {!isLoadingPartners && partnersError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-4 text-sm text-[#d1554a]">{partnersError}</div> : null}
             {!isLoadingPartners && !partnersError && partners.length === 0 ? <div className="text-sm text-[#a39a86]">No franchise partners registered yet.</div> : null}
@@ -6489,15 +6578,22 @@ export default function Home() {
                       <div className="font-serif text-lg font-semibold text-[#f5f1e6]">{partner.name}</div>
                       <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${partner.isActive ? "border border-[rgba(63,174,106,0.3)] bg-[rgba(63,174,106,0.12)] text-[#3fae6a]" : "border border-[rgba(163,154,134,0.3)] bg-[rgba(163,154,134,0.12)] text-[#a39a86]"}`}>{partner.isActive ? "Active" : "Inactive"}</span>
                     </div>
-                    {partner.email ? <div className="mt-1 text-xs text-[#a39a86]">{partner.email}</div> : null}
-                    {partner.phone ? <div className="mt-1 text-xs text-[#a39a86]">{partner.phone}</div> : null}
+                    {partner.email ? <div className="mt-2 flex items-center gap-2 text-xs text-[#a39a86]"><span className="text-[#d4af37]">Email:</span><a href={`mailto:${partner.email}`} className="text-[#f5f1e6] hover:underline">{partner.email}</a></div> : null}
+                    {partner.phone ? <div className="mt-1 flex items-center gap-2 text-xs text-[#a39a86]"><span className="text-[#d4af37]">Mobile:</span><a href={`tel:${partner.phone}`} className="text-[#f5f1e6] hover:underline">{partner.phone}</a></div> : null}
                     <div className="mt-3 flex items-center justify-between text-xs text-[#a39a86]">
-                      <span>Outlets</span>
-                      <span className="font-medium text-[#f5f1e6]">{partner.outletCount}</span>
+                      <span>Outlets: <span className="font-medium text-[#f5f1e6]">{partner.outletCount}</span></span>
+                      <span>Agreements: <span className="font-medium text-[#f5f1e6]">{partner.agreementCount}</span></span>
                     </div>
-                    <div className="mt-1 flex items-center justify-between text-xs text-[#a39a86]">
-                      <span>Agreements</span>
-                      <span className="font-medium text-[#f5f1e6]">{partner.agreementCount}</span>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {partner.email ? <a href={`mailto:${partner.email}`} className="rounded-lg border border-[rgba(212,175,55,0.2)] bg-[#17150f] px-3 py-1.5 text-xs font-medium text-[#d4af37] hover:bg-[#1f1d15]">Email</a> : null}
+                      {partner.phone ? <a href={`tel:${partner.phone}`} className="rounded-lg border border-[rgba(212,175,55,0.2)] bg-[#17150f] px-3 py-1.5 text-xs font-medium text-[#d4af37] hover:bg-[#1f1d15]">Call</a> : null}
+                      {partner.phone ? <a href={`https://wa.me/${partner.phone.replace(/[^0-9]/g, "")}`} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-[rgba(63,174,106,0.3)] bg-[rgba(63,174,106,0.08)] px-3 py-1.5 text-xs font-medium text-[#3fae6a] hover:bg-[rgba(63,174,106,0.15)]">WhatsApp</a> : null}
+                    </div>
+                    <div className="mt-3 flex gap-2">
+                      {permissionCodes.includes("franchise.write") ? (
+                        <button onClick={() => startEditPartner(partner)} className="rounded-lg border border-[rgba(212,175,55,0.2)] bg-[#17150f] px-3 py-1.5 text-xs font-medium text-[#d4af37] hover:bg-[#1f1d15]">Edit</button>
+                      ) : null}
+                      <button onClick={() => window.open(`/xnail/franchise/partners/${partner.id}/dashboard`, "_blank")} className="premium-btn-primary px-3 py-1.5 text-xs">Open Dashboard</button>
                     </div>
                   </div>
                 ))}

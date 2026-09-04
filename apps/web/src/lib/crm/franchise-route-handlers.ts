@@ -13,6 +13,7 @@ export interface FranchiseRouteServices {
   readonly listPartners: (tenantId: string) => Promise<unknown>;
   readonly getPartner: (tenantId: string, partnerId: string) => Promise<unknown>;
   readonly createPartner: (tenantId: string, data: Record<string, unknown>) => Promise<unknown>;
+  readonly updatePartner: (tenantId: string, partnerId: string, data: Record<string, unknown>) => Promise<unknown | null>;
   readonly listAgreements: (tenantId: string) => Promise<unknown>;
   readonly getAgreement: (tenantId: string, agreementId: string) => Promise<unknown>;
   readonly createAgreement: (tenantId: string, data: Record<string, unknown>) => Promise<unknown>;
@@ -145,6 +146,34 @@ export async function handleCreatePartner(
   }
   const partner = await services.createPartner(authResult.tenantId, body);
   return response(201, { partner });
+}
+
+export async function handleUpdatePartner(
+  request: Request,
+  services: FranchiseRouteServices,
+  partnerId: string,
+): Promise<Response> {
+  const authorization = await services.authorize("franchise.write");
+  const authResult = authorizationOutcome(authorization);
+  if (!authResult.ok) {
+    return authResult.response;
+  }
+  const body = (await request.json()) as Record<string, unknown>;
+  if (body.tenantId !== undefined && body.tenantId !== authResult.tenantId) {
+    return response(400, { error: "tenantId mismatch" });
+  }
+  const allowedKeys = new Set(["name", "email", "phone", "panNumber", "gstin", "address", "isActive"]);
+  if (Object.keys(body).some((key) => !allowedKeys.has(key))) {
+    return response(400, { error: "Only name, email, phone, panNumber, gstin, address, and isActive are allowed" });
+  }
+  if (Object.keys(body).length === 0) {
+    return response(400, { error: "At least one field must be provided" });
+  }
+  const partner = await services.updatePartner(authResult.tenantId, partnerId, body);
+  if (partner === null) {
+    return response(404);
+  }
+  return response(200, { partner });
 }
 
 export async function handleListAgreements(

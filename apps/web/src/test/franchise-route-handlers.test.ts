@@ -26,6 +26,7 @@ function createServices(authorization: FranchiseAuthorization): FranchiseRouteSe
     listPartners: vi.fn().mockResolvedValue([]),
     getPartner: vi.fn().mockResolvedValue({ id: "p1", name: "Kushwaha" }),
     createPartner: vi.fn().mockResolvedValue({ id: "p1" }),
+    updatePartner: vi.fn().mockResolvedValue({ id: "p1", name: "Updated" }),
     listAgreements: vi.fn().mockResolvedValue([]),
     getAgreement: vi.fn().mockResolvedValue({ id: "a1" }),
     createAgreement: vi.fn().mockResolvedValue({ id: "a1" }),

@@ -73,6 +73,16 @@ export interface FranchisePartnerCreateInput {
   readonly address?: string | null;
 }
 
+export interface FranchisePartnerUpdateInput {
+  readonly name?: string;
+  readonly email?: string | null;
+  readonly phone?: string | null;
+  readonly panNumber?: string | null;
+  readonly gstin?: string | null;
+  readonly address?: string | null;
+  readonly isActive?: boolean;
+}
+
 export interface FranchiseAgreementCreateInput {
   readonly tenantId: string;
   readonly partnerId: string;
@@ -122,6 +132,7 @@ export interface FranchiseService {
   listPartners(args: { tenantId: string }): Promise<ReadonlyArray<FranchisePartnerRecord & { readonly outletCount: number; readonly agreementCount: number }>>;
   getPartner(args: { tenantId: string; partnerId: string }): Promise<(FranchisePartnerRecord & { readonly outletCount: number; readonly agreementCount: number }) | null>;
   createPartner(input: FranchisePartnerCreateInput): Promise<FranchisePartnerRecord>;
+  updatePartner(args: { tenantId: string; partnerId: string; input: FranchisePartnerUpdateInput }): Promise<FranchisePartnerRecord | null>;
 
   listAgreements(args: { tenantId: string }): Promise<ReadonlyArray<FranchiseAgreementRecord & { readonly partnerName: string; readonly territoryName: string; readonly outletCount: number }>>;
   getAgreement(args: { tenantId: string; agreementId: string }): Promise<(FranchiseAgreementRecord & { readonly partnerName: string; readonly territoryName: string; readonly outletCount: number }) | null>;
@@ -145,6 +156,7 @@ interface FranchisePrismaClient {
     create(args: { data: Record<string, unknown> }): Promise<FranchisePartnerRecord>;
     findUnique(args: { where: { id: string } }): Promise<FranchisePartnerRecord | null>;
     findMany(args: { where?: Record<string, unknown> }): Promise<FranchisePartnerRecord[]>;
+    update(args: { data: Record<string, unknown>; where: { id: string } }): Promise<FranchisePartnerRecord>;
     count(args: { where?: Record<string, unknown> }): Promise<number>;
   };
   readonly franchiseAgreement: {
@@ -255,6 +267,22 @@ export function createFranchiseService(prisma: FranchisePrismaClient): Franchise
           address: input.address ?? null,
         },
       });
+    },
+
+    async updatePartner({ tenantId, partnerId, input }) {
+      const existing = await prisma.franchisePartner.findUnique({ where: { id: partnerId } });
+      if (existing === null || existing.tenantId !== tenantId) {
+        return null;
+      }
+      const data: Record<string, unknown> = {};
+      if (input.name !== undefined) data.name = input.name;
+      if (input.email !== undefined) data.email = input.email;
+      if (input.phone !== undefined) data.phone = input.phone;
+      if (input.panNumber !== undefined) data.panNumber = input.panNumber;
+      if (input.gstin !== undefined) data.gstin = input.gstin;
+      if (input.address !== undefined) data.address = input.address;
+      if (input.isActive !== undefined) data.isActive = input.isActive;
+      return prisma.franchisePartner.update({ where: { id: partnerId }, data });
     },
 
     async listAgreements({ tenantId }) {
