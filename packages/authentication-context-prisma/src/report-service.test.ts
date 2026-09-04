@@ -702,7 +702,7 @@ describe("report service: getFranchisePayout", () => {
       if (lt) {
         results = results.filter((invoice) => invoice.issuedAt < lt);
       }
-      return results;
+      return results.map((invoice) => ({ ...invoice, gstCents: invoice.gstCents ?? 0 }));
     });
 
     function matchesAgreement(agreement: typeof input.agreements[0], where: Record<string, unknown> | undefined): boolean {
@@ -915,11 +915,11 @@ describe("report service: getFranchisePayout", () => {
     expect(result.payouts[0]!.agreementPayouts[0]).toMatchObject({
       grossRevenueCents: 7500000,
       revenueShareCents: 1500000,
-      eligibleRevenueSharePayoutCents: 1500000,
+      eligibleRevenueSharePayoutCents: 2250000,
     });
   });
 
-  it("calculates revenue share at ₹80,000 → ₹16,000 payout", async () => {
+  it("calculates revenue share at ₹80,000 → ₹24,000 payout (30% of Net Sales)", async () => {
     const prisma = createFranchisePrisma({
       partners: [{ id: "partner-1", userId: "user-1", name: "Kushwaha" }],
       territories: [{ id: "territory-1", name: "Surat" }],
@@ -957,12 +957,12 @@ describe("report service: getFranchisePayout", () => {
     expect(result.payouts[0]!.agreementPayouts[0]).toMatchObject({
       grossRevenueCents: 8000000,
       revenueShareCents: 1600000,
-      eligibleRevenueSharePayoutCents: 1600000,
+      eligibleRevenueSharePayoutCents: 2400000,
     });
-    expect(result.payouts[0]!.totalRevenueSharePayoutCents).toBe(1600000);
+    expect(result.payouts[0]!.totalRevenueSharePayoutCents).toBe(2400000);
   });
 
-  it("calculates revenue share at ₹100,000 → ₹20,000 payout", async () => {
+  it("calculates revenue share at ₹100,000 → ₹30,000 payout (30% of Net Sales)", async () => {
     const prisma = createFranchisePrisma({
       partners: [{ id: "partner-1", userId: "user-1", name: "Kushwaha" }],
       territories: [{ id: "territory-1", name: "Surat" }],
@@ -1000,7 +1000,7 @@ describe("report service: getFranchisePayout", () => {
     expect(result.payouts[0]!.agreementPayouts[0]).toMatchObject({
       grossRevenueCents: 10000000,
       revenueShareCents: 2000000,
-      eligibleRevenueSharePayoutCents: 2000000,
+      eligibleRevenueSharePayoutCents: 3000000,
     });
   });
 
@@ -1128,7 +1128,7 @@ describe("report service: getFranchisePayout", () => {
     expect(result.payouts[0]!.agreementPayouts[0]).toMatchObject({
       grossRevenueCents: 8500000,
       revenueShareCents: 1700000,
-      eligibleRevenueSharePayoutCents: 1700000,
+      eligibleRevenueSharePayoutCents: 2550000,
     });
   });
 

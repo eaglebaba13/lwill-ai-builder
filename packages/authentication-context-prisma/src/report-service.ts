@@ -760,7 +760,8 @@ export function createReportService(prisma: ReportPrismaClient): ReportService {
             const percentage = distributionMap.get(outlet.id) ?? 0;
             const revenueShareCents = Math.round((grossRevenueCents * percentage) / 100);
             const minimumGuaranteeCents = agreement.minimumGuaranteeCents ?? 1500000;
-            const eligibleRevenueSharePayoutCents = revenueShareCents > minimumGuaranteeCents ? revenueShareCents : minimumGuaranteeCents;
+            const netSalesVariableReturnCents = Math.round(grossRevenueCents * 0.30);
+            const eligibleRevenueSharePayoutCents = Math.max(minimumGuaranteeCents, netSalesVariableReturnCents);
 
             return {
               agreementId: agreement.id,
