@@ -3053,4 +3053,24 @@ POST /api/appointments
 - Event subscription API: NOT IMPLEMENTED — no REST API for managing subscriptions
 - Scheduled triggers: NOT IMPLEMENTED — no cron/scheduler infrastructure
 
+## Notification Dispatch Failure Diagnosis — 2026-09-04
+
+### Production Finding
+The appointment.created event was emitted correctly, the EventSubscription was found, and the NotificationDispatcher was invoked. But no NotificationQueue or NotificationLog records were created. The `notification-event-handler.ts` catch block silently swallowed the dispatcher exception.
+
+### Root Cause
+`notification-dispatcher-service.ts` line 73-75 threw `Error: missing template variables: userName, tenantName` because the test template body (`"Hello {{userName}}, this is a test notification for {{tenantName}}."`) expected variables that the event payload (`{ appointmentId, customerId, serviceId, branchId, startsAt, endsAt, status }`) did not contain.
+
+The `renderVariables()` function already handles missing variables gracefully by leaving `{{placeholder}}` text in place, but the dispatcher threw anyway, preventing the notification from being created.
+
+### Fix
+1. **Dispatcher**: Changed strict `throw` on missing variables to `console.warn` — the rendered body with placeholders is now used instead of failing
+2. **Event handler**: Replaced silent catch with `console.error` logging that includes event type, tenant ID, subscription ID, template ID, and error message (no secrets)
+
+### Status
+- Event → notification dispatch path is now operational
+- Missing template variables produce a warning log instead of a silent failure
+- Event handler errors are now observable in server logs
+
+
 
