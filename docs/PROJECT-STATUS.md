@@ -2996,4 +2996,61 @@ The reference repository (`https://github.com/eaglebaba13/makemeartist`) is a **
 4. If business confirms multi-product need, initiate FP-01 revision process before creating any `FranchiseProduct` entity.
 5. Implement Commission, Reports, Settings, AI Assistant, Notification/WhatsApp automation, and Platform administration as separate approved phases.
 
+## Domain Event Foundation & appointment.created Wiring — 2026-09-03
+
+### Status: **IMPLEMENTED — READY FOR PRODUCTION VERIFICATION**
+
+### Implementation
+- **DomainEvent abstraction**: `domain-event.ts` — eventType, tenantId, payload, timestamp
+- **In-process event bus**: `domain-event-bus.ts` — publish/subscribe/unsubscribe, synchronous, no external dependencies
+- **EventSubscription model**: Prisma model with tenantId, eventType, notificationTemplateId, isEnabled. Migration `20260903120000_add_event_subscriptions` applied in production.
+- **EventSubscriptionService**: `event-subscription-service.ts` — tenant-scoped CRUD with findEnabledSubscriptions
+- **NotificationEventHandler**: `notification-event-handler.ts` — bridges domain events to existing NotificationDispatcher via subscription lookup
+- **AppointmentEventEmitter**: `appointment-event-emitter.ts` — wraps AppointmentService, emits `appointment.created` after successful creation
+- **Wiring**: `appointment-runtime.ts` — creates shared DomainEventBus, subscribes NotificationEventHandler to "appointment.created", wraps base AppointmentService with AppointmentEventEmitter
+
+### Call Path
+```
+POST /api/appointments
+→ handleCreateAppointment (route handler)
+→ createAppointmentRouteServices (runtime)
+→ AppointmentEventEmitter.createAppointment (wrapper)
+→ AppointmentService.createAppointment (base — Prisma write)
+→ success → DomainEventBus.publish("appointment.created")
+→ NotificationEventHandler
+→ EventSubscription.findEnabledSubscriptions
+→ NotificationDispatcher.dispatchNotification (for each matching subscription)
+→ return appointment to route handler
+→ 201 response
+```
+
+### Event Content
+- eventType: "appointment.created"
+- tenantId: from authoritative persisted appointment (not client-supplied)
+- payload: appointmentId, customerId, serviceId, branchId, startsAt, endsAt, status
+
+### Safety
+- Event emission only after successful Prisma write
+- Notification dispatch failure does not break business operation (caught silently)
+- Tenant isolation preserved — event uses persisted appointment.tenantId
+- No external dependencies (Redis/Kafka/etc.)
+- No transaction/rollback concerns — Prisma auto-commit model
+
+### Verification
+- `@lwill/authentication-context-prisma` tests: 65 files / 551 tests PASS
+- `apps/web` tests: 57 files / 638 tests PASS
+- `pnpm --filter web lint`: 0 errors, 15 pre-existing warnings
+- `pnpm build`: PASS
+
+### SRS Traceability
+- DOC-026 WF-002 (Event triggers): PARTIAL — appointment.created event wired
+- DOC-026 WF-005 (Notification actions): PARTIAL — event → notification bridge active
+- DOC-028 COM-003 (Event-triggered notifications): PARTIAL — appointment.created only
+
+### Remaining
+- invoice.paid event: BLOCKED — invoice service has no payment status concept
+- Other business events: NOT WIRED — requires individual implementation
+- Event subscription API: NOT IMPLEMENTED — no REST API for managing subscriptions
+- Scheduled triggers: NOT IMPLEMENTED — no cron/scheduler infrastructure
+
 
