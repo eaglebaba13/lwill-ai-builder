@@ -25,9 +25,9 @@ export function createNotificationEventHandler(deps: NotificationEventHandlerDep
           templateId: subscription.notificationTemplateId,
           variables: event.payload,
         });
-      } catch {
-        // Notification dispatch failure must not break the business operation.
-        // The dispatcher already handles queue creation and error logging.
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "unknown dispatch error";
+        console.error(`[notification-event-handler] dispatch failed: event=${event.eventType}, tenant=${event.tenantId}, subscription=${subscription.id}, template=${subscription.notificationTemplateId}, error=${errorMessage}`);
       }
     }
   };

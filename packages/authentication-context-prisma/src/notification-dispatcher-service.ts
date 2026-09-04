@@ -71,7 +71,7 @@ export function createNotificationDispatcherService(prisma: NotificationDispatch
 
       const { rendered, missingVariables } = renderVariables(template.body, input.variables ?? null);
       if (missingVariables.length > 0) {
-        throw new Error(`missing template variables: ${missingVariables.join(", ")}`);
+        console.warn(`[notification-dispatcher] missing template variables: ${missingVariables.join(", ")} (template: ${input.templateId}, tenant: ${input.tenantId})`);
       }
 
       const subject = template.subject ?? null;
