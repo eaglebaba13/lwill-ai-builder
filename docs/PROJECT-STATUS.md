@@ -5,8 +5,8 @@
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
   - **Current Branch**: `phase-1d-native-auth`
-  - **Current HEAD Commit**: `3580846` (`feat(franchise): exclude GST from Net Sales per NP-01 approved rule`)
-  - **Git State**: `phase-1d-native-auth` at `3580846`; Franchise MG agreement-level override and NP-01 Net Sales GST exclusion implemented and production-verified. Payment, Gateway Account, and Settings foundations production-verified.
+  - **Current HEAD Commit**: `8b67c2d` (`feat(franchise): implement higher-of payout rule MAX(MG, 30% Net Sales) per NP-02`)
+  - **Git State**: `phase-1d-native-auth` at `8b67c2d`; Franchise MG, NP-01, and NP-02 approved rules implemented and production-verified. Payment, Gateway Account, and Settings foundations production-verified.
 
 ## Franchise Dashboard — Technical Implementation & Production Delivery — 2026-09-01
 
@@ -3422,7 +3422,6 @@ Replaced the hardcoded `1500000` with `agreement.minimumGuaranteeCents ?? 150000
 The following rules were approved on 2026-09-02 but are NOT YET coded in `report-service.ts`:
 
 - **MG-02**: Formula-based MG for new products: `investmentCents × 3%` (requires `FranchiseOutletProfile.investmentCents` lookup + `mgFormulaRateBp` from agreement). Schema columns exist (`mgFormulaRateBp`, `mgFormulaBase`, `investmentCents`).
-- **NP-02**: Higher-of payout rule: `MAX(MG, 30% of Net Sales excluding GST)` (requires changing the MG comparison from fixed floor to computed higher-of).
 - **TR-01/TR-02**: Agreement-level royalty rate (requires `territoryRoyaltyRateBp` column on `FranchiseAgreement`; currently hardcoded to `0.02` / 2%).
 - **HR-02**: Agreement-level effective-dating snapshot (schema column `termsSnapshot` exists; not yet populated).
 
@@ -3466,6 +3465,38 @@ Added `gstCents` to both invoice queries (partner branches and all-territory bra
 - ✅ Franchise payout API returns real production data.
 - ✅ For existing production invoices (where `gstCents` may be0 or not set), the calculation correctly computes `totalCents - gstCents`.
 - ✅ Regression: all endpoints return200.
+
+## Franchise Higher-Of Payout Rule (NP-02) — 2026-09-04
+
+### Status: IMPLEMENTED — PRODUCTION VERIFIED
+
+- **Commit**: `8b67c2d` (`feat(franchise): implement higher-of payout rule MAX(MG, 30% Net Sales) per NP-02`)
+- **ADR reference**: ADR 014, FRANCHISE-COMMERCIAL-RULES-APPROVALS.md NP-02 (approved 2026-09-02)
+- **Production deploy commit**: `8b67c2d`
+- **Production verification date**: 2026-09-04
+
+### Problem
+
+`report-service.ts:763` compared `revenueShareCents` (20% distribution) to MG floor. Per NP-02 (approved 2026-09-02), the payout should be `MAX(MG, 30% of Net Sales excluding GST)`.
+
+### Resolution
+
+Replaced `revenueShareCents > minimumGuaranteeCents ? revenueShareCents : minimumGuaranteeCents` with `Math.max(minimumGuaranteeCents, Math.round(grossRevenueCents * 0.30))`. The `grossRevenueCents` variable already computes Net Sales (totalCents - gstCents) after the NP-01 change.
+
+### Changes
+
+- `packages/authentication-context-prisma/src/report-service.ts`:
+  - Added `netSalesVariableReturnCents = Math.round(grossRevenueCents * 0.30)`.
+  - Changed eligible payout to `Math.max(minimumGuaranteeCents, netSalesVariableReturnCents)`.
+- `packages/authentication-context-prisma/src/report-service.test.ts`:
+  - Updated test expectations: ₹75K → ₹22.5K (was ₹15K), ₹80K → ₹24K (was ₹16K), ₹100K → ₹30K (was ₹20K), NP-01 ₹85K net → ₹25.5K (was ₹17K).
+  - Added `gstCents` defaulting to `0` in invoice mock to avoid `NaN`.
+  - MG-floor tests (₹50K, zero revenue, cross-partner ₹20K) remain ₹15K MG — unchanged.
+
+### Production Verification
+
+- ✅ Franchise payout returns real data: `eligibleRevenueSharePayoutCents: 1500000` (₹15K MG when 30% of ₹15 = ₹4.5K < MG).
+- ✅ All regression endpoints return 200.
 
 
 
