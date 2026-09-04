@@ -5,8 +5,8 @@
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
   - **Current Branch**: `phase-1d-native-auth`
-  - **Current HEAD Commit**: `f484ce5` (`docs: record payment and gateway foundation status`)
-  - **Git State**: `phase-1d-native-auth` at `f484ce5`; Payment Recording Foundation (commit `1c4f99a`) and Reusable Gateway Account Foundation (commit `de467fb`) implemented, tested, built, lint-clean, committed, pushed, and production-verified. Both migrations applied. Authenticated API verification complete. Public DTO secret stripping confirmed. No regressions.
+  - **Current HEAD Commit**: `f6a63db` (`docs: mark payment and gateway foundations production verified`)
+  - **Git State**: `phase-1d-native-auth` at `f6a63db`; Payment and Gateway Account foundations production-verified. Settings permission bootstrap run in production — `setting.read` and `setting.write` now granted to `tenant-admin`.
 
 ## Franchise Dashboard — Technical Implementation & Production Delivery — 2026-09-01
 
@@ -3337,6 +3337,50 @@ Gateway configuration is server-side. Public DTOs strip the `config` field entir
 
 Credential encryption at rest remains **NOT SPECIFIED — APPROVAL REQUIRED**.
 
+## Settings Authorization Fix — 2026-09-04
+
+### Status: IMPLEMENTED — PRODUCTION VERIFIED
+
+### Problem
+
+The Settings tab in X NAIL returned "You are not authorized to view settings." in production. The `GET /api/settings` endpoint returned `403` for the authenticated `tenant-admin` user.
+
+### Root Cause
+
+The `setting.read` and `setting.write` permissions were never bootstrapped to the `tenant-admin` role in the production database. The Settings API requires `setting.read` for GET and `setting.write` for POST/PATCH (`apps/web/src/lib/crm/setting-route-handlers.ts:130,160,182`). The bootstrap CLI (`packages/authentication-context-prisma/src/initial-setting-permissions-bootstrap-cli.ts`) existed and was tested but was never run against production.
+
+### Resolution
+
+Ran `pnpm --filter @lwill/authentication-context-prisma run bootstrap:initial-setting-permissions` in the production container (`e7147dc1728e`).
+
+Result:
+```json
+{
+  "status": "completed",
+  "tenantId": "ae70e866-aa44-4cef-86f8-90fe253eb5ce",
+  "roleId": "a73b9ea0-5a89-4d12-b063-8452f577b447",
+  "permissionCodes": ["setting.read", "setting.write"],
+  "permissionsCreated": 2,
+  "rolePermissionsCreated": 2
+}
+```
+
+### Production Verification
+
+- ✅ `auth/me` confirms `setting.read` and `setting.write` now present in `tenant-admin` permission codes.
+- ✅ `GET /api/settings` returns `200` with `{"settings":[]}`.
+- ✅ `POST /api/settings` returns `201` with persisted setting.
+- ✅ Settings tab visibility: `role-dashboard-config.ts:193` gates on `setting.read || setting.write` — now true for `tenant-admin`.
+- ✅ Settings data loading: `page.tsx:728` gates on `tenant.manage` — already true for `tenant-admin`.
+
+### Test Artifacts
+
+- **Setting ID**: `6f9b89ec-aef4-4e2b-bade-e39d907490a4` (key: `verification.test.key`, persists in production)
+
+### Notes
+
+- No code changes, no schema changes, no migrations. Operations-only fix.
+- The Settings UI data-loading effect (`page.tsx:728`) gates on `tenant.manage` rather than `setting.read`. This is a minor code-level inconsistency (a user with `setting.read` but not `tenant.manage` would see the Settings tab but get no data). This does not affect `tenant-admin` users who have both permissions. A code fix to align the gate with `setting.read` is deferred.
 
 
 
