@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { AppSidebar } from "@/components/app-sidebar";
 import { AppHeader } from "@/components/app-header";
 
 export default function AdminPage() {
+  const router = useRouter();
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [activeSection, setActiveSection] = useState("dashboard");
   const [platformStatus, setPlatformStatus] = useState<string | null>(null);
@@ -42,14 +44,14 @@ export default function AdminPage() {
 
   const sidebarItems = [
     { label: "Dashboard", active: activeSection === "dashboard", onClick: () => setActiveSection("dashboard") },
-    { label: "Tenants", active: activeSection === "tenants", onClick: () => setActiveSection("tenants") },
+    { label: "Tenants", active: false, onClick: () => { router.push("/admin/tenants"); } },
     { label: "Users", active: activeSection === "users", onClick: () => setActiveSection("users") },
     { label: "Settings", active: activeSection === "settings", onClick: () => setActiveSection("settings") },
     { label: "Audit", active: activeSection === "audit", onClick: () => setActiveSection("audit") },
   ];
 
   const bottomItems = [
-    { label: "Back to X Nail", onClick: () => { window.location.href = "/xnail"; } },
+    { label: "Back to X Nail", onClick: () => { router.push("/xnail"); } },
   ];
 
   // Loading state
