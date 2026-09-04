@@ -195,6 +195,7 @@ interface ReportPrismaClient {
       readonly territoryId: string;
       readonly startDate: Date;
       readonly endDate: Date | null;
+      readonly minimumGuaranteeCents: number | null;
       readonly partner: { readonly id: string; readonly name: string };
       readonly territory: { readonly id: string; readonly name: string };
       readonly outlets: ReadonlyArray<{
@@ -756,7 +757,8 @@ export function createReportService(prisma: ReportPrismaClient): ReportService {
             const grossRevenueCents = branchSalesMap.get(outlet.branchId) ?? 0;
             const percentage = distributionMap.get(outlet.id) ?? 0;
             const revenueShareCents = Math.round((grossRevenueCents * percentage) / 100);
-            const eligibleRevenueSharePayoutCents = revenueShareCents > 1500000 ? revenueShareCents : 1500000;
+            const minimumGuaranteeCents = agreement.minimumGuaranteeCents ?? 1500000;
+            const eligibleRevenueSharePayoutCents = revenueShareCents > minimumGuaranteeCents ? revenueShareCents : minimumGuaranteeCents;
 
             return {
               agreementId: agreement.id,
