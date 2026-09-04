@@ -5,8 +5,8 @@
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
   - **Current Branch**: `phase-1d-native-auth`
-  - **Current HEAD Commit**: `e451dee` (`feat(appointment): persist tenant branch attribution`)
-  - **Git State**: `phase-1d-native-auth` at `e451dee`; Appointment.branchId column + FK + index added to production database; service persists authenticated branch context; `/api/reports/franchise-overview` 500 resolved.
+  - **Current HEAD Commit**: `de467fb` (`feat(payment): add reusable gateway account foundation`)
+  - **Git State**: `phase-1d-native-auth` at `de467fb`; Payment Recording Foundation (commit `1c4f99a`) and Reusable Gateway Account Foundation (commit `de467fb`) implemented, tested, built, lint-clean, committed, and pushed. Production deployment and authenticated production verification remain separate, pending operator action.
 
 ## Franchise Dashboard — Technical Implementation & Production Delivery — 2026-09-01
 
@@ -3137,6 +3137,173 @@ The processor used `listNotificationQueues()` (non-atomic `findMany`) to read el
 - 58 files / 657 web tests: PASS
 - Lint: 0 errors, 15 warnings
 - Build: PASS
+
+
+## Payment Recording Foundation — 2026-09-04
+
+### Status: IMPLEMENTED — READY FOR PRODUCTION VERIFICATION
+
+- **Commit**: `1c4f99a` (`feat(billing): add payment recording foundation`)
+- **Migration**: `packages/database/prisma/migrations/20260904130000_add_payments/migration.sql`
+- **Architecture reference**: Existing reusable LWILL Payment domain, continued in `docs/DECISIONS.md` ADR 016.
+
+### Implemented
+
+- `Payment` Prisma model — `id`, `tenantId`, `invoiceId`, `amountCents`, `method`, `paidAt`, `notes`, `createdAt`, `updatedAt`, with composite unique `(tenantId, id)`, indexes on `(tenantId, invoiceId)` and `(tenantId, paidAt)`, and FKs to `Tenant(id)` and `Invoice(tenantId, id)`.
+- Tenant-scoped payment persistence: every `Payment` row is bound to the authenticated `tenantId` server-side; client-supplied `tenantId` is never trusted.
+- Invoice relationship: the `Payment.invoiceId` FK is composite-keyed `(invoiceId, tenantId) → Invoice(tenantId, id)`, guaranteeing a payment cannot point at an invoice owned by another tenant.
+- `amountCents`: positive integer cent amount (no float, no currency stored at payment-row level).
+- `method`: free-text string (default `"offline"`). Taxonomies and validation are NOT SPECIFIED (see below).
+- `paidAt`: timestamp defaulting to `now()`; overridable.
+- `notes`: optional free-text string, nullable.
+- Service: `createPaymentService` exposes `createPayment`, `listPaymentsForInvoice`, and `getPaymentTotal` (in `packages/authentication-context-prisma/src/payment-service.ts`).
+- `createPayment`: validates invoice existence and same-tenant ownership (`"invoice must belong to the same tenant"`), validates `amountCents > 0` (`"amount must be positive"`), then persists with server-derived `tenantId`.
+- `listPaymentsForInvoice`: tenant + invoice-scoped read, ordered by `paidAt desc`.
+- `getPaymentTotal`: tenant + invoice-scoped `SUM(amountCents)`.
+- `POST /api/payments` (route handler `apps/web/src/app/api/payments/route.ts` via `handleCreatePayment`): authentication, RBAC (`invoice.write`), JSON-body validation (only `invoiceId`, `amountCents`, `method`, `paidAt`, `notes` allowed), server-derived `tenantId`, 201 on success, 400 on bad input, 401 unauthenticated, 403 forbidden, 404 if invoice not in tenant.
+- `GET /api/invoices/[id]/payments` (route handler `apps/web/src/app/api/invoices/[id]/payments/route.ts` via `handleListPaymentsForInvoice`): authentication, RBAC (`invoice.read`), returns `{ payments, totalPaidCents, invoiceTotalCents }` for the invoice scoped to the authenticated tenant.
+- Server-derived `tenantId`: the authenticated tenant context is the sole source of `tenantId` for every `Payment` row, eliminating client-supplied tenant scope.
+- Invoice tenant validation: the service refuses to record a payment for an invoice not owned by the authenticated tenant.
+- Cross-tenant protection: enforced at the database FK level (composite `(invoiceId, tenantId)`) and at the service layer (tenant equality check on lookup).
+- RBAC enforcement: `invoice.write` for create, `invoice.read` for list — both consistent with the existing invoice module.
+- Payment UI integration: `apps/web/src/app/xnail/page.tsx` exposes payment entry on invoice detail; payments list, total, and a "Record Payment" form are wired to the new APIs.
+- Payment total display: invoice detail shows `totalPaidCents` alongside `invoiceTotalCents`.
+- Record-payment UI: client form posts to `POST /api/payments` and refreshes the invoice payment list.
+
+### Explicitly Not Implemented
+
+- **Invoice status automation** is **NOT IMPLEMENTED**. The Payment model records payments against an invoice; invoice paid / outstanding / partial status derivation, automatic invoice status transition on payment, and any related UI badge / summary logic are NOT SPECIFIED and have not been added by this foundation.
+- **Provider-specific gateway integration** (Razorpay, Stripe, etc.) is NOT IMPLEMENTED in this foundation. Payments are recorded as offline/internal entries against the `Payment` model. Gateway integration is the Reusable Gateway Account Foundation (separate section below) and remains provider-neutral.
+- **Idempotency, webhooks, refunds, settlement, overpayment handling, and payment-method taxonomy** are NOT IMPLEMENTED here and are listed below as approval-required deferred decisions.
+
+### Deferred Decisions (NOT SPECIFIED — APPROVAL REQUIRED)
+
+The following decisions are explicitly **not specified by any source document** in this repository and are **not implemented** by the Payment Recording Foundation. They must not be invented or assumed; each requires project-owner / business approval before any code, schema, or configuration change is attempted:
+
+- **Payment status taxonomy** (`PAID` / `PARTIAL` / `OUTSTANDING` / `REFUNDED` / etc.):
+  NOT SPECIFIED — APPROVAL REQUIRED.
+- **Payment method taxonomy** (validation of `method`, allowed values such as `cash`, `card`, `upi`, `bank_transfer`, `gateway:<provider>`, etc.):
+  NOT SPECIFIED — APPROVAL REQUIRED.
+- **Overpayment policy** (whether `SUM(amountCents)` exceeding `invoiceTotalCents` is allowed, clamped, or rejected, and how it is surfaced in the UI):
+  NOT SPECIFIED — APPROVAL REQUIRED.
+- **Idempotency for payment creation** (e.g. `Idempotency-Key` header support, dedupe window, retry semantics on `POST /api/payments`):
+  NOT SPECIFIED — APPROVAL REQUIRED.
+- **Refund / partial refund** (refund model, refund API, refund–payment linkage, accounting impact, gateway-initiated refund vs. internal-only refund):
+  NOT SPECIFIED — APPROVAL REQUIRED.
+- **Settlement / reconciliation** (gateway settlement records, bank reconciliation, franchise partner settlement, marketplace vendor settlement — all are separate domains; see ADR 016):
+  NOT SPECIFIED — APPROVAL REQUIRED.
+
+### Verification Evidence (Local)
+
+- `pnpm --filter web test` — passing suite includes `apps/web/src/test/payment-route-handlers.test.ts` (10 new tests covering authentication, RBAC, validation, cross-tenant rejection, and success paths).
+- `pnpm --filter web lint` — 0 errors, 15 pre-existing warnings.
+- `pnpm build` — PASS (Next.js 16 production build + TypeScript compilation).
+- `pnpm --filter @lwill/database exec prisma validate` — PASS.
+- Source evidence: commit `1c4f99a` (`git show --stat 1c4f99a`).
+
+### Production Status
+
+**NOT VERIFIED — NOT DEPLOYED FROM THIS TASK.**
+
+Production verification is a separate task and must confirm, end-to-end against the production database and authenticated production routes:
+
+1. Migration `20260904130000_add_payments` applied to production PostgreSQL.
+2. `payments` table exists with the expected columns, indexes, and FKs.
+3. `POST /api/payments` returns `201` with a persisted `Payment` row carrying the authenticated tenant.
+4. `GET /api/invoices/[id]/payments` returns tenant-scoped payments, `totalPaidCents`, and `invoiceTotalCents`.
+5. `401` for unauthenticated, `403` for unauthorized (missing `invoice.read` / `invoice.write`).
+6. Cross-tenant rejection: a payment against another tenant's invoice is rejected with `404`.
+7. Production regression: existing invoice and authentication flows unaffected.
+
+## Reusable Gateway Account Foundation — 2026-09-04
+
+### Status: IMPLEMENTED — READY FOR PRODUCTION VERIFICATION
+
+- **Commit**: `de467fb` (`feat(payment): add reusable gateway account foundation`)
+- **Migration**: `packages/database/prisma/migrations/20260904153000_add_gateway_accounts/migration.sql`
+- **Architecture reference**: ADR 016 — Reusable LWILL Payment & Gateway Core (`docs/DECISIONS.md`).
+
+### Implemented
+
+- **Reusable, provider-neutral `GatewayProviderAdapter` abstraction** (`packages/authentication-context-prisma/src/gateway-provider-adapter.ts`): defines `processPayment`, optional `processRefund`, `GatewayPaymentRequest`, `GatewayPaymentResult`, `GatewayRefundRequest`, `GatewayRefundResult`, and a `provider` string identifier. No provider-specific implementation is included. The interface is intentionally provider-neutral so adapters (Razorpay, future providers) can be added behind it without changing the domain model.
+- **`GatewayAccount` Prisma model** — `id`, `tenantId`, `provider`, `label`, `isActive`, `config` (JSONB, nullable), `createdAt`, `updatedAt`, with composite unique `(tenantId, id)`, indexes on `(tenantId, provider)` and `(tenantId, isActive)`, and FK to `Tenant(id)`.
+- **Tenant-scoped `GatewayAccount` ownership**: every row carries the authenticated `tenantId`; the service refuses to read, update, or delete a `GatewayAccount` whose `tenantId` does not match the authenticated session.
+- **Provider identifier** (`provider`): free-text string identifying the configured gateway (e.g. `"razorpay"`, `"stripe"`, or any future provider key). The model does not constrain it to an enum, preserving provider neutrality.
+- **Server-side config storage** (`config` JSONB): provider-specific credentials and settings are stored server-side. The column is not exposed through the public DTO.
+- **Active/inactive state** (`isActive`): boolean flag defaulting to `true`, used by downstream consumers to skip inactive accounts.
+- **Timestamps**: `createdAt` (`@default(now())`), `updatedAt` (`@updatedAt`).
+- **Service**: `createGatewayAccountService` in `packages/authentication-context-prisma/src/gateway-account-service.ts` exposes `createGatewayAccount`, `listGatewayAccounts`, `getGatewayAccount` (public DTO), `getGatewayAccountWithConfig` (internal record with config), `updateGatewayAccount`, and `deleteGatewayAccount`.
+- **Authenticated GatewayAccount API**:
+  - `GET /api/gateway-accounts` — list all accounts for the authenticated tenant (public DTO).
+  - `POST /api/gateway-accounts` — create an account; persists server-side `config`; returns public DTO.
+  - `GET /api/gateway-accounts/[id]` — fetch one account (public DTO); `404` if unknown or cross-tenant.
+  - `PATCH /api/gateway-accounts/[id]` — update `label` / `isActive` / `config`; only the listed keys are accepted; empty body rejected; `404` if unknown or cross-tenant.
+  - `DELETE /api/gateway-accounts/[id]` — delete an account; `204` on success, `404` if unknown or cross-tenant.
+- **Tenant isolation**: enforced by `getGatewayAccount`, `updateGatewayAccount`, and `deleteGatewayAccount` checking `record.tenantId !== tenantId` and returning `null` / `false`, which the route handler maps to `404`. There is no cross-tenant read, update, or delete path.
+- **RBAC enforcement**: all five endpoints require `tenant.manage` permission, consistent with the existing tenant-administration boundary.
+- **Validation**: provider required (non-empty string); `label` optional non-empty string or `null`; `isActive` boolean; `config` object or `null`; create rejects unknown body keys; update rejects empty body and unknown body keys.
+- **Public DTO configuration / secret stripping** (`toPublicDTO` in the service): the public DTO returned by `listGatewayAccounts`, `getGatewayAccount`, `createGatewayAccount`, and `updateGatewayAccount` excludes the `config` field entirely. Server-side code that needs the raw config must call `getGatewayAccountWithConfig`, which is not exposed by any route handler in this foundation.
+- **Provider neutrality (explicit)**: no provider-specific gateway (Razorpay, Stripe, PayPal, etc.) is implemented in this foundation. The `GatewayProviderAdapter` interface is the contract; concrete adapters and any external API calls are deferred. The `Payment` model and `POST /api/payments` route continue to function as the offline / internal payment recorder; no automatic call from `Payment` into `GatewayAccount` is made.
+
+### Security Limitation (Documented, Not Invented)
+
+`GatewayAccount.config` is stored server-side. Public DTOs strip the `config` field. This follows the existing provider-config pattern used by notification provider configurations.
+
+**At-rest encryption strategy for `config` is NOT SPECIFIED — APPROVAL REQUIRED.** No application-level column encryption, KMS integration, secret rotation, or environment-managed envelope encryption has been introduced in this implementation. The current state is "server-side storage, not exposed to clients". Any production hardening beyond this (column encryption, KMS, vault-backed secrets, audit logging of config reads) requires an explicit decision and a separately approved change.
+
+### Deferred Decisions (NOT SPECIFIED — APPROVAL REQUIRED)
+
+The following are explicitly **not specified** and **not implemented** by this foundation. Each requires project-owner / business approval before any code, schema, migration, configuration, or deployment is attempted:
+
+- **Gateway credential encryption at rest** (column encryption, KMS, envelope encryption, vault integration):
+  NOT SPECIFIED — APPROVAL REQUIRED.
+- **Multiple gateway accounts per tenant** (whether a tenant may hold more than one `GatewayAccount` for the same or different providers, and selection/priority policy):
+  NOT SPECIFIED — APPROVAL REQUIRED.
+- **Branch-level gateway routing** (per-branch, per-business-unit, or per-region gateway selection; the model currently has no `branchId`):
+  NOT SPECIFIED — APPROVAL REQUIRED.
+- **Gateway account ownership beyond current tenant scope** (application-level or organization-level ownership per ADR 016):
+  NOT SPECIFIED — APPROVAL REQUIRED.
+- **`PaymentIntent` design** (gateway-side intent lifecycle, client-side intent exposure, capture/confirm flow):
+  NOT SPECIFIED — APPROVAL REQUIRED.
+- **`GatewayTransaction` design** (gateway-side transaction records, lifecycle states, linkage to `Payment` and `Invoice`):
+  NOT SPECIFIED — APPROVAL REQUIRED.
+- **Webhook endpoint design** (route, signature validation, replay protection, ingress authorization):
+  NOT SPECIFIED — APPROVAL REQUIRED.
+- **Webhook idempotency mechanism** (event ID tracking, dedupe window, replay handling, domain-event publication):
+  NOT SPECIFIED — APPROVAL REQUIRED.
+- **Refund design** (refund model, refund API, refund-to-payment linkage, accounting impact):
+  NOT SPECIFIED — APPROVAL REQUIRED.
+- **Settlement / reconciliation integration** (gateway settlement records, bank reconciliation, franchise partner settlement, marketplace vendor settlement — all separate domains per ADR 016):
+  NOT SPECIFIED — APPROVAL REQUIRED.
+- **Provider-specific adapter implementations** (Razorpay, Stripe, etc.) behind `GatewayProviderAdapter`:
+  NOT SPECIFIED — APPROVAL REQUIRED.
+
+### Verification Evidence (Local)
+
+- `pnpm --filter web test` — passing suite includes `apps/web/src/test/gateway-account-route-handlers.test.ts` (20 new tests covering authentication, RBAC, validation, cross-tenant rejection, public DTO secret stripping, and success paths).
+- `pnpm --filter web lint` — 0 errors, 15 pre-existing warnings.
+- `pnpm build` — PASS (Next.js 16 production build + TypeScript compilation).
+- `pnpm --filter @lwill/database exec prisma validate` — PASS.
+- Source evidence: commit `de467fb` (`git show --stat de467fb`).
+
+### Production Status
+
+**NOT VERIFIED — NOT DEPLOYED FROM THIS TASK.**
+
+Production verification is a separate task and must confirm, end-to-end against the production database and authenticated production routes:
+
+1. Migration `20260904153000_add_gateway_accounts` applied to production PostgreSQL.
+2. `gatewayaccounts` table exists with the expected columns, indexes, and FKs.
+3. `GET /api/gateway-accounts` returns `200` for the authenticated tenant with public DTOs (no `config` field in any response).
+4. `POST /api/gateway-accounts` returns `201` and persists the row, including server-side `config`.
+5. `GET /api/gateway-accounts/[id]` returns `200` for an owned account and `404` for an unknown or cross-tenant account.
+6. `PATCH /api/gateway-accounts/[id]` returns `200` and updates only the listed fields; `400` for empty / unknown-key body; `404` for unknown or cross-tenant account.
+7. `DELETE /api/gateway-accounts/[id]` returns `204`; `404` for unknown or cross-tenant account.
+8. `401` for unauthenticated across all five endpoints; `403` for authenticated but missing `tenant.manage`.
+9. Tenant isolation: a session for tenant A cannot read, update, or delete tenant B's `GatewayAccount`.
+10. Public DTO secret stripping: `config` is absent from every list, get, create, and update response body.
+11. Production regression: existing authentication, notification, and `Payment` flows are unaffected.
+
 
 
 
