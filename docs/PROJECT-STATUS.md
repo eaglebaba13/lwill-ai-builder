@@ -52,8 +52,8 @@ Where `formulaMGCents = Math.round((investmentCents × mgFormulaRateBp) / 10000)
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
   - **Current Branch**: `phase-1d-native-auth`
-  - **Current HEAD Commit**: `5845288` (`feat(franchise): implement formula-based minimum guarantee per MG-02`)
-  - **Git State**: `phase-1d-native-auth` at `5845288`; Franchise MG-01, MG-02, NP-01, and NP-02 approved rules implemented and production-verified. Payment, Gateway Account, and Settings foundations production-verified.
+  - **Current HEAD Commit**: `1ad9223` (`feat(franchise): implement agreement-level royalty rate per TR-01/TR-02`)
+  - **Git State**: `phase-1d-native-auth` at `1ad9223`; All approved franchise commercial rules (MG-01, MG-02, NP-01, NP-02, TR-01/TR-02) implemented and production-verified. Payment, Gateway Account, and Settings foundations production-verified.
 
 ## Franchise Dashboard — Technical Implementation & Production Delivery — 2026-09-01
 
@@ -3466,9 +3466,8 @@ Replaced the hardcoded `1500000` with `agreement.minimumGuaranteeCents ?? 150000
 
 ### Remaining Approved But Not Yet Implemented
 
-The following rules were approved on 2026-09-02 but are NOT YET coded in `report-service.ts`:
+The following rule was approved on 2026-09-02 but is NOT YET coded in `report-service.ts`:
 
-- **TR-01/TR-02**: Agreement-level royalty rate (requires `territoryRoyaltyRateBp` column on `FranchiseAgreement`; currently hardcoded to `0.02` / 2%).
 - **HR-02**: Agreement-level effective-dating snapshot (schema column `termsSnapshot` exists; not yet populated).
 
 ### Remaining NOT SPECIFIED — APPROVAL REQUIRED
@@ -3542,6 +3541,53 @@ Replaced `revenueShareCents > minimumGuaranteeCents ? revenueShareCents : minimu
 ### Production Verification
 
 - ✅ Franchise payout returns real data: `eligibleRevenueSharePayoutCents: 1500000` (₹15K MG when 30% of ₹15 = ₹4.5K < MG).
+- ✅ All regression endpoints return 200.
+
+## Franchise Agreement-Level Royalty Rate (TR-01/TR-02) — 2026-09-05
+
+### Status: IMPLEMENTED — PRODUCTION VERIFIED
+
+- **Commit**: `1ad9223` (`feat(franchise): implement agreement-level royalty rate per TR-01/TR-02`)
+- **Migration**: `packages/database/prisma/migrations/20260905120000_add_agreement_royalty_rate/migration.sql`
+- **ADR reference**: ADR 014, FRANCHISE-COMMERCIAL-RULES-APPROVALS.md TR-01/TR-02 (approved 2026-09-02)
+- **Production deploy commit**: `1ad9223`
+- **Production verification date**: 2026-09-05
+
+### Approved Business Rule
+
+TR-01: Agreement-level royalty override (not hardcoded).
+TR-02: Rate stored as basis points on `FranchiseAgreement.territoryRoyaltyRateBp`.
+
+Formula: `royaltyPoolCents = Math.round((territorySales × territoryRoyaltyRateBp) / 10000)`
+
+Fallback: if `territoryRoyaltyRateBp` is null, default to `200` (2%).
+
+### Implementation
+
+- Added `territoryRoyaltyRateBp Int?` to `FranchiseAgreement` in Prisma schema.
+- Created migration `20260905120000_add_agreement_royalty_rate`.
+- Updated `ReportPrismaClient` agreement type to include `territoryRoyaltyRateBp`.
+- Updated `allTerritoryAgreements` query to select `territoryRoyaltyRateBp`.
+- Built `territoryRoyaltyRateBpMap` (first non-null rate per territory).
+- Changed royalty pool calculation from `Math.round(sales * 0.02)` to `Math.round((sales * royaltyRateBp) / 10000)` where `royaltyRateBp = territoryRoyaltyRateBpMap.get(territoryId) ?? 200`.
+
+### Changes
+
+- `packages/database/prisma/schema.prisma`: added `territoryRoyaltyRateBp Int?` to `FranchiseAgreement`.
+- `packages/database/prisma/migrations/20260905120000_add_agreement_royalty_rate/migration.sql`: `ALTER TABLE "FranchiseAgreement" ADD COLUMN "territoryRoyaltyRateBp" INTEGER`.
+- `packages/authentication-context-prisma/src/report-service.ts`: type update, query update, royalty calculation update.
+- `packages/authentication-context-prisma/src/report-service.test.ts`: mock updates,2 new tests.
+
+### Tests
+
+- "uses agreement-level territoryRoyaltyRateBp instead of hardcoded 2%" — `territoryRoyaltyRateBp=300`, sales=₹10L, expected `royaltyPoolCents=30000`.
+- "falls back to 2% royalty when territoryRoyaltyRateBp is not set" — `territoryRoyaltyRateBp=null`, sales=₹10L, expected `royaltyPoolCents=20000`.
+
+### Production Verification
+
+- ✅ Migration `20260905120000_add_agreement_royalty_rate` applied to production PostgreSQL.
+- ✅ Existing agreement `dddddddd-...` has `territoryRoyaltyRateBp=null` → falls back to2% (200 bp).
+- ✅ Franchise payout returns real data with correct royalty calculation.
 - ✅ All regression endpoints return 200.
 
 
