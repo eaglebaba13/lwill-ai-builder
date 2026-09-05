@@ -4001,6 +4001,7 @@ export default function Home() {
       body: JSON.stringify({
         customerId: appointmentCustomer,
         serviceId: appointmentService,
+        staffId: appointmentStaff || null,
         startsAt: startsAt.toISOString(),
         endsAt: endsAt.toISOString(),
         status: "Booked",

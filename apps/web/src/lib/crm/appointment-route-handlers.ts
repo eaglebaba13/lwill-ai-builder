@@ -8,6 +8,7 @@ export type AppointmentAuthorization =
 export interface AppointmentWriteInput {
   readonly customerId: string;
   readonly serviceId: string;
+  readonly staffId?: string | null;
   readonly startsAt: Date;
   readonly endsAt: Date;
   readonly status: string;
@@ -81,6 +82,7 @@ function parseCreateInput(input: unknown): AppointmentWriteInput | null {
   const allowedKeys = new Set([
     "customerId",
     "serviceId",
+    "staffId",
     "startsAt",
     "endsAt",
     "status",
@@ -115,6 +117,7 @@ function parseCreateInput(input: unknown): AppointmentWriteInput | null {
   return {
     customerId: record.customerId,
     serviceId: record.serviceId,
+    staffId: (record.staffId as string | null | undefined) ?? null,
     startsAt,
     endsAt,
     status: record.status,
