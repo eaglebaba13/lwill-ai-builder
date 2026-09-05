@@ -52,8 +52,8 @@ Where `formulaMGCents = Math.round((investmentCents × mgFormulaRateBp) / 10000)
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
   - **Current Branch**: `phase-1d-native-auth`
-  - **Current HEAD Commit**: `2020523` (`feat(appointments): add staff assignment to appointment creation`)
-  - **Git State**: `phase-1d-native-auth` at `2020523`; Appointment staff assignment implemented. All approved franchise commercial rules, Gateway Account UI, and Settings foundations production-verified.
+  - **Current HEAD Commit**: `58e2d17` (`feat(xnail): add customer profile with visit history and invoice summary`)
+  - **Git State**: `phase-1d-native-auth` at `58e2d17`; Customer profile with visit history implemented. Commission calculation NOT SPECIFIED — APPROVAL REQUIRED. All approved franchise commercial rules production-verified.
 
 ## Franchise Dashboard — Technical Implementation & Production Delivery — 2026-09-01
 
@@ -3692,5 +3692,59 @@ The X NAIL appointment booking form had a staff selector (`appointmentStaff` sta
 - ✅ X NAIL page loads: 200.
 - ✅ All regression endpoints return 200.
 
+## Customer Profile with Visit History — 2026-09-05
+
+### Status: IMPLEMENTED — PRODUCTION VERIFIED
+
+- **SRS reference**: DOC-017 XN-002 "Customer profile with visit history"
+- **Commit**: `58e2d17` (`feat(xnail): add customer profile with visit history and invoice summary`)
+- **Production deploy commit**: `58e2d17`
+- **Production verification date**: 2026-09-05
+
+### Problem
+
+The Customers tab showed only name, phone, visit count, and last visit date. No dedicated profile view existed. Visit count was computed using a mutating `.sort()` call (latent bug). Email and notes were accepted by the API but not displayed. No invoice/spend history was shown.
+
+### Implementation
+
+- Added `selectedCustomerId` state to track which customer is expanded.
+- Fixed sort mutation bug: changed `customerAppointments.sort(...)` to `customerAppointments.slice().sort(...)`.
+- Added total spend display per customer row (sum of `invoices.totalCents`).
+- Added click-to-expand on customer rows (highlighted border when selected).
+- Replaced right column with conditional rendering:
+  - **No customer selected**: "Add customer" form (as before).
+  - **Customer selected**: Detail panel with:
+    - Customer info (name, phone, email, notes)
+    - Visit count + total spend
+    - Visit history list (appointments with service name, staff name, date, status)
+    - Invoice list (date + amount)
+- All data derived from existing globally-loaded `appointments`, `invoices`, `services`, `staff` arrays — no new API calls needed.
+
+### Production Verification
+
+- ✅ X NAIL page loads: 200.
+- ✅ All regression endpoints return 200.
+
+## Commission Calculation — XN-006
+
+### Status: NOT SPECIFIED — APPROVAL REQUIRED
+
+DOC-017 XN-006 requires "Staff attendance and commission calculation." Attendance is implemented. Commission is not.
+
+The SRS does NOT specify:
+- Commission rate or percentage
+- Commission basis (per service, per invoice, per payment, flat fee)
+- When commission is calculated (on invoice, on payment, on completion)
+- Refund/cancellation behavior
+- Branch-specific rules
+- Package/membership commission rules
+
+`FRANCHISE-COMMERCIAL-ARCHITECTURE-DECISION.md` line 334 explicitly marks "Commission model" as **NOT SPECIFIED — APPROVAL REQUIRED**.
+
+`FRANCHISE-COMMERCIAL-RULES-APPROVALS.md` line 66 states "Do not implement franchise-sale commission."
+
+**Decision Required**: Commission rate, basis, and calculation rules.
+
+**Blocked Features**: Staff commission report, commission tracking, commission payout.
 
 
