@@ -230,6 +230,7 @@ model FranchiseAgreement {
   variableReturnRateBp    Int?
   variableReturnBasis     String?
   payoutRule              String?
+  territoryRoyaltyRateBp  Int?
   termsSnapshot           Json?
   effectiveFrom           DateTime?
   effectiveTo             DateTime?

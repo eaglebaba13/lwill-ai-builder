@@ -655,6 +655,7 @@ describe("report service: getFranchisePayout", () => {
       endDate: Date | null;
       minimumGuaranteeCents?: number | null;
       mgFormulaRateBp?: number | null;
+      territoryRoyaltyRateBp?: number | null;
       partner: { id: string; name: string };
       territory: { id: string; name: string };
       outlets: Array<{
@@ -781,7 +782,7 @@ describe("report service: getFranchisePayout", () => {
               return results.map((agreement) => ({ partnerId: agreement.partnerId }));
             }
             if ("partnerId" in args.select && "territoryId" in args.select) {
-              return results.map((agreement) => ({ partnerId: agreement.partnerId, territoryId: agreement.territoryId }));
+              return results.map((agreement) => ({ partnerId: agreement.partnerId, territoryId: agreement.territoryId, territoryRoyaltyRateBp: agreement.territoryRoyaltyRateBp ?? null }));
             }
           }
           return results.map((agreement) => ({
@@ -792,6 +793,7 @@ describe("report service: getFranchisePayout", () => {
             endDate: agreement.endDate,
             minimumGuaranteeCents: agreement.minimumGuaranteeCents ?? null,
             mgFormulaRateBp: agreement.mgFormulaRateBp ?? null,
+            territoryRoyaltyRateBp: agreement.territoryRoyaltyRateBp ?? null,
             partner: agreement.partner,
             territory: agreement.territory,
             outlets: agreement.outlets,
@@ -1285,6 +1287,93 @@ describe("report service: getFranchisePayout", () => {
     expect(result.payouts[0]!.agreementPayouts[0]).toMatchObject({
       eligibleRevenueSharePayoutCents: 600000,
     });
+  });
+
+  it("uses agreement-level territoryRoyaltyRateBp instead of hardcoded 2%", async () => {
+    const prisma = createFranchisePrisma({
+      partners: [
+        { id: "partner-1", userId: "user-1", name: "Kushwaha" },
+      ],
+      territories: [{ id: "territory-1", name: "Surat" }],
+      branches: [{ id: "branch-1", name: "Main", territoryId: "territory-1" }],
+      agreements: [
+        {
+          id: "agreement-1",
+          tenantId: "tenant-1",
+          partnerId: "partner-1",
+          territoryId: "territory-1",
+          startDate: baseDate(1),
+          endDate: null,
+          territoryRoyaltyRateBp: 300,
+          partner: { id: "partner-1", name: "Kushwaha" },
+          territory: { id: "territory-1", name: "Surat" },
+          outlets: [
+            {
+              id: "outlet-1",
+              branchId: "branch-1",
+              branch: { id: "branch-1", name: "Main", territoryId: "territory-1" },
+            },
+          ],
+        },
+      ],
+      invoices: [
+        { branchId: "branch-1", totalCents: 1000000, issuedAt: baseDate(5) },
+      ],
+      distributions: [
+        { agreementOutletId: "outlet-1", percentage: 20 },
+      ],
+    });
+    const service = createReportService(prisma);
+
+    const result = await service.getFranchisePayout({ tenantId: "tenant-1", year: 2026, month: 8 });
+
+    const territoryRoyalty = result.payouts[0]!.territoryRoyalties[0]!;
+    expect(territoryRoyalty.territorySalesTurnoverCents).toBe(1000000);
+    expect(territoryRoyalty.royaltyPoolCents).toBe(30000);
+    expect(territoryRoyalty.eligiblePartnerCount).toBe(1);
+    expect(territoryRoyalty.individualRoyaltyCents).toBe(30000);
+  });
+
+  it("falls back to 2% royalty when territoryRoyaltyRateBp is not set", async () => {
+    const prisma = createFranchisePrisma({
+      partners: [
+        { id: "partner-1", userId: "user-1", name: "Kushwaha" },
+      ],
+      territories: [{ id: "territory-1", name: "Surat" }],
+      branches: [{ id: "branch-1", name: "Main", territoryId: "territory-1" }],
+      agreements: [
+        {
+          id: "agreement-1",
+          tenantId: "tenant-1",
+          partnerId: "partner-1",
+          territoryId: "territory-1",
+          startDate: baseDate(1),
+          endDate: null,
+          partner: { id: "partner-1", name: "Kushwaha" },
+          territory: { id: "territory-1", name: "Surat" },
+          outlets: [
+            {
+              id: "outlet-1",
+              branchId: "branch-1",
+              branch: { id: "branch-1", name: "Main", territoryId: "territory-1" },
+            },
+          ],
+        },
+      ],
+      invoices: [
+        { branchId: "branch-1", totalCents: 1000000, issuedAt: baseDate(5) },
+      ],
+      distributions: [
+        { agreementOutletId: "outlet-1", percentage: 20 },
+      ],
+    });
+    const service = createReportService(prisma);
+
+    const result = await service.getFranchisePayout({ tenantId: "tenant-1", year: 2026, month: 8 });
+
+    const territoryRoyalty = result.payouts[0]!.territoryRoyalties[0]!;
+    expect(territoryRoyalty.royaltyPoolCents).toBe(20000);
+    expect(territoryRoyalty.individualRoyaltyCents).toBe(20000);
   });
 
   it("excludes GST from sales (Net Sales = totalCents - gstCents)", async () => {

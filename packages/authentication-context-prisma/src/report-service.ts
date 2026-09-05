@@ -197,6 +197,7 @@ interface ReportPrismaClient {
       readonly endDate: Date | null;
       readonly minimumGuaranteeCents: number | null;
       readonly mgFormulaRateBp: number | null;
+      readonly territoryRoyaltyRateBp: number | null;
       readonly partner: { readonly id: string; readonly name: string };
       readonly territory: { readonly id: string; readonly name: string };
       readonly outlets: ReadonlyArray<{
@@ -675,7 +676,7 @@ export function createReportService(prisma: ReportPrismaClient): ReportService {
               { endDate: { gte: monthStart } },
             ],
           },
-          select: { partnerId: true, territoryId: true },
+          select: { partnerId: true, territoryId: true, territoryRoyaltyRateBp: true },
         }),
         prisma.branch.findMany({
           where: { tenantId, territoryId: { in: territoryIds } },
@@ -740,18 +741,23 @@ export function createReportService(prisma: ReportPrismaClient): ReportService {
       }
 
       const allTerritoryPartnerMap = new Map<string, Set<string>>();
+      const territoryRoyaltyRateBpMap = new Map<string, number>();
       for (const agreement of allTerritoryAgreements) {
         const territoryId = agreement.territoryId;
         if (!allTerritoryPartnerMap.has(territoryId)) {
           allTerritoryPartnerMap.set(territoryId, new Set());
         }
         allTerritoryPartnerMap.get(territoryId)!.add(agreement.partnerId);
+        if (agreement.territoryRoyaltyRateBp != null && !territoryRoyaltyRateBpMap.has(territoryId)) {
+          territoryRoyaltyRateBpMap.set(territoryId, agreement.territoryRoyaltyRateBp);
+        }
       }
 
       const territoryRoyaltyMap = new Map<string, { poolCents: number; eligibleCount: number; individualCents: number }>();
       for (const [territoryId, partners] of allTerritoryPartnerMap.entries()) {
         const sales = territorySalesMap.get(territoryId) ?? 0;
-        const poolCents = Math.round(sales * 0.02);
+        const royaltyRateBp = territoryRoyaltyRateBpMap.get(territoryId) ?? 200;
+        const poolCents = Math.round((sales * royaltyRateBp) / 10000);
         const eligibleCount = partners.size;
         const individualCents = eligibleCount > 0 ? Math.round(poolCents / eligibleCount) : 0;
         territoryRoyaltyMap.set(territoryId, { poolCents, eligibleCount, individualCents });
