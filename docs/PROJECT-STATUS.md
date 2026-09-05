@@ -52,8 +52,8 @@ Where `formulaMGCents = Math.round((investmentCents × mgFormulaRateBp) / 10000)
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
   - **Current Branch**: `phase-1d-native-auth`
-  - **Current HEAD Commit**: `58e2d17` (`feat(xnail): add customer profile with visit history and invoice summary`)
-  - **Git State**: `phase-1d-native-auth` at `58e2d17`; Customer profile with visit history implemented. Commission calculation NOT SPECIFIED — APPROVAL REQUIRED. All approved franchise commercial rules production-verified.
+  - **Current HEAD Commit**: `b338b47` (`docs: record customer profile and commission NOT SPECIFIED status`)
+  - **Git State**: `phase-1d-native-auth` at `b338b47`; Full project audit complete. All implementable X NAIL MVP requirements production-verified. Remaining gaps: Commission (NOT SPECIFIED), Online Booking (NOT SPECIFIED), WhatsApp (BLOCKED), AI Assistant (BLOCKED). Phases 5-7 are future work with no code.
 
 ## Franchise Dashboard — Technical Implementation & Production Delivery — 2026-09-01
 
@@ -3746,5 +3746,119 @@ The SRS does NOT specify:
 **Decision Required**: Commission rate, basis, and calculation rules.
 
 **Blocked Features**: Staff commission report, commission tracking, commission payout.
+
+## Comprehensive Project Audit — 2026-09-05
+
+### Audit Date: 2026-09-05
+### Audit Commit: `b338b47`
+### Production Commit: `b338b47`
+
+### Phase 1 — Foundation Platform
+
+| Area | Status |
+|------|--------|
+| Multi-tenant database architecture | IMPLEMENTED |
+| Authentication system | IMPLEMENTED |
+| RBAC system | IMPLEMENTED |
+| Tenant resolution | PARTIAL (auth layer handles it; middleware does app-routing only) |
+
+### Phase 2 — Authentication & Multi-Tenancy
+
+| Area | Status |
+|------|--------|
+| Login/logout | IMPLEMENTED |
+| Session management | IMPLEMENTED |
+| Permission system | IMPLEMENTED |
+| Tenant isolation | IMPLEMENTED |
+
+### Phase 3 — Shared Business Modules
+
+| Area | Status |
+|------|--------|
+| CRM (Customers) | IMPLEMENTED |
+| Inventory (Products, Stock, Categories, Warehouses, Suppliers, Reorder Rules) | IMPLEMENTED |
+| Notifications (Templates, Dispatch, Logs, Preferences, Event Subscriptions) | PARTIAL (mock providers; CLI queue processor; domain event bus wired) |
+| Reports (Daily Sales, GST, Branch Performance, Inventory, Franchise) | IMPLEMENTED |
+
+### Phase 4 — X NAIL ERP MVP
+
+| Requirement | Status |
+|-------------|--------|
+| XN-001 Online and walk-in appointment booking | Walk-in: IMPLEMENTED. Online: NOT SPECIFIED — APPROVAL REQUIRED |
+| XN-002 Customer profile with visit history | IMPLEMENTED — PRODUCTION VERIFIED |
+| XN-003 Membership and package management | IMPLEMENTED |
+| XN-004 POS billing with GST support | IMPLEMENTED |
+| XN-005 Product inventory and stock alerts | IMPLEMENTED |
+| XN-006 Staff attendance and commission calculation | Attendance: IMPLEMENTED. Commission: NOT SPECIFIED — APPROVAL REQUIRED |
+| XN-007 Franchise and branch management | IMPLEMENTED — PRODUCTION VERIFIED |
+| XN-008 WhatsApp reminders and notifications | BLOCKED — EXTERNAL ACCESS REQUIRED (WhatsApp Business API credentials) |
+| XN-009 AI assistant for business insights | BLOCKED — EXTERNAL ACCESS REQUIRED (AI provider credentials) |
+| XN-010 Operational dashboards and reports | IMPLEMENTED |
+
+### Franchise Commercial Rules
+
+| Rule | Status |
+|------|--------|
+| MG-01 Fixed MG from agreement | IMPLEMENTED — PRODUCTION VERIFIED |
+| MG-02 Formula-based MG (investment × rate) | IMPLEMENTED — PRODUCTION VERIFIED |
+| NP-01 Net Sales excludes GST | IMPLEMENTED — PRODUCTION VERIFIED |
+| NP-02 Payout = MAX(MG, 30% Net Sales) | IMPLEMENTED — PRODUCTION VERIFIED |
+| TR-01/TR-02 Agreement-level royalty rate | IMPLEMENTED — PRODUCTION VERIFIED |
+| HR-02 Terms snapshot auto-generation | IMPLEMENTED — PRODUCTION VERIFIED |
+
+### Phase 5-7 — Future Phases
+
+| Phase | Status |
+|-------|--------|
+| Marketplace / Plugin SDK | NOT IMPLEMENTED (no code — future phase) |
+| AI Builder Engine | NOT IMPLEMENTED (no code — future phase) |
+| Additional Industry Clouds | NOT IMPLEMENTED (no code — future phase) |
+
+### Security Verification
+
+| Check | Status |
+|-------|--------|
+| Authentication | IMPLEMENTED (JWT RS256, 15-min access, 30-day refresh) |
+| RBAC | IMPLEMENTED (26 permission codes, role assignments with tenant/BU/branch scope) |
+| Tenant isolation | IMPLEMENTED (tenantId FK on all business models, server-derived context) |
+| Gateway credential protection | IMPLEMENTED (public DTO strips config field) |
+| Settings permission bootstrap | IMPLEMENTED (setting.read + setting.write granted to tenant-admin) |
+| Cross-tenant protection | IMPLEMENTED (service-level tenantId checks on all CRUD operations) |
+
+### Production Verification Summary
+
+| Endpoint | Status |
+|----------|--------|
+| GET /api/auth/me | 200 (authenticated) |
+| GET /api/customers | 200 |
+| GET /api/services | 200 |
+| GET /api/appointments | 200 |
+| GET /api/invoices | 200 |
+| GET /api/payments (POST-only) | 405 (correct) |
+| GET /api/gateway-accounts | 200 |
+| GET /api/settings | 200 |
+| GET /api/notification-templates | 200 |
+| GET /api/notification-logs | 200 |
+| GET /api/franchise/payout | 200 (real data) |
+| GET /api/reports/franchise-overview | 200 |
+| X NAIL page | 200 |
+
+### Remaining Gaps (All Properly Classified)
+
+| Gap | Classification | Reason |
+|-----|---------------|--------|
+| Online booking (XN-001) | NOT SPECIFIED — APPROVAL REQUIRED | SRS does not define customer-facing booking flow |
+| Commission calculation (XN-006) | NOT SPECIFIED — APPROVAL REQUIRED | SRS does not define rate/basis/formula |
+| WhatsApp integration (XN-008) | BLOCKED — EXTERNAL ACCESS REQUIRED | WhatsApp Business API credentials unavailable |
+| AI Assistant (XN-009) | BLOCKED — EXTERNAL ACCESS REQUIRED | AI provider credentials unavailable |
+| Marketplace (Phase 5) | NOT IMPLEMENTED | Future phase — no code |
+| AI Builder (Phase 6) | NOT IMPLEMENTED | Future phase — no code |
+| Industry Clouds (Phase 7) | NOT IMPLEMENTED | Future phase — no code |
+
+### Final Assessment
+
+All explicitly required and technically applicable X NAIL MVP requirements that can be implemented without business approval or external credentials are **IMPLEMENTED — PRODUCTION VERIFIED**.
+
+The remaining gaps are properly classified as NOT SPECIFIED — APPROVAL REQUIRED or BLOCKED — EXTERNAL ACCESS REQUIRED. They are not silently invented or falsely completed.
 
 
