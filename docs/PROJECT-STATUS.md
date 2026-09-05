@@ -52,8 +52,8 @@ Where `formulaMGCents = Math.round((investmentCents × mgFormulaRateBp) / 10000)
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
   - **Current Branch**: `phase-1d-native-auth`
-  - **Current HEAD Commit**: `9a7bf7d` (`feat(marketplace): add installation audit history per MP-008`)
-  - **Git State**: `phase-1d-native-auth` at `9a7bf7d`; Phase 5 Marketplace: MP-001, MP-002, MP-008 implemented. MP-004 NOT SPECIFIED. MP-003, MP-006 remaining.
+  - **Current HEAD Commit**: `76cdff3` (`feat(marketplace): add rollback to previous versions per MP-006`)
+  - **Git State**: `phase-1d-native-auth` at `76cdff3`; Phase 5 Marketplace: MP-001, MP-002, MP-006, MP-008 implemented. MP-003 remaining. MP-004, MP-005, MP-007 NOT SPECIFIED.
 
 ## Franchise Dashboard — Technical Implementation & Production Delivery — 2026-09-01
 
@@ -3880,7 +3880,7 @@ The remaining gaps are properly classified as NOT SPECIFIED — APPROVAL REQUIRE
 | MP-003 | Enable automatic update notifications | NOT IMPLEMENTED (future task) |
 | MP-004 | Validate compatibility before installation | NOT IMPLEMENTED (future task) |
 | MP-005 | Support licensing and subscriptions | NOT SPECIFIED — APPROVAL REQUIRED |
-| MP-006 | Rollback to previous versions | NOT IMPLEMENTED (future task) |
+| MP-006 | Rollback to previous versions | IMPLEMENTED — PRODUCTION VERIFIED |
 | MP-007 | Allow verified developers to publish plugins | NOT SPECIFIED — APPROVAL REQUIRED |
 | MP-008 | Maintain installation audit history | IMPLEMENTED — PRODUCTION VERIFIED |
 
@@ -3946,6 +3946,29 @@ The remaining gaps are properly classified as NOT SPECIFIED — APPROVAL REQUIRE
 - ✅ Install flow: `POST /api/marketplace/installations` → 201. Audit log records `marketplace.install` with `versionId` and `installationId`.
 - ✅ Uninstall flow: `DELETE /api/marketplace/installations/[assetId]` → 204. Audit log records `marketplace.uninstall` with `versionId`.
 - ✅ Audit log API returns both entries after install + uninstall.
+- ✅ All regression endpoints: 200.
+
+## Marketplace Rollback (MP-006) — 2026-09-05
+
+### Status: IMPLEMENTED — PRODUCTION VERIFIED
+
+- **SRS reference**: DOC-022 MP-006 "Rollback to previous versions"
+- **Commit**: `76cdff3` (`feat(marketplace): add rollback to previous versions per MP-006`)
+- **Production deploy commit**: `76cdff3`
+- **Production verification date**: 2026-09-05
+
+### Implementation
+
+- Added `rollbackAsset` method to marketplace service: validates existing installation, validates target version belongs to same asset, updates `versionId` on `TenantInstallation`, creates audit log entry `marketplace.rollback` with `previousVersionId` and `newVersionId`.
+- Added `PATCH /api/marketplace/installations/[assetId]` endpoint for rollback (requires `tenant.manage`).
+- Updated `MarketplaceRouteServices` interface and runtime to wire rollback.
+
+### Production Verification
+
+- ✅ Created asset + v1 + v2. Installed with v2. Rolled back to v1. Version correctly changed.
+- ✅ Audit log records `marketplace.rollback` with `previousVersionId` and `newVersionId`.
+- ✅ Rollback to nonexistent version: 404.
+- ✅ Rollback for non-installed asset: 404.
 - ✅ All regression endpoints: 200.
 
 
