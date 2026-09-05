@@ -167,7 +167,7 @@ function KpiCard({ definition, context }: { readonly definition: RoleDashboardCo
   );
 }
 
-const ALL_TABS = ["Overview", "Customers", "Services", "Packages", "Memberships", "Inventory", "Staff", "Attendance", "Appointments", "Billing", "Branches", "Reports", "Settings", "Notifications", "Users & Access", "Franchise Overview", "Financials", "Territories", "Partners", "Agreements", "Outlets"] as const;
+const ALL_TABS = ["Overview", "Customers", "Services", "Packages", "Memberships", "Inventory", "Staff", "Attendance", "Appointments", "Billing", "Branches", "Reports", "Settings", "Notifications", "Users & Access", "Gateway Accounts", "Franchise Overview", "Financials", "Territories", "Partners", "Agreements", "Outlets"] as const;
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<(typeof ALL_TABS)[number]>("Overview");
@@ -413,6 +413,15 @@ export default function Home() {
   const [editingSettingKey, setEditingSettingKey] = useState("");
   const [editingSettingValue, setEditingSettingValue] = useState("");
   const [editingSettingIsActive, setEditingSettingIsActive] = useState(true);
+  const [gatewayAccounts, setGatewayAccounts] = useState<Array<{ id: string; provider: string; label: string | null; isActive: boolean; createdAt: string }>>([]);
+  const [isLoadingGatewayAccounts, setIsLoadingGatewayAccounts] = useState(false);
+  const [gatewayAccountError, setGatewayAccountError] = useState<string | null>(null);
+  const [newGatewayProvider, setNewGatewayProvider] = useState("");
+  const [newGatewayLabel, setNewGatewayLabel] = useState("");
+  const [newGatewayConfig, setNewGatewayConfig] = useState("{}");
+  const [editingGatewayId, setEditingGatewayId] = useState<string | null>(null);
+  const [editingGatewayLabel, setEditingGatewayLabel] = useState("");
+  const [editingGatewayIsActive, setEditingGatewayIsActive] = useState(true);
   const [roleAssignmentUsers, setRoleAssignmentUsers] = useState<Array<{ id: string; membershipId: string; email: string | null; displayName: string | null; isActive: boolean }>>([]);
   const [isLoadingRoleAssignmentUsers, setIsLoadingRoleAssignmentUsers] = useState(false);
   const [roleAssignmentRoles, setRoleAssignmentRoles] = useState<Array<{ id: string; code: string; name: string }>>([]);
@@ -1778,6 +1787,57 @@ export default function Home() {
   }, [authenticated, activeTab]);
 
   useEffect(() => {
+    if (authenticated !== true || activeTab !== "Gateway Accounts" || !permissionCodes.includes("tenant.manage")) {
+      return;
+    }
+
+    let mounted = true;
+    let completed = false;
+    const loadingTimer = window.setTimeout(() => {
+      if (mounted && !completed) {
+        setIsLoadingGatewayAccounts(true);
+        setGatewayAccountError(null);
+      }
+    }, 0);
+    void fetch("/api/gateway-accounts", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        completed = true;
+        if (result.status === 401) {
+          setGatewayAccounts([]);
+          return;
+        }
+        if (result.status === 403) {
+          setGatewayAccountError("You are not authorized to view gateway accounts.");
+          return;
+        }
+        if (!result.ok) {
+          throw new Error("Gateway accounts request failed");
+        }
+        const body = await result.json() as { gatewayAccounts?: Array<{ id: string; provider: string; label: string | null; isActive: boolean; createdAt: string }> };
+        setGatewayAccounts(Array.isArray(body.gatewayAccounts) ? body.gatewayAccounts : []);
+      })
+      .catch(() => {
+        completed = true;
+        if (mounted) {
+          setGatewayAccounts([]);
+          setGatewayAccountError("Gateway accounts could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          window.clearTimeout(loadingTimer);
+          setIsLoadingGatewayAccounts(false);
+        }
+      });
+
+    return () => {
+      mounted = false;
+      window.clearTimeout(loadingTimer);
+    };
+  }, [authenticated, activeTab, permissionCodes]);
+
+  useEffect(() => {
     if (authenticated !== true || activeTab !== "Users & Access") {
       return;
     }
@@ -2504,6 +2564,87 @@ export default function Home() {
     const body = await result.json() as { setting: { id: string; key: string; value: string; isActive: boolean } };
     setSettings((current) => current.map((item) => (item.id === settingId ? body.setting : item)));
     setEditingSettingId(null);
+  };
+
+  const createGatewayAccount = async () => {
+    if (!newGatewayProvider.trim()) return;
+    setGatewayAccountError(null);
+    let config: Record<string, unknown> | null = null;
+    try {
+      config = JSON.parse(newGatewayConfig);
+    } catch {
+      setGatewayAccountError("Config must be valid JSON.");
+      return;
+    }
+    const result = await fetch("/api/gateway-accounts", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ provider: newGatewayProvider, label: newGatewayLabel || null, isActive: true, config }),
+    });
+    if (result.status === 401) {
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setGatewayAccountError("You are not authorized to create gateway accounts.");
+      return;
+    }
+    if (!result.ok) {
+      setGatewayAccountError("Gateway account could not be created.");
+      return;
+    }
+    const body = await result.json() as { gatewayAccount: { id: string; provider: string; label: string | null; isActive: boolean; createdAt: string } };
+    setGatewayAccounts((current) => [body.gatewayAccount, ...current]);
+    setNewGatewayProvider("");
+    setNewGatewayLabel("");
+    setNewGatewayConfig("{}");
+  };
+
+  const updateGatewayAccount = async (gatewayId: string) => {
+    setGatewayAccountError(null);
+    const result = await fetch(`/api/gateway-accounts/${gatewayId}`, {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ label: editingGatewayLabel || null, isActive: editingGatewayIsActive }),
+    });
+    if (result.status === 401) {
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setGatewayAccountError("You are not authorized to update gateway accounts.");
+      return;
+    }
+    if (!result.ok) {
+      setGatewayAccountError("Gateway account could not be updated.");
+      return;
+    }
+    const body = await result.json() as { gatewayAccount: { id: string; provider: string; label: string | null; isActive: boolean; createdAt: string } };
+    setGatewayAccounts((current) => current.map((item) => (item.id === gatewayId ? body.gatewayAccount : item)));
+    setEditingGatewayId(null);
+  };
+
+  const deleteGatewayAccount = async (gatewayId: string) => {
+    setGatewayAccountError(null);
+    const result = await fetch(`/api/gateway-accounts/${gatewayId}`, {
+      method: "DELETE",
+      credentials: "same-origin",
+    });
+    if (result.status === 401) {
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setGatewayAccountError("You are not authorized to delete gateway accounts.");
+      return;
+    }
+    if (!result.ok && result.status !== 204) {
+      setGatewayAccountError("Gateway account could not be deleted.");
+      return;
+    }
+    setGatewayAccounts((current) => current.filter((item) => item.id !== gatewayId));
   };
 
   const assignRole = async () => {
@@ -7171,6 +7312,116 @@ export default function Home() {
               </div>
             </div>
             ) : null}
+          </section>
+        ) : null}
+
+        {activeTab === "Gateway Accounts" ? (
+          <section className="mt-6 space-y-6">
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+              <h2 className="text-xl font-semibold">Gateway Accounts</h2>
+              <p className="mt-1 text-sm text-[#a39a86]">Manage payment gateway configurations. Sensitive config fields are never exposed.</p>
+              {gatewayAccountError ? <p className="mt-2 text-sm text-red-400">{gatewayAccountError}</p> : null}
+              <div className="mt-4 space-y-3">
+                {isLoadingGatewayAccounts ? <div className="text-sm text-[#a39a86]">Loading gateway accounts...</div> : null}
+                {!isLoadingGatewayAccounts && gatewayAccounts.length === 0 ? <div className="text-sm text-[#a39a86]">No gateway accounts configured.</div> : null}
+                {gatewayAccounts.map((gw) => (
+                  <div key={gw.id} className="rounded-lg border border-[rgba(212,175,55,0.1)] bg-[#1a1816] p-4">
+                    {editingGatewayId === gw.id ? (
+                      <div className="space-y-2">
+                        <input
+                          className="w-full rounded-lg border border-[rgba(212,175,55,0.2)] bg-[#12110f] px-3 py-2 text-sm"
+                          value={editingGatewayLabel}
+                          onChange={(e) => setEditingGatewayLabel(e.target.value)}
+                          placeholder="Label"
+                        />
+                        <label className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={editingGatewayIsActive}
+                            onChange={(e) => setEditingGatewayIsActive(e.target.checked)}
+                          />
+                          Active
+                        </label>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            className="rounded-lg bg-[rgba(212,175,55,0.15)] px-3 py-1 text-sm font-medium hover:bg-[rgba(212,175,55,0.25)]"
+                            onClick={() => void updateGatewayAccount(gw.id)}
+                          >
+                            Save
+                          </button>
+                          <button
+                            type="button"
+                            className="rounded-lg bg-[rgba(255,255,255,0.05)] px-3 py-1 text-sm hover:bg-[rgba(255,255,255,0.1)]"
+                            onClick={() => setEditingGatewayId(null)}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-sm font-medium">{gw.provider}{gw.label ? ` — ${gw.label}` : ""}</div>
+                          <div className="text-xs text-[#a39a86]">{gw.isActive ? "Active" : "Inactive"} · Created {new Date(gw.createdAt).toLocaleDateString()}</div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            className="rounded-lg bg-[rgba(255,255,255,0.05)] px-2 py-1 text-xs hover:bg-[rgba(255,255,255,0.1)]"
+                            onClick={() => {
+                              setEditingGatewayId(gw.id);
+                              setEditingGatewayLabel(gw.label ?? "");
+                              setEditingGatewayIsActive(gw.isActive);
+                            }}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="rounded-lg bg-red-900/30 px-2 py-1 text-xs text-red-300 hover:bg-red-900/50"
+                            onClick={() => void deleteGatewayAccount(gw.id)}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+              <h2 className="text-lg font-semibold">Add Gateway Account</h2>
+              <div className="mt-3 space-y-3">
+                <input
+                  className="w-full rounded-lg border border-[rgba(212,175,55,0.2)] bg-[#1a1816] px-3 py-2 text-sm"
+                  value={newGatewayProvider}
+                  onChange={(e) => setNewGatewayProvider(e.target.value)}
+                  placeholder="Provider (e.g. razorpay, stripe, manual)"
+                />
+                <input
+                  className="w-full rounded-lg border border-[rgba(212,175,55,0.2)] bg-[#1a1816] px-3 py-2 text-sm"
+                  value={newGatewayLabel}
+                  onChange={(e) => setNewGatewayLabel(e.target.value)}
+                  placeholder="Label (optional)"
+                />
+                <textarea
+                  className="w-full rounded-lg border border-[rgba(212,175,55,0.2)] bg-[#1a1816] px-3 py-2 text-sm font-mono"
+                  value={newGatewayConfig}
+                  onChange={(e) => setNewGatewayConfig(e.target.value)}
+                  placeholder='{"key": "value"}'
+                  rows={3}
+                />
+                <button
+                  type="button"
+                  className="rounded-lg bg-[rgba(212,175,55,0.15)] px-4 py-2 text-sm font-medium hover:bg-[rgba(212,175,55,0.25)]"
+                  onClick={() => void createGatewayAccount()}
+                >
+                  Add Gateway Account
+                </button>
+              </div>
+            </div>
           </section>
         ) : null}
 

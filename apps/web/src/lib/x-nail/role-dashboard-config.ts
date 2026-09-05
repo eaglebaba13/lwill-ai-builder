@@ -193,6 +193,7 @@ export function deriveTabsFromPermissions(permissionCodes: readonly string[]): r
   if (has("setting.read") || has("setting.write")) tabs.push("Settings");
   if (has("notification.read") || has("notification.write")) tabs.push("Notifications");
   if (has("tenant.manage")) tabs.push("Users & Access");
+  if (has("tenant.manage")) tabs.push("Gateway Accounts");
   if (has("franchise.read") || has("franchise.write") || has("report.read")) {
     tabs.push("Franchise Overview");
     tabs.push("Financials");
