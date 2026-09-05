@@ -1,12 +1,59 @@
 # Project Status & Baseline Tracking
 
-## General Project Overview
+## Franchise Formula-Based Minimum Guarantee (MG-02) — 2026-09-05
+
+### Status: IMPLEMENTED — PRODUCTION VERIFIED
+
+- **Commit**: `5845288` (`feat(franchise): implement formula-based minimum guarantee per MG-02`)
+- **ADR reference**: ADR 014, FRANCHISE-COMMERCIAL-RULES-APPROVALS.md MG-01/MG-02 (approved 2026-09-02)
+- **Production deploy commit**: `5845288`
+- **Production verification date**: 2026-09-05
+
+### Approved Business Rule
+
+MG-01: Existing ₹3.10L agreements use fixed `minimumGuaranteeCents` (backfilled to ₹15,000).
+MG-02: New products use formula-based MG = `investmentCents × mgFormulaRateBp / 10000`.
+
+Applicability: if `minimumGuaranteeCents` is set on the agreement, use it (MG-01). Otherwise, if `mgFormulaRateBp` is set and `investmentCents` is available from the outlet profile, compute formula MG (MG-02). Otherwise, fall back to default ₹15,000.
+
+### Implementation
+
+MG fallback chain: `agreement.minimumGuaranteeCents ?? formulaMGCents ?? 1500000`
+
+Where `formulaMGCents = Math.round((investmentCents × mgFormulaRateBp) / 10000)` when both are available, otherwise `null`.
+
+### Changes
+
+- `packages/authentication-context-prisma/src/report-service.ts`:
+  - Updated `ReportPrismaClient.franchiseOutletProfile.findMany` return type to include `investmentCents: number | null`.
+  - Updated `ReportPrismaClient.franchiseAgreement.findMany` return type to include `mgFormulaRateBp: number | null`.
+  - Added `FranchiseOutletProfile.findMany` query for `investmentCents` by branch.
+  - Added `investmentMap` (`branchId → investmentCents`).
+  - Updated MG calculation: `agreement.minimumGuaranteeCents ?? formulaMGCents ?? 1500000`.
+- `packages/authentication-context-prisma/src/report-service.test.ts`:
+  - Updated `createFranchisePrisma` to accept `mgFormulaRateBp` on agreements and `outletProfiles` with `investmentCents`.
+  - Added `franchiseOutletProfile.findMany` mock.
+  - Updated agreement mock return to include `mgFormulaRateBp` and `minimumGuaranteeCents`.
+  - Added test: "calculates formula-based MG at 3% of investment (MG-02)" — `investmentCents=1000000`, `mgFormulaRateBp=300`, expected `formulaMG=30000`.
+  - Added test: "uses agreement-level mgFormulaRateBp not hardcoded 3%" — `mgFormulaRateBp=500`, expected `formulaMG=50000`.
+  - Added test: "formula MG flows into NP-02 higher-of calculation" — `investmentCents=10000000`, `mgFormulaRateBp=300`, `formulaMG=300000`, `netSales30=15000000`, payout=15000000.
+  - Added test: "variable payout > formula MG when 30% net sales exceeds formula MG" — `investmentCents=500000`, `mgFormulaRateBp=300`, `formulaMG=15000`, `netSales30=600000`, payout=600000.
+
+### Production Verification
+
+- ✅ Franchise payout returns real data: existing agreement uses MG-01 (`minimumGuaranteeCents=1500000`, `eligibleRevenueSharePayoutCents=1500000`).
+- ✅ Production data confirmed: agreement `dddddddd-...` has `minimumGuaranteeCents=1500000`, `mgFormulaRateBp=null`. Outlet profile `ffffffff-...` has `investmentCents=31000000`.
+- ✅ MG-02 formula path would activate for new agreements where `minimumGuaranteeCents` is null but `mgFormulaRateBp` is set: `31000000 × 300 / 10000 = 930000` (₹9,300).
+- ✅ NP-01 GST exclusion unchanged.
+- ✅ NP-02 higher-of rule unchanged.
+- ✅ All regression endpoints return 200.
+
 
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
   - **Current Branch**: `phase-1d-native-auth`
-  - **Current HEAD Commit**: `8b67c2d` (`feat(franchise): implement higher-of payout rule MAX(MG, 30% Net Sales) per NP-02`)
-  - **Git State**: `phase-1d-native-auth` at `8b67c2d`; Franchise MG, NP-01, and NP-02 approved rules implemented and production-verified. Payment, Gateway Account, and Settings foundations production-verified.
+  - **Current HEAD Commit**: `5845288` (`feat(franchise): implement formula-based minimum guarantee per MG-02`)
+  - **Git State**: `phase-1d-native-auth` at `5845288`; Franchise MG-01, MG-02, NP-01, and NP-02 approved rules implemented and production-verified. Payment, Gateway Account, and Settings foundations production-verified.
 
 ## Franchise Dashboard — Technical Implementation & Production Delivery — 2026-09-01
 
@@ -3421,7 +3468,6 @@ Replaced the hardcoded `1500000` with `agreement.minimumGuaranteeCents ?? 150000
 
 The following rules were approved on 2026-09-02 but are NOT YET coded in `report-service.ts`:
 
-- **MG-02**: Formula-based MG for new products: `investmentCents × 3%` (requires `FranchiseOutletProfile.investmentCents` lookup + `mgFormulaRateBp` from agreement). Schema columns exist (`mgFormulaRateBp`, `mgFormulaBase`, `investmentCents`).
 - **TR-01/TR-02**: Agreement-level royalty rate (requires `territoryRoyaltyRateBp` column on `FranchiseAgreement`; currently hardcoded to `0.02` / 2%).
 - **HR-02**: Agreement-level effective-dating snapshot (schema column `termsSnapshot` exists; not yet populated).
 
