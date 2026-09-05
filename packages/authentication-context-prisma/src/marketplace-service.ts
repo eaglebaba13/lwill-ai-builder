@@ -74,6 +74,7 @@ export interface MarketplaceService {
   publishVersion(args: { versionId: string }): Promise<AssetVersionRecord | null>;
   listInstallations(args: { tenantId: string }): Promise<TenantInstallationRecord[]>;
   installAsset(input: TenantInstallationCreateInput): Promise<TenantInstallationRecord>;
+  rollbackAsset(args: { tenantId: string; assetId: string; versionId: string; actorUserId?: string | null }): Promise<TenantInstallationRecord | null>;
   uninstallAsset(args: { tenantId: string; assetId: string; actorUserId?: string | null }): Promise<boolean>;
   getInstallation(args: { tenantId: string; assetId: string }): Promise<TenantInstallationRecord | null>;
 }
@@ -94,6 +95,7 @@ interface MarketplacePrismaClient {
     findMany: (args: { where?: Record<string, unknown> }) => Promise<TenantInstallationRecord[]>;
     findUnique: (args: { where: { tenantId_assetId?: { tenantId: string; assetId: string } } }) => Promise<TenantInstallationRecord | null>;
     create: (args: { data: Record<string, unknown> }) => Promise<TenantInstallationRecord>;
+    update: (args: { where: { tenantId_assetId?: { tenantId: string; assetId: string } }; data: Record<string, unknown> }) => Promise<TenantInstallationRecord>;
     delete: (args: { where: { tenantId_assetId?: { tenantId: string; assetId: string } } }) => Promise<TenantInstallationRecord>;
   };
   readonly auditLog: {
@@ -187,6 +189,30 @@ export function createMarketplaceService(prisma: MarketplacePrismaClient): Marke
         },
       });
       return installation;
+    },
+
+    async rollbackAsset({ tenantId, assetId, versionId, actorUserId }) {
+      const existing = await prisma.tenantInstallation.findUnique({
+        where: { tenantId_assetId: { tenantId, assetId } },
+      });
+      if (existing === null) return null;
+      const version = await prisma.assetVersion.findUnique({ where: { id: versionId } });
+      if (version === null || version.assetId !== assetId) return null;
+      const updated = await prisma.tenantInstallation.update({
+        where: { tenantId_assetId: { tenantId, assetId } },
+        data: { versionId, updatedAt: new Date() },
+      });
+      await prisma.auditLog.create({
+        data: {
+          tenantId,
+          actorUserId: actorUserId ?? null,
+          action: "marketplace.rollback",
+          entityType: "MarketplaceAsset",
+          entityId: assetId,
+          metadata: { previousVersionId: existing.versionId, newVersionId: versionId },
+        },
+      });
+      return updated;
     },
 
     async uninstallAsset({ tenantId, assetId, actorUserId }) {

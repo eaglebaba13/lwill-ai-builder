@@ -30,6 +30,7 @@ export interface MarketplaceRouteServices {
   readonly createVersion: (args: { assetId: string; version: string; changelog?: string | null; manifest?: Record<string, unknown> | null }) => Promise<unknown>;
   readonly listInstallations: (tenantId: string) => Promise<readonly unknown[]>;
   readonly installAsset: (tenantId: string, input: MarketplaceInstallInput) => Promise<unknown>;
+  readonly rollbackAsset: (tenantId: string, assetId: string, versionId: string) => Promise<unknown | null>;
   readonly uninstallAsset: (tenantId: string, assetId: string, actorUserId?: string | null) => Promise<boolean>;
 }
 
@@ -199,6 +200,24 @@ export async function handleInstallAsset(
   if (input === null) return response(400);
   const installation = await services.installAsset(authResult.tenantId, input);
   return response(201, { installation });
+}
+
+export async function handleRollbackAsset(
+  request: Request,
+  services: MarketplaceRouteServices,
+  assetId: string,
+): Promise<Response> {
+  const authorization = await services.authorize("tenant.manage");
+  const authResult = authorizationOutcome(authorization);
+  if (!authResult.ok) return authResult.response;
+  const body = await readJsonBody(request);
+  if (body === INVALID_JSON) return response(400);
+  if (typeof body !== "object" || body === null) return response(400);
+  const record = body as Record<string, unknown>;
+  if (!isNonEmptyString(record.versionId)) return response(400);
+  const installation = await services.rollbackAsset(authResult.tenantId, assetId, record.versionId);
+  if (installation === null) return response(404);
+  return response(200, { installation });
 }
 
 export async function handleUninstallAsset(

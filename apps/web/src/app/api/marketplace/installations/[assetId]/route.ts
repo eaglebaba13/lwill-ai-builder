@@ -1,7 +1,12 @@
-import { handleUninstallAsset } from "@/lib/crm/marketplace-route-handlers";
+import { handleRollbackAsset, handleUninstallAsset } from "@/lib/crm/marketplace-route-handlers";
 import { createMarketplaceRouteServices } from "@/lib/crm/marketplace-runtime";
 
 export const runtime = "nodejs";
+
+export async function PATCH(request: Request, { params }: { params: Promise<{ assetId: string }> }): Promise<Response> {
+  const { assetId } = await params;
+  return handleRollbackAsset(request, createMarketplaceRouteServices(), assetId);
+}
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ assetId: string }> }): Promise<Response> {
   const { assetId } = await params;
