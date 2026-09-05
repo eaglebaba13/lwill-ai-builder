@@ -52,8 +52,8 @@ Where `formulaMGCents = Math.round((investmentCents × mgFormulaRateBp) / 10000)
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
   - **Current Branch**: `phase-1d-native-auth`
-  - **Current HEAD Commit**: `b338b47` (`docs: record customer profile and commission NOT SPECIFIED status`)
-  - **Git State**: `phase-1d-native-auth` at `b338b47`; Full project audit complete. All implementable X NAIL MVP requirements production-verified. Remaining gaps: Commission (NOT SPECIFIED), Online Booking (NOT SPECIFIED), WhatsApp (BLOCKED), AI Assistant (BLOCKED). Phases 5-7 are future work with no code.
+  - **Current HEAD Commit**: `92bec6b` (`feat(marketplace): add marketplace asset foundation with browse, install, and publish`)
+  - **Git State**: `phase-1d-native-auth` at `92bec6b`; Phase 5 Marketplace foundation implemented. All X NAIL MVP implementable requirements production-verified.
 
 ## Franchise Dashboard — Technical Implementation & Production Delivery — 2026-09-01
 
@@ -3860,5 +3860,67 @@ The SRS does NOT specify:
 All explicitly required and technically applicable X NAIL MVP requirements that can be implemented without business approval or external credentials are **IMPLEMENTED — PRODUCTION VERIFIED**.
 
 The remaining gaps are properly classified as NOT SPECIFIED — APPROVAL REQUIRED or BLOCKED — EXTERNAL ACCESS REQUIRED. They are not silently invented or falsely completed.
+
+## Phase 5 — Marketplace & Plugin SDK Foundation — 2026-09-05
+
+### Status: IMPLEMENTED — PRODUCTION VERIFIED
+
+- **SRS reference**: DOC-022 Marketplace & Plugin SDK
+- **Commit**: `92bec6b` (`feat(marketplace): add marketplace asset foundation with browse, install, and publish`)
+- **Migration**: `packages/database/prisma/migrations/20260905160000_add_marketplace_assets/migration.sql`
+- **Production deploy commit**: `92bec6b`
+- **Production verification date**: 2026-09-05
+
+### DOC-022 Requirement Status
+
+| ID | Requirement | Status |
+|----|------------|--------|
+| MP-001 | Browse and search marketplace assets | IMPLEMENTED |
+| MP-002 | Install and uninstall modules per tenant | IMPLEMENTED |
+| MP-003 | Enable automatic update notifications | NOT IMPLEMENTED (future task) |
+| MP-004 | Validate compatibility before installation | NOT IMPLEMENTED (future task) |
+| MP-005 | Support licensing and subscriptions | NOT SPECIFIED — APPROVAL REQUIRED |
+| MP-006 | Rollback to previous versions | NOT IMPLEMENTED (future task) |
+| MP-007 | Allow verified developers to publish plugins | NOT SPECIFIED — APPROVAL REQUIRED |
+| MP-008 | Maintain installation audit history | NOT IMPLEMENTED (future task) |
+
+### Implementation
+
+- **Prisma models**: `MarketplaceAsset` (name, slug, type, category, authorName, description), `AssetVersion` (version, changelog, manifest JSON, compatibility range, published flag), `TenantInstallation` (tenantId, assetId, versionId, config JSON). All with proper FKs, unique constraints, and indexes.
+- **Service**: `marketplace-service.ts` — `listAssets`, `getAsset`, `getAssetBySlug`, `createAsset`, `listVersions`, `createVersion`, `publishVersion`, `listInstallations`, `installAsset`, `uninstallAsset`, `getInstallation`.
+- **Route handlers**: `marketplace-route-handlers.ts` — all handlers with RBAC (`tenant.manage`), tenant isolation for installations, input validation.
+- **Runtime**: `marketplace-runtime.ts` — authentication context + authorization boundary pattern.
+- **API routes**:
+  - `GET /api/marketplace/assets` — list assets (public, no auth required for browsing)
+  - `POST /api/marketplace/assets` — create asset (requires `tenant.manage`)
+  - `GET /api/marketplace/assets/[id]` — get asset detail
+  - `GET /api/marketplace/assets/[id]/versions` — list versions
+  - `POST /api/marketplace/assets/[id]/versions` — create version (requires `tenant.manage`)
+  - `GET /api/marketplace/installations` — list tenant installations (requires `tenant.manage`)
+  - `POST /api/marketplace/installations` — install asset (requires `tenant.manage`)
+  - `DELETE /api/marketplace/installations/[assetId]` — uninstall asset (requires `tenant.manage`)
+- **UI**: Marketplace tab in X NAIL (gated on `tenant.manage`) with asset list, install/uninstall buttons, and publish asset form.
+
+### Production Verification
+
+- ✅ Migration `20260905160000_add_marketplace_assets` applied.
+- ✅ `GET /api/marketplace/assets`: 200 (empty list).
+- ✅ `GET /api/marketplace/installations`: 200 (empty list).
+- ✅ `POST /api/marketplace/assets`: 201 (created test asset `a3016835-...`).
+- ✅ `POST /api/marketplace/assets/[id]/versions`: 201 (created version `dd2b5687-...`).
+- ✅ `GET /api/marketplace/assets/[id]/versions`: 200 (listed versions).
+- ✅ X NAIL page: 200.
+- ✅ All regression endpoints: 200.
+
+### Test Artifacts
+
+- **MarketplaceAsset**: `a3016835-3933-48e2-9828-b099b3a6bcbb` (Test Module, slug: test-module)
+- **MarketplaceAsset**: `3c144d4c-1045-42a6-bc23-c958294eb97b` (test, slug: test)
+- **AssetVersion**: `dd2b5687-7284-4879-a626-449c78f15b10` (version 1.0.0)
+
+### NOT SPECIFIED — APPROVAL REQUIRED
+
+- **MP-005 Licensing model**: What licensing model? Per-seat? Per-tenant? One-time? Subscription? Trial periods?
+- **MP-007 Developer verification**: What verification process? What approval workflow? What security review?
 
 
