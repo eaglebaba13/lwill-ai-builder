@@ -52,8 +52,8 @@ Where `formulaMGCents = Math.round((investmentCents × mgFormulaRateBp) / 10000)
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
   - **Current Branch**: `phase-1d-native-auth`
-  - **Current HEAD Commit**: `66746ab` (`feat(franchise): auto-generate termsSnapshot on agreement creation per HR-02`)
-  - **Git State**: `phase-1d-native-auth` at `66746ab`; ALL approved franchise commercial rules (MG-01, MG-02, NP-01, NP-02, TR-01/TR-02, HR-02) implemented and production-verified. Payment, Gateway Account, and Settings foundations production-verified.
+  - **Current HEAD Commit**: `706b81e` (`feat(xnail): add Gateway Account management UI tab`)
+  - **Git State**: `phase-1d-native-auth` at `706b81e`; ALL approved franchise commercial rules implemented and production-verified. Gateway Account management UI added. Payment, Gateway Account API, and Settings foundations production-verified.
 
 ## Franchise Dashboard — Technical Implementation & Production Delivery — 2026-09-01
 
@@ -3624,6 +3624,43 @@ If the caller explicitly provides `termsSnapshot`, that value is used instead (n
 - ✅ All regression endpoints return 200.
 - ✅ New agreements will have `termsSnapshot` auto-populated.
 - ✅ Existing agreements remain frozen (HR-03).
+
+## Gateway Account Management UI — 2026-09-05
+
+### Status: IMPLEMENTED — PRODUCTION VERIFIED
+
+- **Commit**: `706b81e` (`feat(xnail): add Gateway Account management UI tab`)
+- **Production deploy commit**: `706b81e`
+- **Production verification date**: 2026-09-05
+
+### Implementation
+
+Added "Gateway Accounts" tab to X NAIL page, gated on `tenant.manage` permission (matching the API's RBAC requirement). The tab provides:
+
+- **List view**: Displays all gateway accounts for the authenticated tenant (provider, label, active status, creation date). Config/secrets are never displayed (stripped by public DTO).
+- **Create form**: Provider (required), Label (optional), Config JSON (optional). Posts to `POST /api/gateway-accounts`.
+- **Edit**: Inline edit of label and active status. Patches to `PATCH /api/gateway-accounts/[id]`.
+- **Delete**: Removes gateway account via `DELETE /api/gateway-accounts/[id]`.
+- **Error handling**: Displays authorization errors (403), authentication redirects (401), and validation errors.
+
+### Changes
+
+- `apps/web/src/lib/x-nail/role-dashboard-config.ts`: Added "Gateway Accounts" tab gated on `tenant.manage`.
+- `apps/web/src/app/xnail/page.tsx`:
+  - Added "Gateway Accounts" to `ALL_TABS` constant.
+  - Added state variables: `gatewayAccounts`, `isLoadingGatewayAccounts`, `gatewayAccountError`, `newGatewayProvider`, `newGatewayLabel`, `newGatewayConfig`, `editingGatewayId`, `editingGatewayLabel`, `editingGatewayIsActive`.
+  - Added `useEffect` that fetches `/api/gateway-accounts` when "Gateway Accounts" tab is active.
+  - Added handlers: `createGatewayAccount`, `updateGatewayAccount`, `deleteGatewayAccount`.
+  - Added JSX section with list view, edit inline form, delete button, and create form.
+
+### Production Verification
+
+- ✅ X NAIL page loads: `200`.
+- ✅ `GET /api/gateway-accounts`: `200` (returns tenant's accounts).
+- ✅ `GET /api/settings`: `200` (regression).
+- ✅ `GET /api/franchise/payout`: `200` (regression).
+- ✅ `GET /api/invoices/[id]/payments`: `200` (regression).
+- ✅ `GET /api/auth/me`: `200` (regression).
 
 
 
