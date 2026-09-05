@@ -61,6 +61,7 @@ export interface TenantInstallationCreateInput {
   readonly assetId: string;
   readonly versionId: string;
   readonly config?: Record<string, unknown> | null;
+  readonly actorUserId?: string | null;
 }
 
 export interface MarketplaceService {
@@ -73,7 +74,7 @@ export interface MarketplaceService {
   publishVersion(args: { versionId: string }): Promise<AssetVersionRecord | null>;
   listInstallations(args: { tenantId: string }): Promise<TenantInstallationRecord[]>;
   installAsset(input: TenantInstallationCreateInput): Promise<TenantInstallationRecord>;
-  uninstallAsset(args: { tenantId: string; assetId: string }): Promise<boolean>;
+  uninstallAsset(args: { tenantId: string; assetId: string; actorUserId?: string | null }): Promise<boolean>;
   getInstallation(args: { tenantId: string; assetId: string }): Promise<TenantInstallationRecord | null>;
 }
 
@@ -94,6 +95,9 @@ interface MarketplacePrismaClient {
     findUnique: (args: { where: { tenantId_assetId?: { tenantId: string; assetId: string } } }) => Promise<TenantInstallationRecord | null>;
     create: (args: { data: Record<string, unknown> }) => Promise<TenantInstallationRecord>;
     delete: (args: { where: { tenantId_assetId?: { tenantId: string; assetId: string } } }) => Promise<TenantInstallationRecord>;
+  };
+  readonly auditLog: {
+    create: (args: { data: Record<string, unknown> }) => Promise<unknown>;
   };
 }
 
@@ -164,7 +168,7 @@ export function createMarketplaceService(prisma: MarketplacePrismaClient): Marke
     },
 
     async installAsset(input) {
-      return prisma.tenantInstallation.create({
+      const installation = await prisma.tenantInstallation.create({
         data: {
           tenantId: input.tenantId,
           assetId: input.assetId,
@@ -172,15 +176,36 @@ export function createMarketplaceService(prisma: MarketplacePrismaClient): Marke
           config: input.config ?? null,
         },
       });
+      await prisma.auditLog.create({
+        data: {
+          tenantId: input.tenantId,
+          actorUserId: input.actorUserId ?? null,
+          action: "marketplace.install",
+          entityType: "MarketplaceAsset",
+          entityId: input.assetId,
+          metadata: { versionId: input.versionId, installationId: installation.id },
+        },
+      });
+      return installation;
     },
 
-    async uninstallAsset({ tenantId, assetId }) {
+    async uninstallAsset({ tenantId, assetId, actorUserId }) {
       const existing = await prisma.tenantInstallation.findUnique({
         where: { tenantId_assetId: { tenantId, assetId } },
       });
       if (existing === null) return false;
       await prisma.tenantInstallation.delete({
         where: { tenantId_assetId: { tenantId, assetId } },
+      });
+      await prisma.auditLog.create({
+        data: {
+          tenantId,
+          actorUserId: actorUserId ?? null,
+          action: "marketplace.uninstall",
+          entityType: "MarketplaceAsset",
+          entityId: assetId,
+          metadata: { versionId: existing.versionId },
+        },
       });
       return true;
     },

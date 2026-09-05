@@ -30,7 +30,7 @@ export interface MarketplaceRouteServices {
   readonly createVersion: (args: { assetId: string; version: string; changelog?: string | null; manifest?: Record<string, unknown> | null }) => Promise<unknown>;
   readonly listInstallations: (tenantId: string) => Promise<readonly unknown[]>;
   readonly installAsset: (tenantId: string, input: MarketplaceInstallInput) => Promise<unknown>;
-  readonly uninstallAsset: (tenantId: string, assetId: string) => Promise<boolean>;
+  readonly uninstallAsset: (tenantId: string, assetId: string, actorUserId?: string | null) => Promise<boolean>;
 }
 
 const RESPONSE_HEADERS = { "cache-control": "no-store" };

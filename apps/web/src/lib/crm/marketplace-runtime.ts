@@ -48,6 +48,6 @@ export function createMarketplaceRouteServices(): MarketplaceRouteServices {
     createVersion: (args) => marketplaceService.createVersion(args),
     listInstallations: (tenantId) => marketplaceService.listInstallations({ tenantId }),
     installAsset: (tenantId, input) => marketplaceService.installAsset({ tenantId, ...input }),
-    uninstallAsset: (tenantId, assetId) => marketplaceService.uninstallAsset({ tenantId, assetId }),
+    uninstallAsset: (tenantId, assetId, actorUserId) => marketplaceService.uninstallAsset({ tenantId, assetId, actorUserId }),
   };
 }
