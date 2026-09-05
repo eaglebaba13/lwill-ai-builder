@@ -52,8 +52,8 @@ Where `formulaMGCents = Math.round((investmentCents × mgFormulaRateBp) / 10000)
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
   - **Current Branch**: `phase-1d-native-auth`
-  - **Current HEAD Commit**: `92bec6b` (`feat(marketplace): add marketplace asset foundation with browse, install, and publish`)
-  - **Git State**: `phase-1d-native-auth` at `92bec6b`; Phase 5 Marketplace foundation implemented. All X NAIL MVP implementable requirements production-verified.
+  - **Current HEAD Commit**: `9a7bf7d` (`feat(marketplace): add installation audit history per MP-008`)
+  - **Git State**: `phase-1d-native-auth` at `9a7bf7d`; Phase 5 Marketplace: MP-001, MP-002, MP-008 implemented. MP-004 NOT SPECIFIED. MP-003, MP-006 remaining.
 
 ## Franchise Dashboard — Technical Implementation & Production Delivery — 2026-09-01
 
@@ -3882,7 +3882,7 @@ The remaining gaps are properly classified as NOT SPECIFIED — APPROVAL REQUIRE
 | MP-005 | Support licensing and subscriptions | NOT SPECIFIED — APPROVAL REQUIRED |
 | MP-006 | Rollback to previous versions | NOT IMPLEMENTED (future task) |
 | MP-007 | Allow verified developers to publish plugins | NOT SPECIFIED — APPROVAL REQUIRED |
-| MP-008 | Maintain installation audit history | NOT IMPLEMENTED (future task) |
+| MP-008 | Maintain installation audit history | IMPLEMENTED — PRODUCTION VERIFIED |
 
 ### Implementation
 
@@ -3920,7 +3920,32 @@ The remaining gaps are properly classified as NOT SPECIFIED — APPROVAL REQUIRE
 
 ### NOT SPECIFIED — APPROVAL REQUIRED
 
+- **MP-004 Compatibility validation**: What do `compatibilityMin`/`compatibilityMax` represent? Platform version? API version? What comparison semantics? What happens on incompatibility?
 - **MP-005 Licensing model**: What licensing model? Per-seat? Per-tenant? One-time? Subscription? Trial periods?
 - **MP-007 Developer verification**: What verification process? What approval workflow? What security review?
+
+## Marketplace Installation Audit History (MP-008) — 2026-09-05
+
+### Status: IMPLEMENTED — PRODUCTION VERIFIED
+
+- **SRS reference**: DOC-022 MP-008 "Maintain installation audit history"
+- **Commit**: `9a7bf7d` (`feat(marketplace): add installation audit history per MP-008`)
+- **Production deploy commit**: `9a7bf7d`
+- **Production verification date**: 2026-09-05
+
+### Implementation
+
+- Reuses existing `AuditLog` Prisma model (no new migration needed).
+- `installAsset` creates audit log entry: `action: "marketplace.install"`, `entityType: "MarketplaceAsset"`, `entityId: assetId`, `metadata: { versionId, installationId }`.
+- `uninstallAsset` creates audit log entry: `action: "marketplace.uninstall"`, `entityType: "MarketplaceAsset"`, `entityId: assetId`, `metadata: { versionId }`.
+- `GET /api/marketplace/audit-log` returns audit logs filtered by `entityType: "MarketplaceAsset"` for the authenticated tenant, ordered by `createdAt desc`, limit up to 200.
+
+### Production Verification
+
+- ✅ `GET /api/marketplace/audit-log`: 200 (empty initially).
+- ✅ Install flow: `POST /api/marketplace/installations` → 201. Audit log records `marketplace.install` with `versionId` and `installationId`.
+- ✅ Uninstall flow: `DELETE /api/marketplace/installations/[assetId]` → 204. Audit log records `marketplace.uninstall` with `versionId`.
+- ✅ Audit log API returns both entries after install + uninstall.
+- ✅ All regression endpoints: 200.
 
 
