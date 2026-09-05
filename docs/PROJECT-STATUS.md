@@ -52,8 +52,8 @@ Where `formulaMGCents = Math.round((investmentCents × mgFormulaRateBp) / 10000)
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
   - **Current Branch**: `phase-1d-native-auth`
-  - **Current HEAD Commit**: `706b81e` (`feat(xnail): add Gateway Account management UI tab`)
-  - **Git State**: `phase-1d-native-auth` at `706b81e`; ALL approved franchise commercial rules implemented and production-verified. Gateway Account management UI added. Payment, Gateway Account API, and Settings foundations production-verified.
+  - **Current HEAD Commit**: `2020523` (`feat(appointments): add staff assignment to appointment creation`)
+  - **Git State**: `phase-1d-native-auth` at `2020523`; Appointment staff assignment implemented. All approved franchise commercial rules, Gateway Account UI, and Settings foundations production-verified.
 
 ## Franchise Dashboard — Technical Implementation & Production Delivery — 2026-09-01
 
@@ -3661,6 +3661,36 @@ Added "Gateway Accounts" tab to X NAIL page, gated on `tenant.manage` permission
 - ✅ `GET /api/franchise/payout`: `200` (regression).
 - ✅ `GET /api/invoices/[id]/payments`: `200` (regression).
 - ✅ `GET /api/auth/me`: `200` (regression).
+
+## Appointment Staff Assignment — 2026-09-05
+
+### Status: IMPLEMENTED — PRODUCTION VERIFIED
+
+- **Commit**: `2020523` (`feat(appointments): add staff assignment to appointment creation`)
+- **Migration**: `packages/database/prisma/migrations/20260905140000_add_appointment_staff/migration.sql`
+- **Production deploy commit**: `2020523`
+- **Production verification date**: 2026-09-05
+
+### Problem
+
+The X NAIL appointment booking form had a staff selector (`appointmentStaff` state) but the selected staff was never passed to the API. The `Appointment` Prisma model had no `staffId` column. This meant appointments were created without staff assignment, making commission calculation impossible.
+
+### Implementation
+
+- Added `staffId String? @db.Uuid` to `Appointment` model in Prisma schema.
+- Added `appointments Appointment[]` reverse relation on `Staff` model.
+- Created migration `20260905140000_add_appointment_staff` with FK to `Staff(tenantId, id)`.
+- Updated `AppointmentCreateInput` and `AppointmentRecord` interfaces to include `staffId`.
+- Updated `createAppointment` service to validate staff belongs to same tenant.
+- Updated `parseCreateInput` in route handler to accept `staffId`.
+- Updated X NAIL `addAppointment` to pass `staffId: appointmentStaff || null` in POST body.
+
+### Production Verification
+
+- ✅ Migration applied to production PostgreSQL.
+- ✅ `Appointment` table has `staffId` column with FK to `Staff`.
+- ✅ X NAIL page loads: 200.
+- ✅ All regression endpoints return 200.
 
 
 
