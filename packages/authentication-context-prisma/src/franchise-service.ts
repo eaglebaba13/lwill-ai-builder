@@ -95,6 +95,7 @@ export interface FranchiseAgreementCreateInput {
   readonly variableReturnRateBp?: number | null;
   readonly variableReturnBasis?: string | null;
   readonly payoutRule?: string | null;
+  readonly territoryRoyaltyRateBp?: number | null;
   readonly termsSnapshot?: Record<string, unknown> | null;
   readonly effectiveFrom?: Date | null;
   readonly effectiveTo?: Date | null;
@@ -370,9 +371,26 @@ export function createFranchiseService(prisma: FranchisePrismaClient): Franchise
       if (input.variableReturnRateBp !== undefined) data.variableReturnRateBp = input.variableReturnRateBp ?? null;
       if (input.variableReturnBasis !== undefined) data.variableReturnBasis = input.variableReturnBasis ?? null;
       if (input.payoutRule !== undefined) data.payoutRule = input.payoutRule ?? null;
-      if (input.termsSnapshot !== undefined) data.termsSnapshot = input.termsSnapshot ?? null;
+      if (input.territoryRoyaltyRateBp !== undefined) data.territoryRoyaltyRateBp = input.territoryRoyaltyRateBp ?? null;
       if (input.effectiveFrom !== undefined) data.effectiveFrom = input.effectiveFrom ?? null;
       if (input.effectiveTo !== undefined) data.effectiveTo = input.effectiveTo ?? null;
+
+      if (input.termsSnapshot !== undefined) {
+        data.termsSnapshot = input.termsSnapshot ?? null;
+      } else {
+        data.termsSnapshot = {
+          minimumGuaranteeCents: data.minimumGuaranteeCents ?? null,
+          mgFormulaRateBp: data.mgFormulaRateBp ?? null,
+          mgFormulaBase: data.mgFormulaBase ?? null,
+          variableReturnRateBp: data.variableReturnRateBp ?? null,
+          variableReturnBasis: data.variableReturnBasis ?? null,
+          payoutRule: data.payoutRule ?? null,
+          territoryRoyaltyRateBp: data.territoryRoyaltyRateBp ?? null,
+          startDate: data.startDate instanceof Date ? data.startDate.toISOString() : data.startDate,
+          endDate: data.endDate instanceof Date ? data.endDate.toISOString() : data.endDate,
+          capturedAt: new Date().toISOString(),
+        };
+      }
 
       return prisma.franchiseAgreement.create({
         data,
