@@ -50,5 +50,6 @@ export function createMarketplaceRouteServices(): MarketplaceRouteServices {
     installAsset: (tenantId, input) => marketplaceService.installAsset({ tenantId, ...input }),
     rollbackAsset: (tenantId, assetId, versionId) => marketplaceService.rollbackAsset({ tenantId, assetId, versionId }),
     uninstallAsset: (tenantId, assetId, actorUserId) => marketplaceService.uninstallAsset({ tenantId, assetId, actorUserId }),
+    getAvailableUpdates: (tenantId) => marketplaceService.getAvailableUpdates({ tenantId }),
   };
 }

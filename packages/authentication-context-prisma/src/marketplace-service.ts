@@ -77,6 +77,7 @@ export interface MarketplaceService {
   rollbackAsset(args: { tenantId: string; assetId: string; versionId: string; actorUserId?: string | null }): Promise<TenantInstallationRecord | null>;
   uninstallAsset(args: { tenantId: string; assetId: string; actorUserId?: string | null }): Promise<boolean>;
   getInstallation(args: { tenantId: string; assetId: string }): Promise<TenantInstallationRecord | null>;
+  getAvailableUpdates(args: { tenantId: string }): Promise<Array<{ assetId: string; assetName: string; installedVersion: string; latestVersion: string; latestVersionId: string }>>;
 }
 
 interface MarketplacePrismaClient {
@@ -86,7 +87,7 @@ interface MarketplacePrismaClient {
     create: (args: { data: Record<string, unknown> }) => Promise<MarketplaceAssetRecord>;
   };
   readonly assetVersion: {
-    findMany: (args: { where?: Record<string, unknown>; orderBy?: Record<string, unknown> }) => Promise<AssetVersionRecord[]>;
+    findMany: (args: { where?: Record<string, unknown>; orderBy?: Record<string, unknown>; take?: number }) => Promise<AssetVersionRecord[]>;
     create: (args: { data: Record<string, unknown> }) => Promise<AssetVersionRecord>;
     update: (args: { where: { id: string }; data: Record<string, unknown> }) => Promise<AssetVersionRecord>;
     findUnique: (args: { where: { id: string } }) => Promise<AssetVersionRecord | null>;
@@ -241,6 +242,41 @@ export function createMarketplaceService(prisma: MarketplacePrismaClient): Marke
         where: { tenantId_assetId: { tenantId, assetId } },
       });
       return installation ?? null;
+    },
+
+    async getAvailableUpdates({ tenantId }) {
+      const installations = await prisma.tenantInstallation.findMany({ where: { tenantId } });
+      if (installations.length === 0) return [];
+
+      const updates: Array<{ assetId: string; assetName: string; installedVersion: string; latestVersion: string; latestVersionId: string }> = [];
+
+      for (const installation of installations) {
+        const installedVersion = await prisma.assetVersion.findUnique({ where: { id: installation.versionId } });
+        if (installedVersion === null) continue;
+
+        const latestPublished = await prisma.assetVersion.findMany({
+          where: { assetId: installation.assetId, isPublished: true },
+          orderBy: { publishedAt: "desc" },
+          take: 1,
+        });
+        if (latestPublished.length === 0) continue;
+
+        const latest = latestPublished[0]!;
+        if (latest.id === installation.versionId) continue;
+
+        const asset = await prisma.marketplaceAsset.findUnique({ where: { id: installation.assetId } });
+        if (asset === null) continue;
+
+        updates.push({
+          assetId: installation.assetId,
+          assetName: asset.name,
+          installedVersion: installedVersion.version,
+          latestVersion: latest.version,
+          latestVersionId: latest.id,
+        });
+      }
+
+      return updates;
     },
   };
 }

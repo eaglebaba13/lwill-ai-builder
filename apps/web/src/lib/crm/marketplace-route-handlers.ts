@@ -32,6 +32,7 @@ export interface MarketplaceRouteServices {
   readonly installAsset: (tenantId: string, input: MarketplaceInstallInput) => Promise<unknown>;
   readonly rollbackAsset: (tenantId: string, assetId: string, versionId: string) => Promise<unknown | null>;
   readonly uninstallAsset: (tenantId: string, assetId: string, actorUserId?: string | null) => Promise<boolean>;
+  readonly getAvailableUpdates: (tenantId: string) => Promise<readonly unknown[]>;
 }
 
 const RESPONSE_HEADERS = { "cache-control": "no-store" };
@@ -231,4 +232,15 @@ export async function handleUninstallAsset(
   const removed = await services.uninstallAsset(authResult.tenantId, assetId);
   if (!removed) return response(404);
   return response(204);
+}
+
+export async function handleGetAvailableUpdates(
+  _request: Request,
+  services: MarketplaceRouteServices,
+): Promise<Response> {
+  const authorization = await services.authorize("tenant.manage");
+  const authResult = authorizationOutcome(authorization);
+  if (!authResult.ok) return authResult.response;
+  const updates = await services.getAvailableUpdates(authResult.tenantId);
+  return response(200, { updates });
 }

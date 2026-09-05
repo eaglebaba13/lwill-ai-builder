@@ -431,6 +431,7 @@ export default function Home() {
   const [newAssetSlug, setNewAssetSlug] = useState("");
   const [newAssetType, setNewAssetType] = useState("module");
   const [newAssetDescription, setNewAssetDescription] = useState("");
+  const [availableUpdates, setAvailableUpdates] = useState<Array<{ assetId: string; assetName: string; installedVersion: string; latestVersion: string; latestVersionId: string }>>([]);
   const [roleAssignmentUsers, setRoleAssignmentUsers] = useState<Array<{ id: string; membershipId: string; email: string | null; displayName: string | null; isActive: boolean }>>([]);
   const [isLoadingRoleAssignmentUsers, setIsLoadingRoleAssignmentUsers] = useState(false);
   const [roleAssignmentRoles, setRoleAssignmentRoles] = useState<Array<{ id: string; code: string; name: string }>>([]);
@@ -1862,8 +1863,9 @@ export default function Home() {
     void Promise.all([
       fetch("/api/marketplace/assets", { credentials: "same-origin" }),
       fetch("/api/marketplace/installations", { credentials: "same-origin" }),
+      fetch("/api/marketplace/updates", { credentials: "same-origin" }),
     ])
-      .then(async ([assetsResult, installationsResult]) => {
+      .then(async ([assetsResult, installationsResult, updatesResult]) => {
         completed = true;
         if (!mounted) return;
         if (assetsResult.status === 401 || installationsResult.status === 401) {
@@ -1879,6 +1881,10 @@ export default function Home() {
         if (installationsResult.ok) {
           const instBody = await installationsResult.json() as { installations?: Array<{ id: string; assetId: string; versionId: string; isActive: boolean; installedAt: string }> };
           setInstallations(Array.isArray(instBody.installations) ? instBody.installations : []);
+        }
+        if (updatesResult.ok) {
+          const updBody = await updatesResult.json() as { updates?: Array<{ assetId: string; assetName: string; installedVersion: string; latestVersion: string; latestVersionId: string }> };
+          setAvailableUpdates(Array.isArray(updBody.updates) ? updBody.updates : []);
         }
       })
       .catch(() => {
@@ -2759,6 +2765,22 @@ export default function Home() {
     if (result.status === 403) { setMarketplaceError("You are not authorized to uninstall assets."); return; }
     if (!result.ok && result.status !== 204) { setMarketplaceError("Uninstall failed."); return; }
     setInstallations((current) => current.filter((inst) => inst.assetId !== assetId));
+  };
+
+  const rollbackMarketplaceAsset = async (assetId: string, versionId: string) => {
+    setMarketplaceError(null);
+    const result = await fetch(`/api/marketplace/installations/${assetId}`, {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ versionId }),
+    });
+    if (result.status === 401) { setAuthenticated(false); return; }
+    if (result.status === 403) { setMarketplaceError("You are not authorized to rollback assets."); return; }
+    if (!result.ok) { setMarketplaceError("Rollback failed."); return; }
+    const body = await result.json() as { installation: { id: string; assetId: string; versionId: string; isActive: boolean; installedAt: string } };
+    setInstallations((current) => current.map((inst) => (inst.assetId === assetId ? body.installation : inst)));
+    setAvailableUpdates((current) => current.filter((upd) => upd.assetId !== assetId));
   };
 
   const assignRole = async () => {
@@ -7608,23 +7630,39 @@ export default function Home() {
                 {!isLoadingMarketplace && marketplaceAssets.length === 0 ? <div className="text-sm text-[#a39a86]">No marketplace assets available.</div> : null}
                 {marketplaceAssets.map((asset) => {
                   const isInstalled = installations.some((inst) => inst.assetId === asset.id);
+                  const update = availableUpdates.find((upd) => upd.assetId === asset.id);
                   return (
                     <div key={asset.id} className="rounded-lg border border-[rgba(212,175,55,0.1)] bg-[#1a1816] p-4">
                       <div className="flex items-center justify-between">
                         <div>
-                          <div className="text-sm font-medium">{asset.name}</div>
+                          <div className="text-sm font-medium">
+                            {asset.name}
+                            {update ? <span className="ml-2 rounded-full bg-[rgba(212,175,55,0.2)] px-2 py-0.5 text-xs text-[#d4af37]">Update: v{update.latestVersion}</span> : null}
+                          </div>
                           <div className="text-xs text-[#a39a86]">{asset.type}{asset.category ? ` · ${asset.category}` : ""}{asset.authorName ? ` · by ${asset.authorName}` : ""}</div>
                           {asset.description ? <div className="mt-1 text-xs text-[#a39a86]">{asset.description}</div> : null}
+                          {update ? <div className="mt-1 text-xs text-[#d4af37]">Installed: v{update.installedVersion} → Latest: v{update.latestVersion}</div> : null}
                         </div>
                         <div className="flex gap-2">
                           {isInstalled ? (
-                            <button
-                              type="button"
-                              className="rounded-lg bg-red-900/30 px-3 py-1 text-xs text-red-300 hover:bg-red-900/50"
-                              onClick={() => void uninstallMarketplaceAsset(asset.id)}
-                            >
-                              Uninstall
-                            </button>
+                            <>
+                              {update ? (
+                                <button
+                                  type="button"
+                                  className="rounded-lg bg-[rgba(212,175,55,0.15)] px-3 py-1 text-xs font-medium hover:bg-[rgba(212,175,55,0.25)]"
+                                  onClick={() => void rollbackMarketplaceAsset(asset.id, update.latestVersionId)}
+                                >
+                                  Update
+                                </button>
+                              ) : null}
+                              <button
+                                type="button"
+                                className="rounded-lg bg-red-900/30 px-3 py-1 text-xs text-red-300 hover:bg-red-900/50"
+                                onClick={() => void uninstallMarketplaceAsset(asset.id)}
+                              >
+                                Uninstall
+                              </button>
+                            </>
                           ) : (
                             <button
                               type="button"
