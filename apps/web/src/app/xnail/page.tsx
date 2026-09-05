@@ -378,6 +378,7 @@ export default function Home() {
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
   const [editingCustomerName, setEditingCustomerName] = useState("");
   const [editingCustomerPhone, setEditingCustomerPhone] = useState("");
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [serviceName, setServiceName] = useState("");
   const [servicePrice, setServicePrice] = useState("1500");
   const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
@@ -4344,9 +4345,12 @@ export default function Home() {
                 {!isLoadingCustomers && !customerError && customers.length === 0 ? <div className="text-sm text-[#a39a86]">No customers yet.</div> : null}
                 {customers.map((customer) => {
                   const customerAppointments = appointments.filter((appointment) => appointment.customerId === customer.id);
-                  const lastVisit = customerAppointments.length > 0 ? customerAppointments.sort((a, b) => b.startsAt.localeCompare(a.startsAt))[0].startsAt : null;
+                  const sortedAppointments = customerAppointments.slice().sort((a, b) => b.startsAt.localeCompare(a.startsAt));
+                  const lastVisit = sortedAppointments.length > 0 ? sortedAppointments[0].startsAt : null;
+                  const customerInvoiceList = invoices.filter((inv) => inv.customerId === customer.id);
+                  const totalSpendCents = customerInvoiceList.reduce((sum, inv) => sum + inv.totalCents, 0);
                   return (
-                  <div key={customer.id} className="rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
+                  <div key={customer.id} className={`rounded-xl border p-3 cursor-pointer transition-colors ${selectedCustomerId === customer.id ? "border-[rgba(212,175,55,0.4)] bg-[rgba(212,175,55,0.05)]" : "border-[rgba(212,175,55,0.1)] bg-[#17150f]"}`} onClick={() => setSelectedCustomerId(selectedCustomerId === customer.id ? null : customer.id)}>
                     {editingCustomerId === customer.id ? (
                       <div className="space-y-2">
                         <input
@@ -4390,6 +4394,7 @@ export default function Home() {
                               ) : (
                                 <span className="text-[#a39a86]">No visits yet</span>
                               )}
+                              {totalSpendCents > 0 ? <span> · Spent: ₹{(totalSpendCents / 100).toLocaleString()}</span> : null}
                             </div>
                           </div>
                           <div className="flex items-center gap-3">
@@ -4415,27 +4420,80 @@ export default function Home() {
             </div>
 
             <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
-              <h2 className="text-xl font-semibold">Add customer</h2>
-              <div className="mt-4 space-y-3">
-                <input
-                  value={customerName}
-                  onChange={(event) => setCustomerName(event.target.value)}
-                  placeholder="Customer name"
-                  className="premium-input"
-                />
-                <input
-                  value={customerPhone}
-                  onChange={(event) => setCustomerPhone(event.target.value)}
-                  placeholder="Phone"
-                  className="premium-input"
-                />
-                <button
-                  onClick={addCustomer}
-                  className="premium-btn-primary w-full py-2.5 text-sm"
-                >
-                  Save customer
-                </button>
-              </div>
+              {selectedCustomerId !== null ? (() => {
+                const selectedCustomer = customers.find((c) => c.id === selectedCustomerId);
+                if (!selectedCustomer) return null;
+                const custAppts = appointments.filter((a) => a.customerId === selectedCustomerId).slice().sort((a, b) => b.startsAt.localeCompare(a.startsAt));
+                const custInvoices = invoices.filter((inv) => inv.customerId === selectedCustomerId);
+                const custTotalSpend = custInvoices.reduce((sum, inv) => sum + inv.totalCents, 0);
+                return (
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-xl font-semibold">{selectedCustomer.name}</h2>
+                      <button onClick={() => setSelectedCustomerId(null)} className="text-xs text-[#a39a86] hover:text-white">Close</button>
+                    </div>
+                    <div className="mt-2 space-y-1 text-sm text-[#a39a86]">
+                      {selectedCustomer.phone ? <div>Phone: {selectedCustomer.phone}</div> : null}
+                      {selectedCustomer.email ? <div>Email: {selectedCustomer.email}</div> : null}
+                      {selectedCustomer.notes ? <div>Notes: {selectedCustomer.notes}</div> : null}
+                      <div>Visits: {custAppts.length}{custTotalSpend > 0 ? ` · Total spend: ₹${(custTotalSpend / 100).toLocaleString()}` : ""}</div>
+                    </div>
+                    <h3 className="mt-4 text-sm font-semibold text-[#d4af37]">Visit History</h3>
+                    <div className="mt-2 space-y-2 max-h-60 overflow-y-auto">
+                      {custAppts.length === 0 ? <div className="text-xs text-[#a39a86]">No visits yet.</div> : null}
+                      {custAppts.map((appt) => {
+                        const svc = services.find((s) => s.id === appt.serviceId);
+                        const stf = staff.find((s) => s.id === appt.staffId);
+                        return (
+                          <div key={appt.id} className="rounded-lg border border-[rgba(212,175,55,0.08)] bg-[#17150f] p-2 text-xs">
+                            <div className="flex justify-between">
+                              <span>{svc?.name ?? "Service"}</span>
+                              <span className="text-[#a39a86]">{new Date(appt.startsAt).toLocaleDateString()}</span>
+                            </div>
+                            <div className="text-[#a39a86]">
+                              {stf ? `Staff: ${stf.displayName}` : ""} · {appt.status}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <h3 className="mt-4 text-sm font-semibold text-[#d4af37]">Invoices</h3>
+                    <div className="mt-2 space-y-2 max-h-40 overflow-y-auto">
+                      {custInvoices.length === 0 ? <div className="text-xs text-[#a39a86]">No invoices yet.</div> : null}
+                      {custInvoices.map((inv) => (
+                        <div key={inv.id} className="rounded-lg border border-[rgba(212,175,55,0.08)] bg-[#17150f] p-2 text-xs flex justify-between">
+                          <span>{new Date(inv.issuedAt).toLocaleDateString()}</span>
+                          <span>₹{(inv.totalCents / 100).toLocaleString()}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })() : (
+                <div>
+                  <h2 className="text-xl font-semibold">Add customer</h2>
+                  <div className="mt-4 space-y-3">
+                    <input
+                      value={customerName}
+                      onChange={(event) => setCustomerName(event.target.value)}
+                      placeholder="Customer name"
+                      className="premium-input"
+                    />
+                    <input
+                      value={customerPhone}
+                      onChange={(event) => setCustomerPhone(event.target.value)}
+                      placeholder="Phone"
+                      className="premium-input"
+                    />
+                    <button
+                      onClick={addCustomer}
+                      className="premium-btn-primary w-full py-2.5 text-sm"
+                    >
+                      Save customer
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </section>
         ) : null}
