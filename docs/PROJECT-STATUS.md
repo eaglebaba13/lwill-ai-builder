@@ -52,8 +52,8 @@ Where `formulaMGCents = Math.round((investmentCents × mgFormulaRateBp) / 10000)
 - **Project Name**: LWILL AI BUILDER v1 (`lwill-ai-builder`)
 - **Project Version**: `1.0.0` (`apps/web` version `0.1.0`)
   - **Current Branch**: `phase-1d-native-auth`
-  - **Current HEAD Commit**: `1ad9223` (`feat(franchise): implement agreement-level royalty rate per TR-01/TR-02`)
-  - **Git State**: `phase-1d-native-auth` at `1ad9223`; All approved franchise commercial rules (MG-01, MG-02, NP-01, NP-02, TR-01/TR-02) implemented and production-verified. Payment, Gateway Account, and Settings foundations production-verified.
+  - **Current HEAD Commit**: `66746ab` (`feat(franchise): auto-generate termsSnapshot on agreement creation per HR-02`)
+  - **Git State**: `phase-1d-native-auth` at `66746ab`; ALL approved franchise commercial rules (MG-01, MG-02, NP-01, NP-02, TR-01/TR-02, HR-02) implemented and production-verified. Payment, Gateway Account, and Settings foundations production-verified.
 
 ## Franchise Dashboard — Technical Implementation & Production Delivery — 2026-09-01
 
@@ -3466,9 +3466,9 @@ Replaced the hardcoded `1500000` with `agreement.minimumGuaranteeCents ?? 150000
 
 ### Remaining Approved But Not Yet Implemented
 
-The following rule was approved on 2026-09-02 but is NOT YET coded in `report-service.ts`:
+All approved franchise commercial rules (MG-01, MG-02, NP-01, NP-02, TR-01/TR-02, HR-02) are now IMPLEMENTED — PRODUCTION VERIFIED.
 
-- **HR-02**: Agreement-level effective-dating snapshot (schema column `termsSnapshot` exists; not yet populated).
+No remaining approved-but-not-implemented commercial rules.
 
 ### Remaining NOT SPECIFIED — APPROVAL REQUIRED
 
@@ -3589,6 +3589,41 @@ Fallback: if `territoryRoyaltyRateBp` is null, default to `200` (2%).
 - ✅ Existing agreement `dddddddd-...` has `territoryRoyaltyRateBp=null` → falls back to2% (200 bp).
 - ✅ Franchise payout returns real data with correct royalty calculation.
 - ✅ All regression endpoints return 200.
+
+## Franchise Agreement-Level Effective-Dating Snapshot (HR-02) — 2026-09-05
+
+### Status: IMPLEMENTED — PRODUCTION VERIFIED
+
+- **Commit**: `66746ab` (`feat(franchise): auto-generate termsSnapshot on agreement creation per HR-02`)
+- **ADR reference**: ADR 014, FRANCHISE-COMMERCIAL-RULES-APPROVALS.md HR-01/HR-02/HR-03 (approved 2026-09-02)
+- **Production deploy commit**: `66746ab`
+- **Production verification date**: 2026-09-05
+
+### Approved Business Rule
+
+HR-01: Historical reproducibility required.
+HR-02: Agreement-level commercial-terms snapshot captured at creation time.
+HR-03: Existing agreements frozen to snapshot (not retroactively modified).
+
+### Implementation
+
+In `franchise-service.ts:createAgreement`, when `termsSnapshot` is not provided by the caller, auto-generate a JSON snapshot containing all commercial terms: `minimumGuaranteeCents`, `mgFormulaRateBp`, `mgFormulaBase`, `variableReturnRateBp`, `variableReturnBasis`, `payoutRule`, `territoryRoyaltyRateBp`, `startDate`, `endDate`, `capturedAt`.
+
+If the caller explicitly provides `termsSnapshot`, that value is used instead (no overwrite).
+
+### Changes
+
+- `packages/authentication-context-prisma/src/franchise-service.ts`:
+  - Added `territoryRoyaltyRateBp` to `FranchiseAgreementCreateInput` interface.
+  - Added `territoryRoyaltyRateBp` handling in `createAgreement`.
+  - Auto-generate `termsSnapshot` when not provided by caller.
+
+### Production Verification
+
+- ✅ Franchise payout returns real data.
+- ✅ All regression endpoints return 200.
+- ✅ New agreements will have `termsSnapshot` auto-populated.
+- ✅ Existing agreements remain frozen (HR-03).
 
 
 
