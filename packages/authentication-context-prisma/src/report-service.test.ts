@@ -654,6 +654,7 @@ describe("report service: getFranchisePayout", () => {
       startDate: Date;
       endDate: Date | null;
       minimumGuaranteeCents?: number | null;
+      mgFormulaRateBp?: number | null;
       partner: { id: string; name: string };
       territory: { id: string; name: string };
       outlets: Array<{
@@ -664,6 +665,7 @@ describe("report service: getFranchisePayout", () => {
     }>;
     invoices: Array<{ branchId: string; totalCents: number; issuedAt: Date; gstCents?: number }>;
     distributions?: Array<{ agreementOutletId: string; percentage: number }>;
+    outletProfiles?: Array<{ branchId: string; investmentCents: number | null }>;
   }) {
     const territoryFindMany = vi.fn(async (args: { where?: Record<string, unknown> }) => {
       const where = args.where as Record<string, unknown> | undefined;
@@ -788,11 +790,19 @@ describe("report service: getFranchisePayout", () => {
             territoryId: agreement.territoryId,
             startDate: agreement.startDate,
             endDate: agreement.endDate,
+            minimumGuaranteeCents: agreement.minimumGuaranteeCents ?? null,
+            mgFormulaRateBp: agreement.mgFormulaRateBp ?? null,
             partner: agreement.partner,
             territory: agreement.territory,
             outlets: agreement.outlets,
           }));
         }),
+      },
+      franchiseOutletProfile: {
+        findMany: vi.fn(async () => (input.outletProfiles ?? []).map((profile) => ({
+          branchId: profile.branchId,
+          investmentCents: profile.investmentCents,
+        }))),
       },
       franchiseRevenueDistribution: {
         findMany: distributionFindMany,
@@ -1086,6 +1096,194 @@ describe("report service: getFranchisePayout", () => {
 
     expect(result.payouts[0]!.agreementPayouts[0]).toMatchObject({
       eligibleRevenueSharePayoutCents: 1500000,
+    });
+  });
+
+  it("calculates formula-based MG at 3% of investment (MG-02)", async () => {
+    const prisma = createFranchisePrisma({
+      partners: [{ id: "partner-1", userId: "user-1", name: "Kushwaha" }],
+      territories: [{ id: "territory-1", name: "Surat" }],
+      branches: [{ id: "branch-1", name: "Main", territoryId: "territory-1" }],
+      agreements: [
+        {
+          id: "agreement-1",
+          tenantId: "tenant-1",
+          partnerId: "partner-1",
+          territoryId: "territory-1",
+          startDate: baseDate(1),
+          endDate: null,
+          mgFormulaRateBp: 300,
+          partner: { id: "partner-1", name: "Kushwaha" },
+          territory: { id: "territory-1", name: "Surat" },
+          outlets: [
+            {
+              id: "outlet-1",
+              branchId: "branch-1",
+              branch: { id: "branch-1", name: "Main", territoryId: "territory-1" },
+            },
+          ],
+        },
+      ],
+      invoices: [
+        { branchId: "branch-1", totalCents: 5000000, issuedAt: baseDate(5) },
+      ],
+      distributions: [
+        { agreementOutletId: "outlet-1", percentage: 20 },
+      ],
+      outletProfiles: [
+        { branchId: "branch-1", investmentCents: 1000000 },
+      ],
+    });
+    const service = createReportService(prisma);
+
+    const result = await service.getFranchisePayout({ tenantId: "tenant-1", year: 2026, month: 8 });
+
+    expect(result.payouts[0]!.agreementPayouts[0]).toMatchObject({
+      grossRevenueCents: 5000000,
+      revenueShareCents: 1000000,
+      eligibleRevenueSharePayoutCents: 30000,
+    });
+    expect(result.payouts[0]!.totalRevenueSharePayoutCents).toBe(30000);
+  });
+
+  it("uses agreement-level mgFormulaRateBp not hardcoded 3%", async () => {
+    const prisma = createFranchisePrisma({
+      partners: [{ id: "partner-1", userId: "user-1", name: "Kushwaha" }],
+      territories: [{ id: "territory-1", name: "Surat" }],
+      branches: [{ id: "branch-1", name: "Main", territoryId: "territory-1" }],
+      agreements: [
+        {
+          id: "agreement-1",
+          tenantId: "tenant-1",
+          partnerId: "partner-1",
+          territoryId: "territory-1",
+          startDate: baseDate(1),
+          endDate: null,
+          mgFormulaRateBp: 500,
+          partner: { id: "partner-1", name: "Kushwaha" },
+          territory: { id: "territory-1", name: "Surat" },
+          outlets: [
+            {
+              id: "outlet-1",
+              branchId: "branch-1",
+              branch: { id: "branch-1", name: "Main", territoryId: "territory-1" },
+            },
+          ],
+        },
+      ],
+      invoices: [
+        { branchId: "branch-1", totalCents: 5000000, issuedAt: baseDate(5) },
+      ],
+      distributions: [
+        { agreementOutletId: "outlet-1", percentage: 20 },
+      ],
+      outletProfiles: [
+        { branchId: "branch-1", investmentCents: 1000000 },
+      ],
+    });
+    const service = createReportService(prisma);
+
+    const result = await service.getFranchisePayout({ tenantId: "tenant-1", year: 2026, month: 8 });
+
+    expect(result.payouts[0]!.agreementPayouts[0]).toMatchObject({
+      eligibleRevenueSharePayoutCents: 50000,
+    });
+  });
+
+  it("formula MG flows into NP-02 higher-of calculation", async () => {
+    const prisma = createFranchisePrisma({
+      partners: [{ id: "partner-1", userId: "user-1", name: "Kushwaha" }],
+      territories: [{ id: "territory-1", name: "Surat" }],
+      branches: [{ id: "branch-1", name: "Main", territoryId: "territory-1" }],
+      agreements: [
+        {
+          id: "agreement-1",
+          tenantId: "tenant-1",
+          partnerId: "partner-1",
+          territoryId: "territory-1",
+          startDate: baseDate(1),
+          endDate: null,
+          mgFormulaRateBp: 300,
+          partner: { id: "partner-1", name: "Kushwaha" },
+          territory: { id: "territory-1", name: "Surat" },
+          outlets: [
+            {
+              id: "outlet-1",
+              branchId: "branch-1",
+              branch: { id: "branch-1", name: "Main", territoryId: "territory-1" },
+            },
+          ],
+        },
+      ],
+      invoices: [
+        { branchId: "branch-1", totalCents: 50000000, issuedAt: baseDate(5) },
+      ],
+      distributions: [
+        { agreementOutletId: "outlet-1", percentage: 20 },
+      ],
+      outletProfiles: [
+        { branchId: "branch-1", investmentCents: 10000000 },
+      ],
+    });
+    const service = createReportService(prisma);
+
+    const result = await service.getFranchisePayout({ tenantId: "tenant-1", year: 2026, month: 8 });
+
+    const formulaMG = Math.round((10000000 * 300) / 10000);
+    const netSales30 = Math.round(50000000 * 0.30);
+    expect(formulaMG).toBe(300000);
+    expect(netSales30).toBe(15000000);
+    expect(result.payouts[0]!.agreementPayouts[0]).toMatchObject({
+      grossRevenueCents: 50000000,
+      eligibleRevenueSharePayoutCents: 15000000,
+    });
+  });
+
+  it("variable payout > formula MG when 30% net sales exceeds formula MG", async () => {
+    const prisma = createFranchisePrisma({
+      partners: [{ id: "partner-1", userId: "user-1", name: "Kushwaha" }],
+      territories: [{ id: "territory-1", name: "Surat" }],
+      branches: [{ id: "branch-1", name: "Main", territoryId: "territory-1" }],
+      agreements: [
+        {
+          id: "agreement-1",
+          tenantId: "tenant-1",
+          partnerId: "partner-1",
+          territoryId: "territory-1",
+          startDate: baseDate(1),
+          endDate: null,
+          mgFormulaRateBp: 300,
+          partner: { id: "partner-1", name: "Kushwaha" },
+          territory: { id: "territory-1", name: "Surat" },
+          outlets: [
+            {
+              id: "outlet-1",
+              branchId: "branch-1",
+              branch: { id: "branch-1", name: "Main", territoryId: "territory-1" },
+            },
+          ],
+        },
+      ],
+      invoices: [
+        { branchId: "branch-1", totalCents: 2000000, issuedAt: baseDate(5) },
+      ],
+      distributions: [
+        { agreementOutletId: "outlet-1", percentage: 20 },
+      ],
+      outletProfiles: [
+        { branchId: "branch-1", investmentCents: 500000 },
+      ],
+    });
+    const service = createReportService(prisma);
+
+    const result = await service.getFranchisePayout({ tenantId: "tenant-1", year: 2026, month: 8 });
+
+    const formulaMG = Math.round((500000 * 300) / 10000);
+    const netSales30 = Math.round(2000000 * 0.30);
+    expect(formulaMG).toBe(15000);
+    expect(netSales30).toBe(600000);
+    expect(result.payouts[0]!.agreementPayouts[0]).toMatchObject({
+      eligibleRevenueSharePayoutCents: 600000,
     });
   });
 

@@ -186,7 +186,7 @@ interface ReportPrismaClient {
     findFirst(args: { where?: Record<string, unknown>; select?: Record<string, unknown> }): Promise<{ readonly id: string } | null>;
   };
   readonly franchiseOutletProfile: {
-    findMany(args: { where?: Record<string, unknown>; select?: Record<string, unknown> }): Promise<ReadonlyArray<{ readonly branchId: string }>>;
+    findMany(args: { where?: Record<string, unknown>; select?: Record<string, unknown> }): Promise<ReadonlyArray<{ readonly branchId: string; readonly investmentCents: number | null }>>;
   };
   readonly franchiseAgreement: {
     findMany(args: { where?: Record<string, unknown>; select?: Record<string, unknown>; include?: Record<string, unknown> }): Promise<ReadonlyArray<{
@@ -196,6 +196,7 @@ interface ReportPrismaClient {
       readonly startDate: Date;
       readonly endDate: Date | null;
       readonly minimumGuaranteeCents: number | null;
+      readonly mgFormulaRateBp: number | null;
       readonly partner: { readonly id: string; readonly name: string };
       readonly territory: { readonly id: string; readonly name: string };
       readonly outlets: ReadonlyArray<{
@@ -643,7 +644,7 @@ export function createReportService(prisma: ReportPrismaClient): ReportService {
       const branchIds = [...new Set(agreements.flatMap((agreement) => agreement.outlets.map((outlet) => outlet.branchId)))];
       const agreementOutletIds = agreements.flatMap((agreement) => agreement.outlets.map((outlet) => outlet.id));
 
-      const [territories, branches, invoices, allTerritoryAgreements, allTerritoryBranches, distributions] = await Promise.all([
+      const [territories, branches, invoices, allTerritoryAgreements, allTerritoryBranches, distributions, outletProfiles] = await Promise.all([
         prisma.territory.findMany({
           where: { tenantId, id: { in: territoryIds } },
           select: { id: true, name: true },
@@ -689,12 +690,21 @@ export function createReportService(prisma: ReportPrismaClient): ReportService {
           },
           select: { agreementOutletId: true, percentage: true },
         }),
+        prisma.franchiseOutletProfile.findMany({
+          where: {
+            tenantId,
+            branchId: { in: branchIds },
+            isActive: true,
+          },
+          select: { branchId: true, investmentCents: true },
+        }),
       ]);
 
       const distributionMap = new Map(distributions.map((distribution) => [distribution.agreementOutletId, distribution.percentage]));
 
       const territoryMap = new Map(territories.map((territory) => [territory.id, territory]));
       const branchMap = new Map(branches.map((branch) => [branch.id, branch]));
+      const investmentMap = new Map(outletProfiles.map((profile) => [profile.branchId, profile.investmentCents]));
 
       const allTerritoryBranchIds = allTerritoryBranches.map((branch) => branch.id);
       const allTerritoryInvoices = await prisma.invoice.findMany({
@@ -759,7 +769,11 @@ export function createReportService(prisma: ReportPrismaClient): ReportService {
             const grossRevenueCents = branchSalesMap.get(outlet.branchId) ?? 0;
             const percentage = distributionMap.get(outlet.id) ?? 0;
             const revenueShareCents = Math.round((grossRevenueCents * percentage) / 100);
-            const minimumGuaranteeCents = agreement.minimumGuaranteeCents ?? 1500000;
+            const investmentCents = investmentMap.get(outlet.branchId);
+            const formulaMGCents = (agreement.mgFormulaRateBp != null && investmentCents != null)
+              ? Math.round((investmentCents * agreement.mgFormulaRateBp) / 10000)
+              : null;
+            const minimumGuaranteeCents = agreement.minimumGuaranteeCents ?? formulaMGCents ?? 1500000;
             const netSalesVariableReturnCents = Math.round(grossRevenueCents * 0.30);
             const eligibleRevenueSharePayoutCents = Math.max(minimumGuaranteeCents, netSalesVariableReturnCents);
 
