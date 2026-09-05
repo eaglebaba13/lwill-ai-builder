@@ -167,7 +167,7 @@ function KpiCard({ definition, context }: { readonly definition: RoleDashboardCo
   );
 }
 
-const ALL_TABS = ["Overview", "Customers", "Services", "Packages", "Memberships", "Inventory", "Staff", "Attendance", "Appointments", "Billing", "Branches", "Reports", "Settings", "Notifications", "Users & Access", "Gateway Accounts", "Franchise Overview", "Financials", "Territories", "Partners", "Agreements", "Outlets"] as const;
+const ALL_TABS = ["Overview", "Customers", "Services", "Packages", "Memberships", "Inventory", "Staff", "Attendance", "Appointments", "Billing", "Branches", "Reports", "Settings", "Notifications", "Users & Access", "Gateway Accounts", "Marketplace", "Franchise Overview", "Financials", "Territories", "Partners", "Agreements", "Outlets"] as const;
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<(typeof ALL_TABS)[number]>("Overview");
@@ -423,6 +423,14 @@ export default function Home() {
   const [editingGatewayId, setEditingGatewayId] = useState<string | null>(null);
   const [editingGatewayLabel, setEditingGatewayLabel] = useState("");
   const [editingGatewayIsActive, setEditingGatewayIsActive] = useState(true);
+  const [marketplaceAssets, setMarketplaceAssets] = useState<Array<{ id: string; name: string; slug: string; description: string | null; type: string; category: string | null; authorName: string | null; isActive: boolean; createdAt: string }>>([]);
+  const [isLoadingMarketplace, setIsLoadingMarketplace] = useState(false);
+  const [marketplaceError, setMarketplaceError] = useState<string | null>(null);
+  const [installations, setInstallations] = useState<Array<{ id: string; assetId: string; versionId: string; isActive: boolean; installedAt: string }>>([]);
+  const [newAssetName, setNewAssetName] = useState("");
+  const [newAssetSlug, setNewAssetSlug] = useState("");
+  const [newAssetType, setNewAssetType] = useState("module");
+  const [newAssetDescription, setNewAssetDescription] = useState("");
   const [roleAssignmentUsers, setRoleAssignmentUsers] = useState<Array<{ id: string; membershipId: string; email: string | null; displayName: string | null; isActive: boolean }>>([]);
   const [isLoadingRoleAssignmentUsers, setIsLoadingRoleAssignmentUsers] = useState(false);
   const [roleAssignmentRoles, setRoleAssignmentRoles] = useState<Array<{ id: string; code: string; name: string }>>([]);
@@ -1839,6 +1847,58 @@ export default function Home() {
   }, [authenticated, activeTab, permissionCodes]);
 
   useEffect(() => {
+    if (authenticated !== true || activeTab !== "Marketplace" || !permissionCodes.includes("tenant.manage")) {
+      return;
+    }
+
+    let mounted = true;
+    let completed = false;
+    const loadingTimer = window.setTimeout(() => {
+      if (mounted && !completed) {
+        setIsLoadingMarketplace(true);
+        setMarketplaceError(null);
+      }
+    }, 0);
+    void Promise.all([
+      fetch("/api/marketplace/assets", { credentials: "same-origin" }),
+      fetch("/api/marketplace/installations", { credentials: "same-origin" }),
+    ])
+      .then(async ([assetsResult, installationsResult]) => {
+        completed = true;
+        if (!mounted) return;
+        if (assetsResult.status === 401 || installationsResult.status === 401) {
+          setAuthenticated(false);
+          return;
+        }
+        if (!assetsResult.ok) {
+          setMarketplaceError("Could not load marketplace assets.");
+          return;
+        }
+        const assetsBody = await assetsResult.json() as { assets?: Array<{ id: string; name: string; slug: string; description: string | null; type: string; category: string | null; authorName: string | null; isActive: boolean; createdAt: string }> };
+        setMarketplaceAssets(Array.isArray(assetsBody.assets) ? assetsBody.assets : []);
+        if (installationsResult.ok) {
+          const instBody = await installationsResult.json() as { installations?: Array<{ id: string; assetId: string; versionId: string; isActive: boolean; installedAt: string }> };
+          setInstallations(Array.isArray(instBody.installations) ? instBody.installations : []);
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setMarketplaceAssets([]);
+          setInstallations([]);
+          setMarketplaceError("Marketplace could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          window.clearTimeout(loadingTimer);
+          setIsLoadingMarketplace(false);
+        }
+      });
+
+    return () => { mounted = false; window.clearTimeout(loadingTimer); };
+  }, [authenticated, activeTab, permissionCodes]);
+
+  useEffect(() => {
     if (authenticated !== true || activeTab !== "Users & Access") {
       return;
     }
@@ -2646,6 +2706,59 @@ export default function Home() {
       return;
     }
     setGatewayAccounts((current) => current.filter((item) => item.id !== gatewayId));
+  };
+
+  const createMarketplaceAsset = async () => {
+    if (!newAssetName.trim() || !newAssetSlug.trim()) return;
+    setMarketplaceError(null);
+    const result = await fetch("/api/marketplace/assets", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: newAssetName, slug: newAssetSlug, type: newAssetType, description: newAssetDescription || null }),
+    });
+    if (result.status === 401) { setAuthenticated(false); return; }
+    if (result.status === 403) { setMarketplaceError("You are not authorized to create marketplace assets."); return; }
+    if (!result.ok) { setMarketplaceError("Asset could not be created."); return; }
+    const body = await result.json() as { asset: { id: string; name: string; slug: string; description: string | null; type: string; category: string | null; authorName: string | null; isActive: boolean; createdAt: string } };
+    setMarketplaceAssets((current) => [body.asset, ...current]);
+    setNewAssetName("");
+    setNewAssetSlug("");
+    setNewAssetType("module");
+    setNewAssetDescription("");
+  };
+
+  const installMarketplaceAsset = async (assetId: string) => {
+    setMarketplaceError(null);
+    const versionsResult = await fetch(`/api/marketplace/assets/${assetId}/versions`, { credentials: "same-origin" });
+    if (!versionsResult.ok) { setMarketplaceError("Could not load asset versions."); return; }
+    const versionsBody = await versionsResult.json() as { versions?: Array<{ id: string; version: string; isPublished: boolean }> };
+    const publishedVersions = (versionsBody.versions ?? []).filter((v) => v.isPublished);
+    if (publishedVersions.length === 0) { setMarketplaceError("No published versions available to install."); return; }
+    const latestVersion = publishedVersions[0]!;
+    const installResult = await fetch("/api/marketplace/installations", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ assetId, versionId: latestVersion.id }),
+    });
+    if (installResult.status === 401) { setAuthenticated(false); return; }
+    if (installResult.status === 403) { setMarketplaceError("You are not authorized to install assets."); return; }
+    if (!installResult.ok) { setMarketplaceError("Installation failed."); return; }
+    const installBody = await installResult.json() as { installation: { id: string; assetId: string; versionId: string; isActive: boolean; installedAt: string } };
+    setInstallations((current) => [...current, installBody.installation]);
+  };
+
+  const uninstallMarketplaceAsset = async (assetId: string) => {
+    setMarketplaceError(null);
+    const result = await fetch(`/api/marketplace/installations/${assetId}`, {
+      method: "DELETE",
+      credentials: "same-origin",
+    });
+    if (result.status === 401) { setAuthenticated(false); return; }
+    if (result.status === 403) { setMarketplaceError("You are not authorized to uninstall assets."); return; }
+    if (!result.ok && result.status !== 204) { setMarketplaceError("Uninstall failed."); return; }
+    setInstallations((current) => current.filter((inst) => inst.assetId !== assetId));
   };
 
   const assignRole = async () => {
@@ -7478,6 +7591,99 @@ export default function Home() {
                   onClick={() => void createGatewayAccount()}
                 >
                   Add Gateway Account
+                </button>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {activeTab === "Marketplace" ? (
+          <section className="mt-6 space-y-6">
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+              <h2 className="text-xl font-semibold">Marketplace</h2>
+              <p className="mt-1 text-sm text-[#a39a86]">Browse and install modules, themes, and integrations.</p>
+              {marketplaceError ? <p className="mt-2 text-sm text-red-400">{marketplaceError}</p> : null}
+              <div className="mt-4 space-y-3">
+                {isLoadingMarketplace ? <div className="text-sm text-[#a39a86]">Loading marketplace...</div> : null}
+                {!isLoadingMarketplace && marketplaceAssets.length === 0 ? <div className="text-sm text-[#a39a86]">No marketplace assets available.</div> : null}
+                {marketplaceAssets.map((asset) => {
+                  const isInstalled = installations.some((inst) => inst.assetId === asset.id);
+                  return (
+                    <div key={asset.id} className="rounded-lg border border-[rgba(212,175,55,0.1)] bg-[#1a1816] p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-sm font-medium">{asset.name}</div>
+                          <div className="text-xs text-[#a39a86]">{asset.type}{asset.category ? ` · ${asset.category}` : ""}{asset.authorName ? ` · by ${asset.authorName}` : ""}</div>
+                          {asset.description ? <div className="mt-1 text-xs text-[#a39a86]">{asset.description}</div> : null}
+                        </div>
+                        <div className="flex gap-2">
+                          {isInstalled ? (
+                            <button
+                              type="button"
+                              className="rounded-lg bg-red-900/30 px-3 py-1 text-xs text-red-300 hover:bg-red-900/50"
+                              onClick={() => void uninstallMarketplaceAsset(asset.id)}
+                            >
+                              Uninstall
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              className="rounded-lg bg-[rgba(212,175,55,0.15)] px-3 py-1 text-xs font-medium hover:bg-[rgba(212,175,55,0.25)]"
+                              onClick={() => void installMarketplaceAsset(asset.id)}
+                            >
+                              Install
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+              <h2 className="text-lg font-semibold">Publish Asset</h2>
+              <p className="mt-1 text-xs text-[#a39a86]">Register a new marketplace asset. Versions can be added after creation.</p>
+              <div className="mt-3 space-y-3">
+                <input
+                  className="w-full rounded-lg border border-[rgba(212,175,55,0.2)] bg-[#1a1816] px-3 py-2 text-sm"
+                  value={newAssetName}
+                  onChange={(e) => setNewAssetName(e.target.value)}
+                  placeholder="Asset name"
+                />
+                <input
+                  className="w-full rounded-lg border border-[rgba(212,175,55,0.2)] bg-[#1a1816] px-3 py-2 text-sm"
+                  value={newAssetSlug}
+                  onChange={(e) => setNewAssetSlug(e.target.value)}
+                  placeholder="Slug (unique identifier)"
+                />
+                <select
+                  className="w-full rounded-lg border border-[rgba(212,175,55,0.2)] bg-[#1a1816] px-3 py-2 text-sm"
+                  value={newAssetType}
+                  onChange={(e) => setNewAssetType(e.target.value)}
+                >
+                  <option value="module">Module</option>
+                  <option value="theme">Theme</option>
+                  <option value="plugin">Plugin</option>
+                  <option value="integration">Integration</option>
+                  <option value="workflow_template">Workflow Template</option>
+                  <option value="dashboard">Dashboard</option>
+                  <option value="report">Report</option>
+                  <option value="api_connector">API Connector</option>
+                </select>
+                <textarea
+                  className="w-full rounded-lg border border-[rgba(212,175,55,0.2)] bg-[#1a1816] px-3 py-2 text-sm"
+                  value={newAssetDescription}
+                  onChange={(e) => setNewAssetDescription(e.target.value)}
+                  placeholder="Description (optional)"
+                  rows={2}
+                />
+                <button
+                  type="button"
+                  className="rounded-lg bg-[rgba(212,175,55,0.15)] px-4 py-2 text-sm font-medium hover:bg-[rgba(212,175,55,0.25)]"
+                  onClick={() => void createMarketplaceAsset()}
+                >
+                  Publish Asset
                 </button>
               </div>
             </div>
