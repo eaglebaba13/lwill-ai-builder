@@ -1,5 +1,44 @@
 # Project Status & Baseline Tracking
 
+## Phase 6 — AI Builder Core Data Foundation & Tenant Isolation (Task 1) — 2026-09-08
+
+### Status: IMPLEMENTED & LOCAL VERIFIED
+
+- **Branch**: `phase-1d-native-auth`
+- **Migration**: `packages/database/prisma/migrations/20260908213000_add_ai_builder_models/migration.sql`
+- **Reference Spec**: `docs/LWILL-DOC-021-AI-Builder-Engine-SRS-v1.0.txt`
+
+### Implemented Models & Architecture
+
+- **`AiProject`**: `id`, `tenantId`, `name`, `description`, `status` (`@default("active")`), `metadata` (`Json?`), `createdAt`, `updatedAt`.
+  - Composite unique `@@unique([tenantId, id])`, indexes `@@index([tenantId])`, `@@index([tenantId, status])`.
+- **`AiSession`**: `id`, `tenantId`, `projectId`, `userId`, `title`, `createdAt`, `updatedAt`.
+  - Composite unique `@@unique([tenantId, id])`, indexes `@@index([tenantId])`, `@@index([tenantId, projectId])`, `@@index([userId])`.
+- **`AiPrompt`**: `id`, `tenantId`, `projectId`, `sessionId`, `role`, `content`, `tokenCount`, `createdAt`.
+  - Indexes `@@index([tenantId])`, `@@index([tenantId, sessionId])`, `@@index([tenantId, projectId])`.
+- **`ModelUsage`**: `id`, `tenantId`, `projectId`, `provider`, `modelName`, `promptTokens`, `completionTokens`, `totalTokens`, `durationMs`, `createdAt`.
+  - Indexes `@@index([tenantId])`, `@@index([tenantId, projectId])`, `@@index([tenantId, provider])`, `@@index([tenantId, createdAt])`.
+
+### Relational Integrity & Tenant Isolation
+
+- Foreign keys to `Tenant(id)` on `tenantId` with `ON DELETE RESTRICT`.
+- Foreign keys to `AiProject(tenantId, id)` on `(tenantId, projectId)` with `ON DELETE RESTRICT`.
+- Foreign keys to `AiSession(tenantId, id)` on `(tenantId, sessionId)` with `ON DELETE RESTRICT`.
+- Foreign key to `User(id)` on `userId` with `ON DELETE RESTRICT`.
+
+### RBAC Permissions & Zod Schemas
+
+- Permissions registered: `ai.project.read`, `ai.project.write`.
+- Bootstrap CLI & tests: `bootstrapAiProjectPermissions` in `initial-ai-project-permissions-bootstrap.ts`, tested in `initial-ai-project-permissions-bootstrap.test.ts` (9 tests pass).
+- Role dashboard config updated: `deriveTabsFromPermissions` checks `ai.project.read` / `ai.project.write` for "AI Builder" tab.
+- Zod validation schemas added in `ai-builder-schemas.ts` and tested in `ai-builder-schemas.test.ts` (11 tests pass):
+  - `aiProjectCreateSchema` / `parseAiProjectCreateInput`
+  - `aiPromptStorageSchema` / `parseAiPromptStorageInput`
+  - `aiSessionCreateSchema` / `parseAiSessionCreateInput`
+  - `modelUsageCreateSchema` / `parseModelUsageCreateInput`
+
+---
+
 ## Franchise Formula-Based Minimum Guarantee (MG-02) — 2026-09-05
 
 ### Status: IMPLEMENTED — PRODUCTION VERIFIED

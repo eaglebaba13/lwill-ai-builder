@@ -195,6 +195,7 @@ export function deriveTabsFromPermissions(permissionCodes: readonly string[]): r
   if (has("tenant.manage")) tabs.push("Users & Access");
   if (has("tenant.manage")) tabs.push("Gateway Accounts");
   if (has("tenant.manage")) tabs.push("Marketplace");
+  if (has("ai.project.read") || has("ai.project.write")) tabs.push("AI Builder");
   if (has("franchise.read") || has("franchise.write") || has("report.read")) {
     tabs.push("Franchise Overview");
     tabs.push("Financials");
