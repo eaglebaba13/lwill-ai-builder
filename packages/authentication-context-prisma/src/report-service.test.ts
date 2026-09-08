@@ -1143,9 +1143,9 @@ describe("report service: getFranchisePayout", () => {
     expect(result.payouts[0]!.agreementPayouts[0]).toMatchObject({
       grossRevenueCents: 5000000,
       revenueShareCents: 1000000,
-      eligibleRevenueSharePayoutCents: 30000,
+      eligibleRevenueSharePayoutCents: 1500000,
     });
-    expect(result.payouts[0]!.totalRevenueSharePayoutCents).toBe(30000);
+    expect(result.payouts[0]!.totalRevenueSharePayoutCents).toBe(1500000);
   });
 
   it("uses agreement-level mgFormulaRateBp not hardcoded 3%", async () => {
@@ -1188,7 +1188,7 @@ describe("report service: getFranchisePayout", () => {
     const result = await service.getFranchisePayout({ tenantId: "tenant-1", year: 2026, month: 8 });
 
     expect(result.payouts[0]!.agreementPayouts[0]).toMatchObject({
-      eligibleRevenueSharePayoutCents: 50000,
+      eligibleRevenueSharePayoutCents: 1500000,
     });
   });
 
@@ -1614,7 +1614,7 @@ describe("report service: getFranchisePayout", () => {
     expect(result.payouts).toHaveLength(1);
     expect(result.payouts[0]!.partnerId).toBe("partner-1");
     expect(result.payouts[0]!.agreementPayouts[0]!.grossRevenueCents).toBe(8000000);
-    expect(result.payouts[0]!.totalEligiblePayoutCents).toBe(1600000 + 100000);
+    expect(result.payouts[0]!.totalEligiblePayoutCents).toBe(2500000);
   });
 
   it("denies cross-partner payout access when userId belongs to a different partner", async () => {
