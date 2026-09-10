@@ -4,6 +4,7 @@ import { createNotificationTemplateService, type NotificationTemplateRecord } fr
 import { createMockChannelAdapter, createInAppChannelAdapter, createFailingChannelAdapter, type NotificationChannelAdapter, type NotificationDeliveryResult } from "./notification-channel-adapter";
 import { renderVariables } from "./notification-variable-renderer";
 import { createNotificationRetryPolicy } from "./notification-retry-policy";
+import { createNotificationPreferenceService } from "./notification-preference-service";
 
 export interface NotificationDispatchInput {
   readonly tenantId: string;
@@ -28,6 +29,9 @@ interface NotificationDispatcherPrismaClient {
   readonly notificationTemplate: {
     findUnique: (args: { where: { id: string }; include?: Record<string, unknown> }) => Promise<NotificationTemplateRecord | null>;
   };
+  readonly notificationPreference: {
+    findUnique: (args: { where: { tenantId_userId_channel: { tenantId: string; userId: string; channel: string } } }) => Promise<{ readonly tenantId: string; readonly userId: string; readonly channel: string; readonly isEnabled: boolean } | null>;
+  };
 }
 
 export interface NotificationDispatcherService {
@@ -38,6 +42,7 @@ export function createNotificationDispatcherService(prisma: NotificationDispatch
   const templateService = createNotificationTemplateService(prisma as never);
   const queueService = createNotificationQueueService(prisma as never);
   const logService = createNotificationLogService(prisma as never);
+  const preferenceService = createNotificationPreferenceService(prisma as never);
   const retryPolicy = createNotificationRetryPolicy().policy;
 
   function resolveAdapter(channel: string, providedAdapter: NotificationChannelAdapter | null | undefined): NotificationChannelAdapter {
@@ -77,6 +82,14 @@ export function createNotificationDispatcherService(prisma: NotificationDispatch
       const subject = template.subject ?? null;
       const body = rendered;
 
+      const preference = input.recipientId === undefined || input.recipientId === null
+        ? null
+        : await preferenceService.getNotificationPreference({
+          tenantId: input.tenantId,
+          userId: input.recipientId,
+          channel,
+        });
+
       const queueInput: NotificationQueueCreateInput = {
         tenantId: input.tenantId,
         templateId: input.templateId,
@@ -92,6 +105,41 @@ export function createNotificationDispatcherService(prisma: NotificationDispatch
       };
 
       const queue = await queueService.createNotificationQueue(queueInput);
+
+      if (preference !== null && !preference.isEnabled) {
+        await queueService.updateNotificationQueue({
+          tenantId: input.tenantId,
+          queueId: queue.id,
+          input: {
+            status: "SKIPPED",
+            attempts: 0,
+            nextAttemptAt: null,
+            errorMessage: "notification preference disabled",
+          },
+        });
+
+        const log = await logService.createNotificationLog({
+          tenantId: input.tenantId,
+          recipientId: input.recipientId ?? null,
+          channel,
+          subject,
+          body,
+          status: "SKIPPED",
+          errorMessage: "notification preference disabled",
+          sentAt: null,
+          deliveredAt: null,
+          deliveryMode: null,
+        });
+
+        return {
+          success: false,
+          status: "SKIPPED",
+          queueId: queue.id,
+          logId: log.id,
+          errorMessage: "notification preference disabled",
+          deliveryMode: null,
+        };
+      }
 
       const now = new Date();
       const isScheduled = input.scheduledAt !== undefined && input.scheduledAt !== null && input.scheduledAt > now;

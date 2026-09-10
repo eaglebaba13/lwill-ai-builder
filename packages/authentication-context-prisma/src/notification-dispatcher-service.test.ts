@@ -9,15 +9,23 @@ function createPrisma(overrides: {
   templates?: NotificationTemplateRecord[];
   queues?: NotificationQueueRecord[];
   logs?: NotificationLogRecord[];
+  preferences?: Array<{ tenantId: string; userId: string; channel: string; isEnabled: boolean }>;
 } = {}) {
   const templates = overrides.templates ?? [];
   const queues = overrides.queues ?? [];
   const logs = overrides.logs ?? [];
+  const preferences = overrides.preferences ?? [];
 
   const prisma: Record<string, unknown> = {
     notificationTemplate: {
       findUnique: vi.fn(async ({ where }: { where: { id: string } }) => {
         return templates.find((t) => t.id === where.id) ?? null;
+      }),
+    },
+    notificationPreference: {
+      findUnique: vi.fn(async ({ where }: { where: { tenantId_userId_channel: { tenantId: string; userId: string; channel: string } } }) => {
+        const key = where.tenantId_userId_channel;
+        return preferences.find((preference) => preference.tenantId === key.tenantId && preference.userId === key.userId && preference.channel === key.channel) ?? null;
       }),
     },
     notificationQueue: {
@@ -210,6 +218,99 @@ describe("notification dispatcher service", () => {
     expect(result.status).toBe("FAILED");
     expect(result.errorMessage).toBe("provider error");
     expect(result.deliveryMode).toBe("MOCK");
+  });
+
+  it("skips disabled recipient channel preferences without calling the adapter", async () => {
+    const { prisma, templates, queues, logs } = createPrisma({
+      preferences: [{ tenantId: "tenant-1", userId: "user-1", channel: "email", isEnabled: false }],
+    });
+    const adapter = createMockChannelAdapter();
+    const sendSpy = vi.spyOn(adapter, "send");
+    const service = createNotificationDispatcherService(prisma as never);
+
+    templates.push({
+      id: "template-1",
+      tenantId: "tenant-1",
+      name: "Welcome",
+      channel: "email",
+      subject: "Welcome",
+      body: "Hello",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const result = await service.dispatchNotification({
+      tenantId: "tenant-1",
+      templateId: "template-1",
+      recipientId: "user-1",
+      adapter,
+    });
+
+    expect(result.status).toBe("SKIPPED");
+    expect(sendSpy).not.toHaveBeenCalled();
+    expect(queues[0]?.status).toBe("SKIPPED");
+    expect(logs[0]?.status).toBe("SKIPPED");
+  });
+
+  it("dispatches when the recipient channel preference is enabled", async () => {
+    const { prisma, templates } = createPrisma({
+      preferences: [{ tenantId: "tenant-1", userId: "user-1", channel: "email", isEnabled: true }],
+    });
+    const adapter = createMockChannelAdapter();
+    const sendSpy = vi.spyOn(adapter, "send");
+    const service = createNotificationDispatcherService(prisma as never);
+
+    templates.push({
+      id: "template-1",
+      tenantId: "tenant-1",
+      name: "Welcome",
+      channel: "email",
+      subject: "Welcome",
+      body: "Hello",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const result = await service.dispatchNotification({
+      tenantId: "tenant-1",
+      templateId: "template-1",
+      recipientId: "user-1",
+      adapter,
+    });
+
+    expect(result.status).toBe("SENT");
+    expect(sendSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not apply a preference from another tenant", async () => {
+    const { prisma, templates } = createPrisma({
+      preferences: [{ tenantId: "tenant-2", userId: "user-1", channel: "email", isEnabled: false }],
+    });
+    const adapter = createMockChannelAdapter();
+    const service = createNotificationDispatcherService(prisma as never);
+
+    templates.push({
+      id: "template-1",
+      tenantId: "tenant-1",
+      name: "Welcome",
+      channel: "email",
+      subject: "Welcome",
+      body: "Hello",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    const result = await service.dispatchNotification({
+      tenantId: "tenant-1",
+      templateId: "template-1",
+      recipientId: "user-1",
+      adapter,
+    });
+
+    expect(result.status).toBe("SENT");
   });
 
   it("queues future scheduled notification without calling adapter", async () => {

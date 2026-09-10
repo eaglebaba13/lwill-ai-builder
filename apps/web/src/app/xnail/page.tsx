@@ -460,6 +460,11 @@ export default function Home() {
   const [notificationLogs, setNotificationLogs] = useState<Array<{ id: string; channel: string; subject: string | null; body: string; status: string; sentAt: string | null }>>([]);
   const [isLoadingNotificationLogs, setIsLoadingNotificationLogs] = useState(false);
   const [notificationLogError, setNotificationLogError] = useState<string | null>(null);
+  const [notificationPreferences, setNotificationPreferences] = useState<Array<{ id: string; channel: string; isEnabled: boolean }>>([]);
+  const [isLoadingNotificationPreferences, setIsLoadingNotificationPreferences] = useState(false);
+  const [notificationPreferenceError, setNotificationPreferenceError] = useState<string | null>(null);
+  const [notificationPreferenceChannel, setNotificationPreferenceChannel] = useState("email");
+  const [notificationPreferenceEnabled, setNotificationPreferenceEnabled] = useState(true);
   const [eventSubscriptions, setEventSubscriptions] = useState<Array<{ id: string; eventType: string; notificationTemplateId: string | null; isEnabled: boolean }>>([]);
   const [isLoadingEventSubscriptions, setIsLoadingEventSubscriptions] = useState(false);
   const [eventSubscriptionError, setEventSubscriptionError] = useState<string | null>(null);
@@ -2002,6 +2007,8 @@ export default function Home() {
         setNotificationLogError(null);
         setIsLoadingEventSubscriptions(true);
         setEventSubscriptionError(null);
+        setIsLoadingNotificationPreferences(true);
+        setNotificationPreferenceError(null);
       }
     }, 0);
     void fetch("/api/notification-templates", { credentials: "same-origin" })
@@ -2096,6 +2103,33 @@ export default function Home() {
         if (mounted) {
           setIsLoadingEventSubscriptions(false);
         }
+      });
+
+    void fetch("/api/notification-preferences", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        if (result.status === 401) {
+          setNotificationPreferences([]);
+          setAuthenticated(false);
+          return;
+        }
+        if (result.status === 403) {
+          setNotificationPreferences([]);
+          setNotificationPreferenceError("You are not authorized to view notification preferences.");
+          return;
+        }
+        if (!result.ok) throw new Error("Notification preference list request failed");
+        const body = await result.json() as { notificationPreferences?: Array<{ id: string; channel: string; isEnabled: boolean }> };
+        setNotificationPreferences(Array.isArray(body.notificationPreferences) ? body.notificationPreferences : []);
+      })
+      .catch(() => {
+        if (mounted) {
+          setNotificationPreferences([]);
+          setNotificationPreferenceError("Notification preferences could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) setIsLoadingNotificationPreferences(false);
       });
 
     return () => {
@@ -2985,6 +3019,36 @@ export default function Home() {
     }
     const body = await result.json() as { eventSubscription: { id: string; eventType: string; notificationTemplateId: string | null; isEnabled: boolean } };
     setEventSubscriptions((current) => current.map((item) => (item.id === body.eventSubscription.id ? body.eventSubscription : item)));
+  };
+
+  const saveNotificationPreference = async (channel = notificationPreferenceChannel, enabled = notificationPreferenceEnabled) => {
+    if (!channel.trim()) return;
+    setNotificationPreferenceError(null);
+    const existing = notificationPreferences.find((preference) => preference.channel === channel);
+    const result = await fetch("/api/notification-preferences", {
+      method: existing ? "PATCH" : "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ channel, isEnabled: enabled }),
+    });
+    if (result.status === 401) {
+      setNotificationPreferences([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setNotificationPreferenceError("You are not authorized to manage notification preferences.");
+      return;
+    }
+    if (!result.ok) {
+      setNotificationPreferenceError("Notification preference could not be saved.");
+      return;
+    }
+    const body = await result.json() as { notificationPreference: { id: string; channel: string; isEnabled: boolean } };
+    setNotificationPreferences((current) => {
+      const withoutCurrent = current.filter((preference) => preference.channel !== body.notificationPreference.channel);
+      return [body.notificationPreference, ...withoutCurrent];
+    });
   };
 
   const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -8189,6 +8253,63 @@ export default function Home() {
                   className="premium-btn-primary w-full py-2.5 text-sm disabled:opacity-60"
                 >
                   Save subscription
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+              <h2 className="text-xl font-semibold">Notification preferences</h2>
+              <div className="mt-4 space-y-3">
+                {isLoadingNotificationPreferences ? <div className="text-sm text-[#a39a86]">Loading notification preferences...</div> : null}
+                {!isLoadingNotificationPreferences && notificationPreferenceError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{notificationPreferenceError}</div> : null}
+                {!isLoadingNotificationPreferences && !notificationPreferenceError && notificationPreferences.length === 0 ? <div className="text-sm text-[#a39a86]">No notification preferences configured yet.</div> : null}
+                {notificationPreferences.map((preference) => (
+                  <div key={preference.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
+                    <div>
+                      <div className="font-medium capitalize">{preference.channel}</div>
+                      <div className="text-sm text-[#a39a86]">{preference.isEnabled ? "Notifications enabled" : "Notifications disabled"}</div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setNotificationPreferenceChannel(preference.channel);
+                        setNotificationPreferenceEnabled(!preference.isEnabled);
+                        void saveNotificationPreference(preference.channel, !preference.isEnabled);
+                      }}
+                      className={preference.isEnabled ? "premium-btn-primary px-3 py-1.5 text-xs" : "premium-btn-secondary px-3 py-1.5 text-xs"}
+                    >
+                      {preference.isEnabled ? "Enabled" : "Disabled"}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+              <h2 className="text-xl font-semibold">Add preference</h2>
+              <div className="mt-4 space-y-3">
+                <select
+                  value={notificationPreferenceChannel}
+                  onChange={(event) => setNotificationPreferenceChannel(event.target.value)}
+                  className="premium-input"
+                >
+                  <option value="email">Email</option>
+                  <option value="sms">SMS</option>
+                  <option value="whatsapp">WhatsApp</option>
+                  <option value="push">Push</option>
+                  <option value="in-app">In-App</option>
+                </select>
+                <label className="flex items-center gap-2 text-sm text-[#a39a86]">
+                  <input
+                    type="checkbox"
+                    checked={notificationPreferenceEnabled}
+                    onChange={(event) => setNotificationPreferenceEnabled(event.target.checked)}
+                  />
+                  Enabled
+                </label>
+                <button onClick={() => void saveNotificationPreference()} className="premium-btn-primary w-full py-2.5 text-sm">
+                  Save preference
                 </button>
               </div>
             </div>

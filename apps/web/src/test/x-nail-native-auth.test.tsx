@@ -676,6 +676,15 @@ describe("X Nail native authentication integration", () => {
           return Response.json({ notificationTemplates: [{ id: "template-1", name: "Appointment reminder", channel: "email", subject: "Reminder", body: "Reminder", isActive: true }] });
         }
         if (url === "/api/notification-logs") return Response.json({ notificationLogs: [] });
+        if (url === "/api/notification-preferences" && init?.method === "POST") {
+          return Response.json({ notificationPreference: { id: "pref-2", channel: "sms", isEnabled: false } }, { status: 201 });
+        }
+        if (url === "/api/notification-preferences" && init?.method === "PATCH") {
+          return Response.json({ notificationPreference: { id: "pref-1", channel: "email", isEnabled: false } });
+        }
+        if (url === "/api/notification-preferences") {
+          return Response.json({ notificationPreferences: [{ id: "pref-1", channel: "email", isEnabled: true }] });
+        }
         if (url === "/api/event-subscriptions" && init?.method === "POST") {
           return Response.json({ eventSubscription: { id: "subscription-2", eventType: "appointment.completed", notificationTemplateId: "template-1", isEnabled: true } }, { status: 201 });
         }
@@ -698,17 +707,25 @@ describe("X Nail native authentication integration", () => {
 
     await user.click(screen.getByRole("button", { name: "Notifications" }));
     expect(await screen.findByText("appointment.created")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Enabled" }));
+    expect(await screen.findByText("Notifications enabled")).toBeInTheDocument();
+    await user.click(screen.getAllByRole("button", { name: "Enabled" })[0]);
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
       "/api/event-subscriptions/subscription-1",
       expect.objectContaining({ method: "PATCH", body: JSON.stringify({ isEnabled: false }) }),
     ));
 
-    await user.selectOptions(screen.getByRole("combobox"), "template-1");
+    await user.selectOptions(screen.getAllByRole("combobox")[0], "template-1");
     await user.click(screen.getByRole("button", { name: "Save subscription" }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
       "/api/event-subscriptions",
       expect.objectContaining({ method: "POST", body: JSON.stringify({ eventType: "appointment.created", notificationTemplateId: "template-1", isEnabled: true }) }),
+    ));
+
+    await user.selectOptions(screen.getAllByRole("combobox")[1], "sms");
+    await user.click(screen.getByRole("button", { name: "Save preference" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/api/notification-preferences",
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ channel: "sms", isEnabled: true }) }),
     ));
   });
 
