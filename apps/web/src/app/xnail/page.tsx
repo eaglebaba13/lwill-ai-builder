@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { AppSidebar } from "@/components/app-sidebar";
 import {
   invalidatePendingRefresh,
   loginWithNativeAuthentication,
@@ -4380,8 +4381,8 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-[#080807] text-[#f5f1e6]">
       <header className="sticky top-0 z-20 border-b border-[rgba(212,175,55,0.1)] bg-[#0a0a09]/95 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-3">
+        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-[#9c7a1e] to-[#d4af37] text-sm font-bold text-[#080807]">X</div>
             <div>
               <div className="text-sm font-semibold tracking-tight text-[#f5f1e6]">X Nail</div>
@@ -4390,11 +4391,11 @@ export default function Home() {
               </div>
             </div>
             {userProfile?.displayName ? (
-              <div className="ml-4 text-xs text-[#a39a86]">{userProfile.displayName}</div>
+              <div className="truncate text-xs text-[#a39a86] sm:ml-4">{userProfile.displayName}</div>
             ) : null}
           </div>
 
-          <div className="flex items-center gap-2 text-sm">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
             {effectiveRole ? (
               <span className="premium-badge-success">{effectiveRole.roleName}</span>
             ) : (
@@ -4418,22 +4419,18 @@ export default function Home() {
         ) : null}
       </header>
 
-      <div className="mx-auto max-w-7xl px-6 py-8">
-        <div className="mb-6 flex flex-wrap gap-2">
-          {visibleTabs.map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-                  activeTab === tab
-                    ? "border border-[rgba(212,175,55,0.4)] bg-[#171511] text-[#d4af37]"
-                    : "border border-transparent text-[#a39a86] hover:border-[rgba(212,175,55,0.15)] hover:bg-[#12110f] hover:text-[#f5f1e6]"
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
-        </div>
+      <div className="mx-auto flex max-w-7xl items-start gap-4 px-4 py-6 sm:gap-6 sm:px-6 sm:py-8">
+        <AppSidebar
+          brandName="X Nail"
+          brandSubtitle="Navigation"
+          items={visibleTabs.map((tab) => ({
+            label: tab,
+            active: activeTab === tab,
+            onClick: () => setActiveTab(tab),
+          }))}
+        />
+
+        <div className="min-w-0 flex-1">
 
         {activeTab === "Overview" ? (
           <section className="grid gap-4 md:grid-cols-4">
@@ -8050,6 +8047,7 @@ export default function Home() {
           </section>
           </>
         ) : null}
+        </div>
       </div>
     </main>
   );

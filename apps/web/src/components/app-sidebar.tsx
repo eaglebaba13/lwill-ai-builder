@@ -27,6 +27,8 @@ export function AppSidebar({ brandName, brandSubtitle, logoSrc, items, bottomIte
         className="fixed left-4 top-4 z-50 flex h-10 w-10 items-center justify-center rounded-lg border border-[rgba(212,175,55,0.2)] bg-[#0d0c0a] text-[#a39a86] md:hidden"
         onClick={() => setCollapsed(!collapsed)}
         aria-label="Toggle navigation"
+        aria-controls="app-sidebar"
+        aria-expanded={collapsed}
       >
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.5">
           {collapsed ? (
@@ -44,9 +46,10 @@ export function AppSidebar({ brandName, brandSubtitle, logoSrc, items, bottomIte
 
       {/* Sidebar */}
       <aside
+        id="app-sidebar"
         className={`fixed left-0 top-0 z-40 flex h-screen w-64 flex-col border-r border-[rgba(212,175,55,0.12)] bg-[#0a0a09] transition-transform duration-200 md:relative md:translate-x-0 ${
           collapsed ? "translate-x-0" : "-translate-x-full"
-        } ${className ?? ""}`}
+        } md:sticky md:top-0 md:h-[calc(100vh-4rem)] ${className ?? ""}`}
       >
         {/* Brand */}
         <div className="flex items-center gap-3 border-b border-[rgba(212,175,55,0.1)] px-5 py-5">
