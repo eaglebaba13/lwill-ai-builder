@@ -460,6 +460,11 @@ export default function Home() {
   const [notificationLogs, setNotificationLogs] = useState<Array<{ id: string; channel: string; subject: string | null; body: string; status: string; sentAt: string | null }>>([]);
   const [isLoadingNotificationLogs, setIsLoadingNotificationLogs] = useState(false);
   const [notificationLogError, setNotificationLogError] = useState<string | null>(null);
+  const [eventSubscriptions, setEventSubscriptions] = useState<Array<{ id: string; eventType: string; notificationTemplateId: string | null; isEnabled: boolean }>>([]);
+  const [isLoadingEventSubscriptions, setIsLoadingEventSubscriptions] = useState(false);
+  const [eventSubscriptionError, setEventSubscriptionError] = useState<string | null>(null);
+  const [eventSubscriptionType, setEventSubscriptionType] = useState("appointment.created");
+  const [eventSubscriptionTemplateId, setEventSubscriptionTemplateId] = useState("");
   const [report, setReport] = useState<{
     sales: { invoiceCount: number; totalRevenueCents: number };
     appointments: { total: number; statusBreakdown: Array<{ status: string; count: number }> };
@@ -1995,6 +2000,8 @@ export default function Home() {
         setNotificationTemplateError(null);
         setIsLoadingNotificationLogs(true);
         setNotificationLogError(null);
+        setIsLoadingEventSubscriptions(true);
+        setEventSubscriptionError(null);
       }
     }, 0);
     void fetch("/api/notification-templates", { credentials: "same-origin" })
@@ -2057,6 +2064,37 @@ export default function Home() {
       .finally(() => {
         if (mounted) {
           setIsLoadingNotificationLogs(false);
+        }
+      });
+
+    void fetch("/api/event-subscriptions", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        if (result.status === 401) {
+          setEventSubscriptions([]);
+          setAuthenticated(false);
+          return;
+        }
+        if (result.status === 403) {
+          setEventSubscriptions([]);
+          setEventSubscriptionError("You are not authorized to view event subscriptions.");
+          return;
+        }
+        if (!result.ok) {
+          throw new Error("Event subscription list request failed");
+        }
+        const body = await result.json() as { eventSubscriptions?: Array<{ id: string; eventType: string; notificationTemplateId: string | null; isEnabled: boolean }> };
+        setEventSubscriptions(Array.isArray(body.eventSubscriptions) ? body.eventSubscriptions : []);
+      })
+      .catch(() => {
+        if (mounted) {
+          setEventSubscriptions([]);
+          setEventSubscriptionError("Event subscriptions could not be loaded.");
+        }
+      })
+      .finally(() => {
+        if (mounted) {
+          setIsLoadingEventSubscriptions(false);
         }
       });
 
@@ -2894,6 +2932,59 @@ export default function Home() {
     }
     const body = await result.json() as { notificationTemplate: { id: string; name: string; channel: string; subject: string | null; body: string; isActive: boolean } };
     setNotificationTemplates((current) => current.map((item) => (item.id === body.notificationTemplate.id ? body.notificationTemplate : item)));
+  };
+
+  const addEventSubscription = async () => {
+    if (!eventSubscriptionType.trim() || !eventSubscriptionTemplateId) return;
+    setEventSubscriptionError(null);
+    const result = await fetch("/api/event-subscriptions", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ eventType: eventSubscriptionType, notificationTemplateId: eventSubscriptionTemplateId, isEnabled: true }),
+    });
+    if (result.status === 401) {
+      setEventSubscriptions([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setEventSubscriptionError("You are not authorized to create event subscriptions.");
+      return;
+    }
+    if (!result.ok) {
+      setEventSubscriptionError("Event subscription could not be saved.");
+      return;
+    }
+    const body = await result.json() as { eventSubscription: { id: string; eventType: string; notificationTemplateId: string | null; isEnabled: boolean } };
+    setEventSubscriptions((current) => [body.eventSubscription, ...current]);
+    setEventSubscriptionType("appointment.created");
+    setEventSubscriptionTemplateId("");
+  };
+
+  const updateEventSubscription = async (subscription: { id: string; isEnabled: boolean }) => {
+    setEventSubscriptionError(null);
+    const result = await fetch(`/api/event-subscriptions/${encodeURIComponent(subscription.id)}`, {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ isEnabled: !subscription.isEnabled }),
+    });
+    if (result.status === 401) {
+      setEventSubscriptions([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setEventSubscriptionError("You are not authorized to update event subscriptions.");
+      return;
+    }
+    if (!result.ok) {
+      setEventSubscriptionError("Event subscription could not be updated.");
+      return;
+    }
+    const body = await result.json() as { eventSubscription: { id: string; eventType: string; notificationTemplateId: string | null; isEnabled: boolean } };
+    setEventSubscriptions((current) => current.map((item) => (item.id === body.eventSubscription.id ? body.eventSubscription : item)));
   };
 
   const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -8043,6 +8134,63 @@ export default function Home() {
                   </div>
                 </div>
               ))}
+            </div>
+          </section>
+
+          <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+              <h2 className="text-xl font-semibold">Event subscriptions</h2>
+              <div className="mt-4 space-y-3">
+                {isLoadingEventSubscriptions ? <div className="text-sm text-[#a39a86]">Loading event subscriptions...</div> : null}
+                {!isLoadingEventSubscriptions && eventSubscriptionError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{eventSubscriptionError}</div> : null}
+                {!isLoadingEventSubscriptions && !eventSubscriptionError && eventSubscriptions.length === 0 ? <div className="text-sm text-[#a39a86]">No event subscriptions yet.</div> : null}
+                {eventSubscriptions.map((subscription) => {
+                  const template = notificationTemplates.find((item) => item.id === subscription.notificationTemplateId);
+                  return (
+                    <div key={subscription.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
+                      <div>
+                        <div className="font-medium">{subscription.eventType}</div>
+                        <div className="text-sm text-[#a39a86]">Template: {template?.name ?? subscription.notificationTemplateId ?? "None"}</div>
+                      </div>
+                      <button
+                        onClick={() => void updateEventSubscription(subscription)}
+                        className={subscription.isEnabled ? "premium-btn-primary px-3 py-1.5 text-xs" : "premium-btn-secondary px-3 py-1.5 text-xs"}
+                      >
+                        {subscription.isEnabled ? "Enabled" : "Disabled"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+              <h2 className="text-xl font-semibold">Add event subscription</h2>
+              <div className="mt-4 space-y-3">
+                <input
+                  value={eventSubscriptionType}
+                  onChange={(event) => setEventSubscriptionType(event.target.value)}
+                  placeholder="Event type (e.g. appointment.created)"
+                  className="premium-input"
+                />
+                <select
+                  value={eventSubscriptionTemplateId}
+                  onChange={(event) => setEventSubscriptionTemplateId(event.target.value)}
+                  className="premium-input"
+                >
+                  <option value="">Select a notification template</option>
+                  {notificationTemplates.filter((template) => template.isActive).map((template) => (
+                    <option key={template.id} value={template.id}>{template.name}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => void addEventSubscription()}
+                  disabled={!eventSubscriptionType.trim() || !eventSubscriptionTemplateId}
+                  className="premium-btn-primary w-full py-2.5 text-sm disabled:opacity-60"
+                >
+                  Save subscription
+                </button>
+              </div>
             </div>
           </section>
           </>

@@ -664,6 +664,54 @@ describe("X Nail native authentication integration", () => {
     expect(fetchMock.mock.calls.filter(([url]) => url === "/api/roles").length).toBe(1);
   });
 
+  it("manages notification event subscriptions from the Notifications tab", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 401 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(Response.json({ roles: [{ id: "role-1", code: "tenant-admin", name: "Admin", scope: { kind: "tenant" }, permissions: [] }], permissionCodes: ["notification.read", "notification.write"] }))
+      .mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = typeof input === "string" ? input : input.toString();
+        if (url === "/api/customers") return Response.json({ customers: [] });
+        if (url === "/api/notification-templates") {
+          return Response.json({ notificationTemplates: [{ id: "template-1", name: "Appointment reminder", channel: "email", subject: "Reminder", body: "Reminder", isActive: true }] });
+        }
+        if (url === "/api/notification-logs") return Response.json({ notificationLogs: [] });
+        if (url === "/api/event-subscriptions" && init?.method === "POST") {
+          return Response.json({ eventSubscription: { id: "subscription-2", eventType: "appointment.completed", notificationTemplateId: "template-1", isEnabled: true } }, { status: 201 });
+        }
+        if (url.startsWith("/api/event-subscriptions/") && init?.method === "PATCH") {
+          return Response.json({ eventSubscription: { id: "subscription-1", eventType: "appointment.created", notificationTemplateId: "template-1", isEnabled: false } });
+        }
+        if (url === "/api/event-subscriptions") {
+          return Response.json({ eventSubscriptions: [{ id: "subscription-1", eventType: "appointment.created", notificationTemplateId: "template-1", isEnabled: true }] });
+        }
+        return new Response(null, { status: 404 });
+      });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<Home />);
+    await user.type(await screen.findByLabelText("Email"), "operator@example.test");
+    await user.type(await screen.findByLabelText("Password"), "test-password");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    expect(await screen.findByText("Admin dashboard")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Notifications" }));
+    expect(await screen.findByText("appointment.created")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Enabled" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/api/event-subscriptions/subscription-1",
+      expect.objectContaining({ method: "PATCH", body: JSON.stringify({ isEnabled: false }) }),
+    ));
+
+    await user.selectOptions(screen.getByRole("combobox"), "template-1");
+    await user.click(screen.getByRole("button", { name: "Save subscription" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/api/event-subscriptions",
+      expect.objectContaining({ method: "POST", body: JSON.stringify({ eventType: "appointment.created", notificationTemplateId: "template-1", isEnabled: true }) }),
+    ));
+  });
+
   it("fetches packages when the Packages tab is activated", async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(null, { status: 401 }))
