@@ -1419,6 +1419,50 @@ describe("report service: getFranchisePayout", () => {
     });
   });
 
+  it("applies NP-01 and NP-02 to gross invoice ₹11,800 with ₹1,800 GST", async () => {
+    const prisma = createFranchisePrisma({
+      partners: [{ id: "partner-1", userId: "user-1", name: "Kushwaha" }],
+      territories: [{ id: "territory-1", name: "Surat" }],
+      branches: [{ id: "branch-1", name: "Main", territoryId: "territory-1" }],
+      agreements: [
+        {
+          id: "agreement-1",
+          tenantId: "tenant-1",
+          partnerId: "partner-1",
+          territoryId: "territory-1",
+          startDate: baseDate(1),
+          endDate: null,
+          minimumGuaranteeCents: 250000,
+          partner: { id: "partner-1", name: "Kushwaha" },
+          territory: { id: "territory-1", name: "Surat" },
+          outlets: [
+            {
+              id: "outlet-1",
+              branchId: "branch-1",
+              branch: { id: "branch-1", name: "Main", territoryId: "territory-1" },
+            },
+          ],
+        },
+      ],
+      invoices: [
+        { branchId: "branch-1", totalCents: 1180000, issuedAt: baseDate(5), gstCents: 180000 },
+      ],
+      distributions: [
+        { agreementOutletId: "outlet-1", percentage: 20 },
+      ],
+    });
+    const service = createReportService(prisma);
+
+    const result = await service.getFranchisePayout({ tenantId: "tenant-1", year: 2026, month: 8 });
+
+    expect(result.payouts[0]!.agreementPayouts[0]).toMatchObject({
+      grossRevenueCents: 1000000,
+      revenueShareCents: 200000,
+      eligibleRevenueSharePayoutCents: 300000,
+    });
+    expect(result.payouts[0]!.agreementPayouts[0]!.eligibleRevenueSharePayoutCents).not.toBe(354000);
+  });
+
   it("calculates territory royalty pool and divides equally among partners", async () => {
     const prisma = createFranchisePrisma({
       partners: [
