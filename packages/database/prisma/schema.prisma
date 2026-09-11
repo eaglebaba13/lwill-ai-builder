@@ -60,8 +60,42 @@ model Tenant {
   aiSessions            AiSession[]
   aiPrompts             AiPrompt[]
   modelUsages           ModelUsage[]
+  subscription          TenantSubscription?
+  license               TenantLicense?
 
   @@index([isActive])
+}
+
+model TenantSubscription {
+  id          String    @id @default(uuid()) @db.Uuid
+  tenantId    String    @unique @db.Uuid
+  planName    String
+  status      String    @default("ACTIVE")
+  startedAt   DateTime  @default(now())
+  renewsAt    DateTime?
+  expiresAt   DateTime?
+  cancelledAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@index([status])
+}
+
+model TenantLicense {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @unique @db.Uuid
+  status    String    @default("ACTIVE")
+  issuedAt  DateTime  @default(now())
+  expiresAt DateTime?
+  features  Json?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@index([status])
 }
 
 model TenantDomain {
