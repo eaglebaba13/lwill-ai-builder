@@ -179,6 +179,13 @@ export default function Home() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [passwordResetMode, setPasswordResetMode] = useState<"login" | "request" | "reset">("login");
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetToken, setResetToken] = useState("");
+  const [resetNewPassword, setResetNewPassword] = useState("");
+  const [resetMessage, setResetMessage] = useState<string | null>(null);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [isResetting, setIsResetting] = useState(false);
   const [userRoles, setUserRoles] = useState<Array<{
     id: string;
     code: string;
@@ -3118,6 +3125,56 @@ export default function Home() {
     }
   };
 
+  const handleRequestReset = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setResetError(null);
+    setResetMessage(null);
+    setIsResetting(true);
+    try {
+      const result = await fetch("/api/auth/request-password-reset", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: resetEmail }),
+      });
+      if (result.ok) {
+        setResetMessage("If an account exists with that email, a reset link has been sent.");
+        setPasswordResetMode("reset");
+      } else {
+        setResetError("Request failed. Please try again.");
+      }
+    } catch {
+      setResetError("Request failed. Please try again.");
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
+  const handleResetPassword = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setResetError(null);
+    setResetMessage(null);
+    setIsResetting(true);
+    try {
+      const result = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token: resetToken, newPassword: resetNewPassword }),
+      });
+      if (result.ok) {
+        setResetMessage("Password reset successfully. You can now sign in.");
+        setPasswordResetMode("login");
+        setResetToken("");
+        setResetNewPassword("");
+      } else {
+        setResetError("Invalid or expired reset token.");
+      }
+    } catch {
+      setResetError("Reset failed. Please try again.");
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
   const addCustomer = async () => {
     if (!customerName.trim()) return;
     setCustomerError(null);
@@ -4504,6 +4561,56 @@ export default function Home() {
   }
 
   if (!authenticated) {
+    if (passwordResetMode === "request") {
+      return (
+        <main className="flex min-h-screen items-center justify-center bg-[#080807] px-4 py-12 text-[#f5f1e6]">
+          <div className="w-full max-w-md rounded-2xl border border-[rgba(212,175,55,0.2)] bg-[#0d0c0a] p-8 shadow-[0_30px_80px_rgba(0,0,0,0.5)]">
+            <div className="mb-6">
+              <p className="text-xs font-semibold tracking-[0.22em] text-[#d4af37]">X NAIL</p>
+              <h1 className="mt-2 font-serif text-3xl font-semibold tracking-[-0.04em] text-[#f5f1e6]">Reset password</h1>
+            </div>
+            <form className="space-y-4" onSubmit={handleRequestReset}>
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-[#a39a86]">Email</span>
+                <input type="email" name="email" autoComplete="email" value={resetEmail} onChange={(event) => setResetEmail(event.target.value)} required className="premium-input" />
+              </label>
+              {resetError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] px-3 py-2 text-sm text-[#d1554a]">{resetError}</div> : null}
+              {resetMessage ? <div className="rounded-xl border border-[rgba(212,175,55,0.3)] bg-[rgba(212,175,55,0.08)] px-3 py-2 text-sm text-[#d4af37]">{resetMessage}</div> : null}
+              <button type="submit" disabled={isResetting} className="premium-btn-primary w-full py-3">{isResetting ? "Sending..." : "Send reset link"}</button>
+              <button type="button" onClick={() => { setPasswordResetMode("login"); setResetError(null); setResetMessage(null); }} className="w-full text-center text-sm text-[#a39a86] underline-offset-2 hover:underline">Back to sign in</button>
+            </form>
+          </div>
+        </main>
+      );
+    }
+
+    if (passwordResetMode === "reset") {
+      return (
+        <main className="flex min-h-screen items-center justify-center bg-[#080807] px-4 py-12 text-[#f5f1e6]">
+          <div className="w-full max-w-md rounded-2xl border border-[rgba(212,175,55,0.2)] bg-[#0d0c0a] p-8 shadow-[0_30px_80px_rgba(0,0,0,0.5)]">
+            <div className="mb-6">
+              <p className="text-xs font-semibold tracking-[0.22em] text-[#d4af37]">X NAIL</p>
+              <h1 className="mt-2 font-serif text-3xl font-semibold tracking-[-0.04em] text-[#f5f1e6]">Set new password</h1>
+            </div>
+            <form className="space-y-4" onSubmit={handleResetPassword}>
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-[#a39a86]">Reset token</span>
+                <input type="text" name="token" autoComplete="off" value={resetToken} onChange={(event) => setResetToken(event.target.value)} required className="premium-input" />
+              </label>
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-[#a39a86]">New password</span>
+                <input type="password" name="newPassword" autoComplete="new-password" value={resetNewPassword} onChange={(event) => setResetNewPassword(event.target.value)} required minLength={8} className="premium-input" />
+              </label>
+              {resetError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] px-3 py-2 text-sm text-[#d1554a]">{resetError}</div> : null}
+              {resetMessage ? <div className="rounded-xl border border-[rgba(212,175,55,0.3)] bg-[rgba(212,175,55,0.08)] px-3 py-2 text-sm text-[#d4af37]">{resetMessage}</div> : null}
+              <button type="submit" disabled={isResetting} className="premium-btn-primary w-full py-3">{isResetting ? "Resetting..." : "Reset password"}</button>
+              <button type="button" onClick={() => { setPasswordResetMode("login"); setResetError(null); setResetMessage(null); }} className="w-full text-center text-sm text-[#a39a86] underline-offset-2 hover:underline">Back to sign in</button>
+            </form>
+          </div>
+        </main>
+      );
+    }
+
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#080807] px-4 py-12 text-[#f5f1e6]">
         <div className="w-full max-w-md rounded-2xl border border-[rgba(212,175,55,0.2)] bg-[#0d0c0a] p-8 shadow-[0_30px_80px_rgba(0,0,0,0.5)]">
@@ -4545,12 +4652,26 @@ export default function Home() {
               </div>
             ) : null}
 
+            {resetMessage ? (
+              <div className="rounded-xl border border-[rgba(212,175,55,0.3)] bg-[rgba(212,175,55,0.08)] px-3 py-2 text-sm text-[#d4af37]">
+                {resetMessage}
+              </div>
+            ) : null}
+
             <button
               type="submit"
               disabled={isAuthenticating}
               className="premium-btn-primary w-full py-3"
             >
               {isAuthenticating ? "Signing in..." : "Sign in"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => { setPasswordResetMode("request"); setResetError(null); setResetMessage(null); setResetEmail(email); }}
+              className="w-full text-center text-sm text-[#a39a86] underline-offset-2 hover:underline"
+            >
+              Forgot password?
             </button>
           </form>
         </div>

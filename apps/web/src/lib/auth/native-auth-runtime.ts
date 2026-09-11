@@ -5,6 +5,11 @@ import {
   normalizeHostname,
   resolveTenantByHostname,
 } from "../../../../../packages/authentication-context-prisma/src/tenant-domain";
+import {
+  requestPasswordReset,
+  resetPassword,
+  type PasswordResetPrismaClient,
+} from "../../../../../packages/authentication-context-prisma/src/password-reset-service";
 import { hasValidMultiTenantAuthenticationOrigin } from "./auth-origin";
 import { loadNativeAuthRuntimeConfig } from "./native-auth-config";
 import {
@@ -63,6 +68,7 @@ export async function createNativeAuthRouteServices(
   const cookieStore = await getCookieStore();
   const nativePrisma = prisma as unknown as NativeRefreshPrismaClient;
   const loginPrisma = prisma as unknown as LoginPrismaClient;
+  const passwordResetPrisma = prisma as unknown as PasswordResetPrismaClient;
   const userAgent = request.headers.get("user-agent");
 
   const resolveTenantId = async (hostname: string): Promise<string | null> => {
@@ -95,6 +101,8 @@ export async function createNativeAuthRouteServices(
     revokeAllSessions: (userId, currentSessionId) =>
       revokeAllNativeSessions(nativePrisma, userId, new Date(), cookieStore, currentSessionId),
     clearCookies: () => clearNativeAuthCookies(cookieStore),
+    requestPasswordReset: (input) => requestPasswordReset(passwordResetPrisma, input),
+    resetPassword: (input) => resetPassword(passwordResetPrisma, input),
     async auditFailure(input) {
       await prisma.auditLog.create({
         data: {

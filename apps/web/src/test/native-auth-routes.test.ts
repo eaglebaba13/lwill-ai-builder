@@ -4,6 +4,8 @@ import {
   handleNativeLogout,
   handleNativeLogoutAll,
   handleNativeRefresh,
+  handleRequestPasswordReset,
+  handleResetPassword,
   type NativeAuthRouteServices,
 } from "../lib/auth/native-auth-route-handlers";
 import type { NativeCookieStore } from "../lib/auth/native-auth";
@@ -57,6 +59,8 @@ function createServices(): NativeAuthRouteServices {
     revokeSession: vi.fn(),
     revokeAllSessions: vi.fn(),
     clearCookies: vi.fn(),
+    requestPasswordReset: vi.fn(),
+    resetPassword: vi.fn(),
     auditFailure: vi.fn(),
   } as NativeAuthRouteServices;
 }
@@ -162,5 +166,61 @@ describe("native authentication routes", () => {
       "x-forwarded-host": "   ",
     }, { email: "user@example.com", password: "password" }), services);
     expect(services.resolveTenantId).toHaveBeenCalledWith("builder.lwill.in");
+  });
+});
+
+describe("password reset routes", () => {
+  let services: NativeAuthRouteServices;
+
+  beforeEach(() => {
+    services = createServices();
+  });
+
+  it("rejects cross-origin password reset requests", async () => {
+    vi.mocked(services.hasValidOrigin).mockResolvedValue(false);
+    expect((await handleRequestPasswordReset(request("/api/auth/request-password-reset", { email: "user@example.com" }), services)).status).toBe(403);
+    expect(services.requestPasswordReset).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid request-password-reset input", async () => {
+    expect((await handleRequestPasswordReset(request("/api/auth/request-password-reset", {}), services)).status).toBe(400);
+    expect((await handleRequestPasswordReset(request("/api/auth/request-password-reset", { email: 123 }), services)).status).toBe(400);
+    expect((await handleRequestPasswordReset(request("/api/auth/request-password-reset", { email: "user@example.com", extra: "field" }), services)).status).toBe(400);
+    expect(services.requestPasswordReset).not.toHaveBeenCalled();
+  });
+
+  it("calls requestPasswordReset with server-resolved tenantId and returns 200", async () => {
+    expect((await handleRequestPasswordReset(request("/api/auth/request-password-reset", { email: "user@example.com" }), services)).status).toBe(200);
+    expect(services.requestPasswordReset).toHaveBeenCalledWith({ email: "user@example.com", tenantId: "tenant-1" });
+  });
+
+  it("returns 200 even when tenant cannot be resolved (no information leak)", async () => {
+    vi.mocked(services.resolveTenantId).mockResolvedValue(null);
+    expect((await handleRequestPasswordReset(request("/api/auth/request-password-reset", { email: "user@example.com" }), services)).status).toBe(200);
+    expect(services.requestPasswordReset).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid reset-password input", async () => {
+    expect((await handleResetPassword(request("/api/auth/reset-password", {}), services)).status).toBe(400);
+    expect((await handleResetPassword(request("/api/auth/reset-password", { token: "tok", newPassword: "short" }), services)).status).toBe(400);
+    expect((await handleResetPassword(request("/api/auth/reset-password", { token: "", newPassword: "longpassword" }), services)).status).toBe(400);
+    expect(services.resetPassword).not.toHaveBeenCalled();
+  });
+
+  it("returns 200 on successful password reset", async () => {
+    vi.mocked(services.resetPassword).mockResolvedValue(true);
+    expect((await handleResetPassword(request("/api/auth/reset-password", { token: "valid-token", newPassword: "newpassword123" }), services)).status).toBe(200);
+    expect(services.resetPassword).toHaveBeenCalledWith({ token: "valid-token", newPassword: "newpassword123", tenantId: "tenant-1" });
+  });
+
+  it("returns 400 on failed password reset (invalid/expired token)", async () => {
+    vi.mocked(services.resetPassword).mockResolvedValue(false);
+    expect((await handleResetPassword(request("/api/auth/reset-password", { token: "invalid-token", newPassword: "newpassword123" }), services)).status).toBe(400);
+  });
+
+  it("returns 400 when tenant cannot be resolved for reset", async () => {
+    vi.mocked(services.resolveTenantId).mockResolvedValue(null);
+    expect((await handleResetPassword(request("/api/auth/reset-password", { token: "valid-token", newPassword: "newpassword123" }), services)).status).toBe(400);
+    expect(services.resetPassword).not.toHaveBeenCalled();
   });
 });

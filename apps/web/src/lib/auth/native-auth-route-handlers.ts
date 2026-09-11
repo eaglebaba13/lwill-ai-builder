@@ -31,6 +31,8 @@ export interface NativeAuthRouteServices {
   readonly revokeSession: (sessionId: string) => Promise<void>;
   readonly revokeAllSessions: (userId: string, currentSessionId: string) => Promise<void>;
   readonly clearCookies: () => void;
+  readonly requestPasswordReset: (input: { email: string; tenantId: string }) => Promise<void>;
+  readonly resetPassword: (input: { token: string; newPassword: string; tenantId: string }) => Promise<boolean>;
   readonly auditFailure: (input: {
     tenantId: string;
     action: "auth.login.failed" | "auth.refresh.failed";
@@ -182,4 +184,87 @@ export async function handleNativeLogoutAll(
   }
   await services.revokeAllSessions(accessSession.userId, accessSession.sessionId);
   return response(204);
+}
+
+export async function handleRequestPasswordReset(
+  request: Request,
+  services: NativeAuthRouteServices,
+): Promise<Response> {
+  if (!(await services.hasValidOrigin(request))) {
+    return response(403);
+  }
+
+  let input: unknown;
+  try {
+    input = await request.json();
+  } catch {
+    return response(400);
+  }
+  if (
+    typeof input !== "object" ||
+    input === null ||
+    Object.keys(input).some((key) => key !== "email") ||
+    typeof (input as Record<string, unknown>).email !== "string"
+  ) {
+    return response(400);
+  }
+
+  const tenantId = await resolveTenant(request, services);
+  if (tenantId === null) {
+    return response(200);
+  }
+
+  await services.requestPasswordReset({
+    email: (input as { email: string }).email,
+    tenantId,
+  });
+
+  return response(200);
+}
+
+export async function handleResetPassword(
+  request: Request,
+  services: NativeAuthRouteServices,
+): Promise<Response> {
+  if (!(await services.hasValidOrigin(request))) {
+    return response(403);
+  }
+
+  let input: unknown;
+  try {
+    input = await request.json();
+  } catch {
+    return response(400);
+  }
+  if (
+    typeof input !== "object" ||
+    input === null ||
+    Object.keys(input).some((key) => key !== "token" && key !== "newPassword") ||
+    typeof (input as Record<string, unknown>).token !== "string" ||
+    typeof (input as Record<string, unknown>).newPassword !== "string"
+  ) {
+    return response(400);
+  }
+
+  const tenantId = await resolveTenant(request, services);
+  if (tenantId === null) {
+    return response(400);
+  }
+
+  const parsed = input as { token: string; newPassword: string };
+  if (parsed.token.trim() === "" || parsed.newPassword.length < 8) {
+    return response(400);
+  }
+
+  const success = await services.resetPassword({
+    token: parsed.token,
+    newPassword: parsed.newPassword,
+    tenantId,
+  });
+
+  if (!success) {
+    return response(400);
+  }
+
+  return response(200);
 }
