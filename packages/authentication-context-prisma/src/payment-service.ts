@@ -19,7 +19,7 @@ export interface PaymentCreateInput {
 }
 
 export interface PaymentService {
-  createPayment(tenantId: string, input: PaymentCreateInput): Promise<PaymentRecord>;
+  createPayment(tenantId: string, input: PaymentCreateInput, actorUserId: string | null): Promise<PaymentRecord>;
   listPaymentsForInvoice(tenantId: string, invoiceId: string): Promise<readonly PaymentRecord[]>;
   getPaymentTotal(tenantId: string, invoiceId: string): Promise<number>;
 }
@@ -33,11 +33,24 @@ interface PaymentPrismaClient {
   readonly invoice: {
     findUnique: (args: { where: { id: string } }) => Promise<{ id: string; tenantId: string } | null>;
   };
+  readonly auditLog: {
+    create(args: { data: { tenantId: string; actorUserId: string | null; action: string; entityType: string; entityId: string; metadata: Record<string, unknown> } }): Promise<unknown>;
+  };
+}
+
+function recordAudit(
+  prisma: PaymentPrismaClient,
+  args: { tenantId: string; actorUserId: string | null; action: string; entityType: string; entityId: string; metadata: Record<string, unknown> },
+): void {
+  // Best-effort: audit failure must never roll back a committed financial mutation.
+  void prisma.auditLog.create({ data: args }).catch(() => {
+    // Intentionally swallowed. Audit logging is non-authoritative for financial state.
+  });
 }
 
 export function createPaymentService(prisma: PaymentPrismaClient): PaymentService {
   return {
-    async createPayment(tenantId, input) {
+    async createPayment(tenantId, input, actorUserId) {
       const invoice = await prisma.invoice.findUnique({ where: { id: input.invoiceId } });
       if (invoice === null || invoice.tenantId !== tenantId) {
         throw new Error("invoice must belong to the same tenant");
@@ -46,7 +59,7 @@ export function createPaymentService(prisma: PaymentPrismaClient): PaymentServic
         throw new Error("amount must be positive");
       }
 
-      return prisma.payment.create({
+      const payment = await prisma.payment.create({
         data: {
           tenantId,
           invoiceId: input.invoiceId,
@@ -56,6 +69,23 @@ export function createPaymentService(prisma: PaymentPrismaClient): PaymentServic
           notes: input.notes ?? null,
         },
       });
+
+      // Audit is attempted AFTER the payment commits so a log failure can
+      // never roll back a committed payment.
+      recordAudit(prisma, {
+        tenantId,
+        actorUserId,
+        action: "payment.created",
+        entityType: "Payment",
+        entityId: payment.id,
+        metadata: {
+          invoiceId: input.invoiceId,
+          amountCents: input.amountCents,
+          method: input.method ?? "offline",
+        },
+      });
+
+      return payment;
     },
 
     async listPaymentsForInvoice(tenantId, invoiceId) {

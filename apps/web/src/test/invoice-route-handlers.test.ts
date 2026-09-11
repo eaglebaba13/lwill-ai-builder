@@ -56,7 +56,7 @@ describe("invoice route handlers: authentication/authorization gating", () => {
 
 describe("invoice route handlers: permission code forwarding", () => {
   it("passes 'invoice.read' to authorize for list and get operations", async () => {
-    const services = createServices({ outcome: "authorized", tenantId: "tenant-1", branchId: "branch-1" });
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1", branchId: "branch-1", userId: "user-1" });
     await handleListInvoices(request(), services);
     expect(services.authorize).toHaveBeenCalledWith("invoice.read");
 
@@ -65,7 +65,7 @@ describe("invoice route handlers: permission code forwarding", () => {
   });
 
   it("passes 'invoice.write' to authorize for create and update operations", async () => {
-    const services = createServices({ outcome: "authorized", tenantId: "tenant-1", branchId: "branch-1" });
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1", branchId: "branch-1", userId: "user-1" });
     await handleCreateInvoice(request({ customerId: "cust-1", issuedAt: "2026-08-12T10:00:00.000Z", items: [{ description: "X", quantity: 1, unitPriceCents: 1000 }] }), services);
     expect(services.authorize).toHaveBeenCalledWith("invoice.write");
 
@@ -146,6 +146,7 @@ describe("invoice-runtime authorize(): authentication vs authorization outcome",
       outcome: "authorized",
       tenantId: "tenant-1",
       branchId: "branch-1",
+      userId: "user-1",
     });
   });
 
@@ -209,7 +210,7 @@ describe("invoice-runtime authorize(): authentication vs authorization outcome",
 });
 
 describe("invoice route handlers: authorized operations", () => {
-  const authorized: InvoiceAuthorization = { outcome: "authorized", tenantId: "tenant-1", branchId: "branch-1" };
+  const authorized: InvoiceAuthorization = { outcome: "authorized", tenantId: "tenant-1", branchId: "branch-1", userId: "user-1" };
 
   it("authorizes every operation before accessing invoice data", async () => {
     const services = createServices(authorized);
@@ -248,6 +249,7 @@ describe("invoice route handlers: authorized operations", () => {
       "tenant-1",
       "branch-1",
       expect.objectContaining({ customerId: "cust-1" }),
+      "user-1",
     );
   });
 
@@ -287,6 +289,7 @@ describe("invoice route handlers: authorized operations", () => {
           expect.objectContaining({ productId: "product-1", quantity: 2 }),
         ]),
       }),
+      "user-1",
     );
   });
 
@@ -331,6 +334,7 @@ describe("invoice route handlers: authorized operations", () => {
         gstCents: 450,
         notes: "Thank you",
       }),
+      "user-1",
     );
   });
 
@@ -351,7 +355,7 @@ describe("invoice route handlers: authorized operations", () => {
     const services = createServices(authorized);
     const result = await handleUpdateInvoice(request({ discountCents: 500 }), services, "i1");
     expect(result.status).toBe(200);
-    expect(services.updateInvoice).toHaveBeenCalledWith("tenant-1", "i1", { discountCents: 500, notes: undefined });
+    expect(services.updateInvoice).toHaveBeenCalledWith("tenant-1", "i1", { discountCents: 500, notes: undefined }, "user-1");
   });
 
   it("rejects update with invalid discountCents", async () => {
@@ -369,13 +373,13 @@ describe("invoice route handlers: authorized operations", () => {
     const services = createServices(authorized);
     const result = await handleUpdateInvoice(request({ discountCents: 500, notes: "Updated" }), services, "i1");
     expect(result.status).toBe(200);
-    expect(services.updateInvoice).toHaveBeenCalledWith("tenant-1", "i1", { discountCents: 500, notes: "Updated" });
+    expect(services.updateInvoice).toHaveBeenCalledWith("tenant-1", "i1", { discountCents: 500, notes: "Updated" }, "user-1");
   });
 
   it("accepts update with only notes", async () => {
     const services = createServices(authorized);
     const result = await handleUpdateInvoice(request({ notes: "VIP customer" }), services, "i1");
     expect(result.status).toBe(200);
-    expect(services.updateInvoice).toHaveBeenCalledWith("tenant-1", "i1", { discountCents: undefined, notes: "VIP customer" });
+    expect(services.updateInvoice).toHaveBeenCalledWith("tenant-1", "i1", { discountCents: undefined, notes: "VIP customer" }, "user-1");
   });
 });

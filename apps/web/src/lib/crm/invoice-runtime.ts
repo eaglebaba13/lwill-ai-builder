@@ -35,7 +35,7 @@ async function authorize(permissionCode: string): Promise<InvoiceAuthorization> 
   if (!decision.allowed) {
     return { outcome: "forbidden" };
   }
-  return { outcome: "authorized", tenantId: context.tenantContext.tenantId, branchId: context.tenantContext.branchId };
+  return { outcome: "authorized", tenantId: context.tenantContext.tenantId, branchId: context.tenantContext.branchId, userId: context.user.userId };
 }
 
 export function createInvoiceRouteServices(): InvoiceRouteServices {
@@ -43,7 +43,7 @@ export function createInvoiceRouteServices(): InvoiceRouteServices {
     authorize,
     listInvoices: (tenantId) => invoiceService.listInvoices({ tenantId }),
     getInvoice: (tenantId, invoiceId) => invoiceService.getInvoice({ tenantId, invoiceId }),
-    createInvoice: (tenantId, branchId, input) => invoiceService.createInvoice({ tenantId, branchId, ...input }),
-    updateInvoice: (tenantId, invoiceId, input) => invoiceService.updateInvoice({ tenantId, invoiceId, input }),
+    createInvoice: (tenantId, branchId, input, actorUserId) => invoiceService.createInvoice({ tenantId, branchId, ...input }, actorUserId),
+    updateInvoice: (tenantId, invoiceId, input, actorUserId) => invoiceService.updateInvoice({ tenantId, invoiceId, input, actorUserId }),
   };
 }

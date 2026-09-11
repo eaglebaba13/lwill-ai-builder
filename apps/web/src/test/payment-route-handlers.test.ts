@@ -51,39 +51,39 @@ describe("payment route handlers: authentication", () => {
 
 describe("payment route handlers: create payment", () => {
   it("creates payment for authorized user", async () => {
-    const services = createServices({ outcome: "authorized", tenantId: "tenant-1" });
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1", userId: "user-1" });
     const result = await handleCreatePayment(request({ invoiceId: "inv-1", amountCents: 1500 }), services);
     expect(result.status).toBe(201);
-    expect(services.createPayment).toHaveBeenCalledWith("tenant-1", { invoiceId: "inv-1", amountCents: 1500, method: undefined, paidAt: undefined, notes: undefined });
+    expect(services.createPayment).toHaveBeenCalledWith("tenant-1", { invoiceId: "inv-1", amountCents: 1500, method: undefined, paidAt: undefined, notes: undefined }, "user-1");
   });
 
   it("rejects missing invoiceId", async () => {
-    const services = createServices({ outcome: "authorized", tenantId: "tenant-1" });
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1", userId: "user-1" });
     const result = await handleCreatePayment(request({ amountCents: 1500 }), services);
     expect(result.status).toBe(400);
   });
 
   it("rejects invalid amountCents", async () => {
-    const services = createServices({ outcome: "authorized", tenantId: "tenant-1" });
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1", userId: "user-1" });
     const result = await handleCreatePayment(request({ invoiceId: "inv-1", amountCents: -100 }), services);
     expect(result.status).toBe(400);
   });
 
   it("rejects zero amountCents", async () => {
-    const services = createServices({ outcome: "authorized", tenantId: "tenant-1" });
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1", userId: "user-1" });
     const result = await handleCreatePayment(request({ invoiceId: "inv-1", amountCents: 0 }), services);
     expect(result.status).toBe(400);
   });
 
   it("rejects extra fields", async () => {
-    const services = createServices({ outcome: "authorized", tenantId: "tenant-1" });
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1", userId: "user-1" });
     const result = await handleCreatePayment(request({ invoiceId: "inv-1", amountCents: 1500, extra: "field" }), services);
     expect(result.status).toBe(400);
   });
 
   it("returns 404 for cross-tenant invoice", async () => {
     const services = createServices(
-      { outcome: "authorized", tenantId: "tenant-1" },
+      { outcome: "authorized", tenantId: "tenant-1", userId: "user-1" },
       { createPayment: vi.fn().mockRejectedValue(new Error("invoice must belong to the same tenant")) },
     );
     const result = await handleCreatePayment(request({ invoiceId: "inv-other", amountCents: 1500 }), services);
@@ -94,7 +94,7 @@ describe("payment route handlers: create payment", () => {
 describe("payment route handlers: list payments", () => {
   it("returns payments for invoice", async () => {
     const services = createServices(
-      { outcome: "authorized", tenantId: "tenant-1" },
+      { outcome: "authorized", tenantId: "tenant-1", userId: "user-1" },
       {
         listPaymentsForInvoice: vi.fn().mockResolvedValue([
           { id: "p1", amountCents: 1500, method: "offline" },

@@ -3,7 +3,7 @@ import "server-only";
 export type InvoiceAuthorization =
   | { readonly outcome: "unauthenticated" }
   | { readonly outcome: "forbidden" }
-  | { readonly outcome: "authorized"; readonly tenantId: string; readonly branchId: string | null };
+  | { readonly outcome: "authorized"; readonly tenantId: string; readonly branchId: string | null; readonly userId: string | null };
 
 export interface InvoiceLineItemWriteInput {
   readonly description: string;
@@ -33,8 +33,8 @@ export interface InvoiceRouteServices {
   readonly authorize: (permissionCode: string) => Promise<InvoiceAuthorization>;
   readonly listInvoices: (tenantId: string) => Promise<readonly unknown[]>;
   readonly getInvoice: (tenantId: string, invoiceId: string) => Promise<unknown | null>;
-  readonly createInvoice: (tenantId: string, branchId: string | null, input: InvoiceWriteInput) => Promise<unknown>;
-  readonly updateInvoice: (tenantId: string, invoiceId: string, input: InvoiceUpdateInput) => Promise<unknown | null>;
+  readonly createInvoice: (tenantId: string, branchId: string | null, input: InvoiceWriteInput, actorUserId: string | null) => Promise<unknown>;
+  readonly updateInvoice: (tenantId: string, invoiceId: string, input: InvoiceUpdateInput, actorUserId: string | null) => Promise<unknown | null>;
 }
 
 const RESPONSE_HEADERS = { "cache-control": "no-store" };
@@ -48,14 +48,14 @@ function response(status: number, body?: unknown): Response {
 
 function authorizationOutcome(
   authorization: InvoiceAuthorization,
-): { readonly ok: true; readonly tenantId: string; readonly branchId: string | null } | { readonly ok: false; readonly response: Response } {
+): { readonly ok: true; readonly tenantId: string; readonly branchId: string | null; readonly userId: string | null } | { readonly ok: false; readonly response: Response } {
   if (authorization.outcome === "unauthenticated") {
     return { ok: false, response: response(401) };
   }
   if (authorization.outcome === "forbidden") {
     return { ok: false, response: response(403) };
   }
-  return { ok: true, tenantId: authorization.tenantId, branchId: authorization.branchId ?? null };
+  return { ok: true, tenantId: authorization.tenantId, branchId: authorization.branchId ?? null, userId: authorization.userId };
 }
 
 function isNonEmptyString(value: unknown): value is string {
@@ -223,7 +223,7 @@ export async function handleCreateInvoice(
     return response(400);
   }
   const branchId = authResult.branchId ?? input.branchId ?? null;
-  const invoice = await services.createInvoice(authResult.tenantId, branchId, input);
+  const invoice = await services.createInvoice(authResult.tenantId, branchId, input, authResult.userId);
   return response(201, { invoice });
 }
 
@@ -262,7 +262,7 @@ export async function handleUpdateInvoice(
   if (input === null) {
     return response(400);
   }
-  const invoice = await services.updateInvoice(authResult.tenantId, invoiceId, input);
+  const invoice = await services.updateInvoice(authResult.tenantId, invoiceId, input, authResult.userId);
   if (invoice === null) {
     return response(404);
   }

@@ -28,6 +28,7 @@ export interface InvoiceRecord {
   readonly id: string;
   readonly tenantId: string;
   readonly customerId: string;
+  readonly branchId: string | null;
   readonly issuedAt: Date;
   readonly subtotalCents: number;
   readonly discountCents: number;
@@ -55,10 +56,10 @@ export interface InvoiceUpdateInput {
 }
 
 export interface InvoiceService {
-  createInvoice(input: InvoiceCreateInput): Promise<InvoiceRecord>;
+  createInvoice(input: InvoiceCreateInput, actorUserId: string | null): Promise<InvoiceRecord>;
   getInvoice(args: { tenantId: string; invoiceId: string }): Promise<InvoiceRecord | null>;
   listInvoices(args: { tenantId: string }): Promise<InvoiceRecord[]>;
-  updateInvoice(args: { tenantId: string; invoiceId: string; input: InvoiceUpdateInput }): Promise<InvoiceRecord | null>;
+  updateInvoice(args: { tenantId: string; invoiceId: string; input: InvoiceUpdateInput; actorUserId: string | null }): Promise<InvoiceRecord | null>;
 }
 
 interface InvoicePrismaClient {
@@ -95,9 +96,30 @@ interface InvoicePrismaClient {
   readonly branch: {
     findUnique: (args: { where: { id: string } }) => Promise<{ id: string; tenantId: string } | null>;
   };
+  readonly auditLog: {
+    create(args: { data: { tenantId: string; actorUserId: string | null; action: string; entityType: string; entityId: string; metadata: Record<string, unknown> } }): Promise<unknown>;
+  };
   $transaction: {
     <T>(callback: (client: InvoicePrismaClient) => Promise<T>): Promise<T>;
   };
+}
+
+function recordAudit(
+  prisma: InvoicePrismaClient,
+  args: { tenantId: string; actorUserId: string | null; action: string; entityType: string; entityId: string; metadata: Record<string, unknown> },
+): void {
+  // Best-effort: audit failure must never roll back a committed financial mutation.
+  // Guarded so a client without an auditLog implementation (e.g. a test mock) cannot
+  // interrupt the committed mutation.
+  const auditLog = (prisma as { auditLog?: unknown }).auditLog;
+  if (auditLog === undefined) {
+    return;
+  }
+  void (auditLog as { create: (a: { data: Record<string, unknown> }) => Promise<unknown> })
+    .create({ data: args })
+    .catch(() => {
+      // Intentionally swallowed. Audit logging is non-authoritative for financial state.
+    });
 }
 
 function calculateTotals(items: readonly InvoiceLineItemInput[], discountCents: number, gstCents: number) {
@@ -116,14 +138,23 @@ export function createBillingInvoiceService(prisma: InvoicePrismaClient): Invoic
   const stockService = createStockService(prisma as never);
 
   return {
-    async createInvoice(input) {
-      return prisma.$transaction(async (tx) => {
+    async createInvoice(input, actorUserId) {
+      const normalizedItems = input.items.map((item) => ({
+        ...item,
+        quantity: Number(item.quantity),
+        unitPriceCents: Number(item.unitPriceCents),
+      }));
+      const discountCents = input.discountCents ?? 0;
+      const gstCents = input.gstCents ?? 0;
+      const totals = calculateTotals(normalizedItems, discountCents, gstCents);
+      let resolvedBranchId: string | null = null;
+
+      const invoice = await prisma.$transaction(async (tx) => {
         const customer = await tx.customer.findUnique({ where: { id: input.customerId } });
         if (customer === null || customer.tenantId !== input.tenantId) {
           throw new Error("customer must belong to the same tenant");
         }
 
-        let resolvedBranchId: string | null = null;
         if (input.branchId !== undefined && input.branchId !== null) {
           const branch = await tx.branch.findUnique({ where: { id: input.branchId } });
           if (branch === null || branch.tenantId !== input.tenantId) {
@@ -131,12 +162,6 @@ export function createBillingInvoiceService(prisma: InvoicePrismaClient): Invoic
           }
           resolvedBranchId = branch.id;
         }
-
-        const normalizedItems = input.items.map((item) => ({
-          ...item,
-          quantity: Number(item.quantity),
-          unitPriceCents: Number(item.unitPriceCents),
-        }));
 
         for (const item of normalizedItems) {
           if (item.serviceId) {
@@ -160,10 +185,6 @@ export function createBillingInvoiceService(prisma: InvoicePrismaClient): Invoic
             }
           }
         }
-
-        const discountCents = input.discountCents ?? 0;
-        const gstCents = input.gstCents ?? 0;
-        const totals = calculateTotals(normalizedItems, discountCents, gstCents);
 
         const invoice = await tx.invoice.create({
           data: {
@@ -225,6 +246,28 @@ export function createBillingInvoiceService(prisma: InvoicePrismaClient): Invoic
 
         return invoice;
       });
+
+      // Audit is attempted AFTER the financial transaction commits so a log
+      // failure can never roll back a committed invoice, its line items, or
+      // the stock effects it produced.
+      recordAudit(prisma, {
+        tenantId: input.tenantId,
+        actorUserId,
+        action: "invoice.created",
+        entityType: "Invoice",
+        entityId: invoice.id,
+        metadata: {
+          customerId: input.customerId,
+          branchId: resolvedBranchId,
+          subtotalCents: totals.subtotalCents,
+          discountCents: totals.discountCents,
+          gstCents: totals.gstCents,
+          totalCents: totals.totalCents,
+          itemCount: normalizedItems.length,
+        },
+      });
+
+      return invoice;
     },
     async getInvoice({ tenantId, invoiceId }) {
       const invoice = await prisma.invoice.findUnique({ where: { id: invoiceId } });
@@ -237,7 +280,7 @@ export function createBillingInvoiceService(prisma: InvoicePrismaClient): Invoic
       return prisma.invoice.findMany({ where: { tenantId: args.tenantId } });
     },
 
-    async updateInvoice({ tenantId, invoiceId, input }) {
+    async updateInvoice({ tenantId, invoiceId, input, actorUserId }) {
       const existing = await prisma.invoice.findUnique({ where: { id: invoiceId } });
       if (existing === null || existing.tenantId !== tenantId) {
         return null;
@@ -253,7 +296,20 @@ export function createBillingInvoiceService(prisma: InvoicePrismaClient): Invoic
         data.notes = input.notes;
       }
 
-      return prisma.invoice.update({ where: { id: invoiceId }, data });
+      const updated = await prisma.invoice.update({ where: { id: invoiceId }, data });
+
+      recordAudit(prisma, {
+        tenantId,
+        actorUserId,
+        action: "invoice.updated",
+        entityType: "Invoice",
+        entityId: invoiceId,
+        metadata: {
+          changes: data,
+        },
+      });
+
+      return updated;
     },
   };
 }

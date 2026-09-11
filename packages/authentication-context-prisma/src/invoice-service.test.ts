@@ -83,7 +83,7 @@ describe("billing invoice service", () => {
         { description: "Classic manicure", serviceId: "service-1", quantity: 2, unitPriceCents: 1500 },
         { description: "Glow package", packageId: "pkg-1", quantity: 1, unitPriceCents: 2500 },
       ],
-    });
+    }, null);
 
     expect(invoice.tenantId).toBe("tenant-1");
     expect(invoice.subtotalCents).toBe(5500);
@@ -169,7 +169,7 @@ describe("billing invoice service", () => {
         customerId: "customer-1",
         issuedAt: new Date("2026-08-12T10:00:00.000Z"),
         items: [{ description: "Classic manicure", serviceId: "service-1", quantity: 1, unitPriceCents: 1000 }],
-      }),
+      }, null),
     ).rejects.toThrow("customer must belong to the same tenant");
   });
 
@@ -300,7 +300,7 @@ describe("billing invoice service", () => {
       issuedAt: new Date("2026-08-12T10:00:00.000Z"),
       branchId: "branch-1",
       items: [{ description: "Nail polish", productId: "product-1", quantity: 2, unitPriceCents: 500 }],
-    });
+    }, null);
 
     expect(invoice.id).toBe("invoice-1");
   });
@@ -386,7 +386,7 @@ describe("billing invoice service", () => {
         { description: "Product", productId: "product-1", quantity: 2, unitPriceCents: 500 },
         { description: "Package", packageId: "pkg-1", quantity: 1, unitPriceCents: 2500 },
       ],
-    });
+    }, null);
 
     expect(invoice.id).toBe("invoice-1");
     expect(invoice.subtotalCents).toBe(5000);
@@ -439,7 +439,7 @@ describe("billing invoice service", () => {
       $transaction: async (callback: (client: unknown) => Promise<unknown>) => callback({} as unknown),
     } as never);
 
-    const invoice = await invoiceService.updateInvoice({ tenantId: "tenant-1", invoiceId: "invoice-1", input: { discountCents: 200 } });
+    const invoice = await invoiceService.updateInvoice({ tenantId: "tenant-1", invoiceId: "invoice-1", input: { discountCents: 200 }, actorUserId: "user-1" });
     expect(invoice).not.toBeNull();
     expect(invoice?.discountCents).toBe(200);
     expect(invoice?.totalCents).toBe(900);
@@ -491,7 +491,7 @@ describe("billing invoice service", () => {
       $transaction: async (callback: (client: unknown) => Promise<unknown>) => callback({} as unknown),
     } as never);
 
-    const invoice = await invoiceService.updateInvoice({ tenantId: "tenant-1", invoiceId: "invoice-1", input: { notes: "VIP" } });
+    const invoice = await invoiceService.updateInvoice({ tenantId: "tenant-1", invoiceId: "invoice-1", input: { notes: "VIP" }, actorUserId: "user-1" });
     expect(invoice).not.toBeNull();
     expect(invoice?.notes).toBe("VIP");
   });
@@ -534,7 +534,7 @@ describe("billing invoice service", () => {
       $transaction: async (callback: (client: unknown) => Promise<unknown>) => callback({} as unknown),
     } as never);
 
-    const invoice = await invoiceService.updateInvoice({ tenantId: "tenant-1", invoiceId: "missing", input: { discountCents: 500 } });
+    const invoice = await invoiceService.updateInvoice({ tenantId: "tenant-1", invoiceId: "missing", input: { discountCents: 500 }, actorUserId: "user-1" });
     expect(invoice).toBeNull();
   });
 
@@ -576,7 +576,7 @@ describe("billing invoice service", () => {
       $transaction: async (callback: (client: unknown) => Promise<unknown>) => callback({} as unknown),
     } as never);
 
-    const invoice = await invoiceService.updateInvoice({ tenantId: "tenant-1", invoiceId: "invoice-1", input: { discountCents: 500 } });
+    const invoice = await invoiceService.updateInvoice({ tenantId: "tenant-1", invoiceId: "invoice-1", input: { discountCents: 500 }, actorUserId: "user-1" });
     expect(invoice).toBeNull();
   });
 
@@ -618,7 +618,7 @@ describe("billing invoice service", () => {
       branchId: "branch-1",
       issuedAt: new Date("2026-09-02T10:00:00.000Z"),
       items: [{ description: "Manicure", serviceId: null, quantity: 1, unitPriceCents: 1000 }],
-    });
+    }, null);
 
     expect(invoice.branchId).toBe("branch-1");
     expect(createData[0]?.branchId).toBe("branch-1");
@@ -661,7 +661,7 @@ describe("billing invoice service", () => {
       customerId: "customer-1",
       issuedAt: new Date("2026-09-02T10:00:00.000Z"),
       items: [{ description: "Manicure", serviceId: null, quantity: 1, unitPriceCents: 1000 }],
-    });
+    }, null);
 
     expect(invoice.branchId).toBeNull();
     expect(createData[0]?.branchId).toBeNull();
@@ -698,7 +698,7 @@ describe("billing invoice service", () => {
         branchId: "branch-other",
         issuedAt: new Date("2026-09-02T10:00:00.000Z"),
         items: [{ description: "Manicure", serviceId: null, quantity: 1, unitPriceCents: 1000 }],
-      }),
+      }, null),
     ).rejects.toThrow("branch must belong to the same tenant");
   });
 });

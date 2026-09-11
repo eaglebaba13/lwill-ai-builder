@@ -35,19 +35,19 @@ async function authorize(permissionCode: string): Promise<PaymentAuthorization> 
   if (!decision.allowed) {
     return { outcome: "forbidden" };
   }
-  return { outcome: "authorized", tenantId: context.tenantContext.tenantId };
+  return { outcome: "authorized", tenantId: context.tenantContext.tenantId, userId: context.user.userId };
 }
 
 export function createPaymentRouteServices(): PaymentRouteServices {
   return {
     authorize,
-    createPayment: (tenantId, input) => paymentService.createPayment(tenantId, {
+    createPayment: (tenantId, input, actorUserId) => paymentService.createPayment(tenantId, {
       invoiceId: input.invoiceId,
       amountCents: input.amountCents,
       method: input.method,
       paidAt: input.paidAt ? new Date(input.paidAt) : undefined,
       notes: input.notes,
-    }),
+    }, actorUserId),
     listPaymentsForInvoice: (tenantId, invoiceId) => paymentService.listPaymentsForInvoice(tenantId, invoiceId),
     getPaymentTotal: (tenantId, invoiceId) => paymentService.getPaymentTotal(tenantId, invoiceId),
     getInvoice: async (tenantId, invoiceId) => {

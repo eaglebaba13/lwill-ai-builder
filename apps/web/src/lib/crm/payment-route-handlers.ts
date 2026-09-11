@@ -3,7 +3,7 @@ import "server-only";
 export type PaymentAuthorization =
   | { readonly outcome: "unauthenticated" }
   | { readonly outcome: "forbidden" }
-  | { readonly outcome: "authorized"; readonly tenantId: string };
+  | { readonly outcome: "authorized"; readonly tenantId: string; readonly userId: string | null };
 
 export interface PaymentCreateInput {
   readonly invoiceId: string;
@@ -15,7 +15,7 @@ export interface PaymentCreateInput {
 
 export interface PaymentRouteServices {
   readonly authorize: (permissionCode: string) => Promise<PaymentAuthorization>;
-  readonly createPayment: (tenantId: string, input: PaymentCreateInput) => Promise<unknown>;
+  readonly createPayment: (tenantId: string, input: PaymentCreateInput, actorUserId: string | null) => Promise<unknown>;
   readonly listPaymentsForInvoice: (tenantId: string, invoiceId: string) => Promise<readonly unknown[]>;
   readonly getPaymentTotal: (tenantId: string, invoiceId: string) => Promise<number>;
   readonly getInvoice: (tenantId: string, invoiceId: string) => Promise<{ totalCents: number } | null>;
@@ -32,14 +32,14 @@ function response(status: number, body?: unknown): Response {
 
 function authorizationOutcome(
   authorization: PaymentAuthorization,
-): { readonly ok: true; readonly tenantId: string } | { readonly ok: false; readonly response: Response } {
+): { readonly ok: true; readonly tenantId: string; readonly userId: string | null } | { readonly ok: false; readonly response: Response } {
   if (authorization.outcome === "unauthenticated") {
     return { ok: false, response: response(401) };
   }
   if (authorization.outcome === "forbidden") {
     return { ok: false, response: response(403) };
   }
-  return { ok: true, tenantId: authorization.tenantId };
+  return { ok: true, tenantId: authorization.tenantId, userId: authorization.userId };
 }
 
 function isNonEmptyString(value: unknown): value is string {
@@ -104,7 +104,7 @@ export async function handleCreatePayment(
     notes: record.notes as string | null | undefined,
   };
   try {
-    const payment = await services.createPayment(authResult.tenantId, input);
+    const payment = await services.createPayment(authResult.tenantId, input, authResult.userId);
     return response(201, { payment });
   } catch (error: unknown) {
     if (error instanceof Error && error.message.includes("invoice must belong")) {
