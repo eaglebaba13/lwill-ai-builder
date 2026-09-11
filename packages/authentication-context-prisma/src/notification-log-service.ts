@@ -32,14 +32,16 @@ export interface NotificationLogCreateInput {
 export interface NotificationLogService {
   createNotificationLog(input: NotificationLogCreateInput): Promise<NotificationLogRecord>;
   getNotificationLog(args: { tenantId: string; logId: string }): Promise<NotificationLogRecord | null>;
-  listNotificationLogs(args: { tenantId: string }): Promise<readonly NotificationLogRecord[]>;
+  listNotificationLogs(args: { tenantId: string; recipientId?: string | null }): Promise<readonly NotificationLogRecord[]>;
+  markNotificationAsRead(args: { tenantId: string; logId: string; recipientId?: string | null }): Promise<NotificationLogRecord | null>;
 }
 
 interface NotificationLogPrismaClient {
   readonly notificationLog: {
     create: (args: { data: Record<string, unknown> }) => Promise<NotificationLogRecord>;
     findUnique: (args: { where: { id: string } }) => Promise<NotificationLogRecord | null>;
-    findMany: (args: { where?: Record<string, unknown> }) => Promise<NotificationLogRecord[]>;
+    findMany: (args: { where?: Record<string, unknown>; orderBy?: Record<string, unknown> }) => Promise<NotificationLogRecord[]>;
+    update: (args: { where: { id: string }; data: Record<string, unknown> }) => Promise<NotificationLogRecord>;
   };
 }
 
@@ -69,8 +71,28 @@ export function createNotificationLogService(prisma: NotificationLogPrismaClient
       }
       return log;
     },
-    async listNotificationLogs({ tenantId }) {
-      return prisma.notificationLog.findMany({ where: { tenantId } });
+    async listNotificationLogs({ tenantId, recipientId }) {
+      const where: Record<string, unknown> = { tenantId };
+      if (recipientId !== undefined && recipientId !== null) {
+        where.recipientId = recipientId;
+      }
+      return prisma.notificationLog.findMany({ where, orderBy: { createdAt: "desc" } });
+    },
+    async markNotificationAsRead({ tenantId, logId, recipientId }) {
+      const log = await prisma.notificationLog.findUnique({ where: { id: logId } });
+      if (log === null || log.tenantId !== tenantId) {
+        return null;
+      }
+      if (recipientId !== undefined && recipientId !== null && log.recipientId !== recipientId) {
+        return null;
+      }
+      if (log.readAt !== null) {
+        return log;
+      }
+      return prisma.notificationLog.update({
+        where: { id: logId },
+        data: { readAt: new Date() },
+      });
     },
   };
 }

@@ -3,7 +3,7 @@ import "server-only";
 export type NotificationLogAuthorization =
   | { readonly outcome: "unauthenticated" }
   | { readonly outcome: "forbidden" }
-  | { readonly outcome: "authorized"; readonly tenantId: string };
+  | { readonly outcome: "authorized"; readonly tenantId: string; readonly userId: string | null };
 
 export interface NotificationLogWriteInput {
   readonly recipientId?: string | null;
@@ -19,9 +19,10 @@ export interface NotificationLogWriteInput {
 
 export interface NotificationLogRouteServices {
   readonly authorize: (permissionCode: string) => Promise<NotificationLogAuthorization>;
-  readonly listNotificationLogs: (tenantId: string) => Promise<readonly unknown[]>;
+  readonly listNotificationLogs: (tenantId: string, recipientId?: string | null) => Promise<readonly unknown[]>;
   readonly getNotificationLog: (tenantId: string, logId: string) => Promise<unknown | null>;
   readonly createNotificationLog: (tenantId: string, input: NotificationLogWriteInput) => Promise<unknown>;
+  readonly markNotificationAsRead: (tenantId: string, logId: string, recipientId?: string | null) => Promise<unknown | null>;
 }
 
 const RESPONSE_HEADERS = { "cache-control": "no-store" };
@@ -35,14 +36,14 @@ function response(status: number, body?: unknown): Response {
 
 function authorizationOutcome(
   authorization: NotificationLogAuthorization,
-): { readonly ok: true; readonly tenantId: string } | { readonly ok: false; readonly response: Response } {
+): { readonly ok: true; readonly tenantId: string; readonly userId: string | null } | { readonly ok: false; readonly response: Response } {
   if (authorization.outcome === "unauthenticated") {
     return { ok: false, response: response(401) };
   }
   if (authorization.outcome === "forbidden") {
     return { ok: false, response: response(403) };
   }
-  return { ok: true, tenantId: authorization.tenantId };
+  return { ok: true, tenantId: authorization.tenantId, userId: authorization.userId };
 }
 
 function isNonEmptyString(value: unknown): value is string {
@@ -163,7 +164,7 @@ export async function handleListNotificationLogs(
   if (!authResult.ok) {
     return authResult.response;
   }
-  const logList = await services.listNotificationLogs(authResult.tenantId);
+  const logList = await services.listNotificationLogs(authResult.tenantId, authResult.userId);
   return response(200, { notificationLogs: logList });
 }
 
@@ -203,4 +204,21 @@ export async function handleCreateNotificationLog(
   }
   const log = await services.createNotificationLog(authResult.tenantId, input);
   return response(201, { notificationLog: log });
+}
+
+export async function handleMarkNotificationAsRead(
+  _request: Request,
+  services: NotificationLogRouteServices,
+  logId: string,
+): Promise<Response> {
+  const authorization = await services.authorize("notification.read");
+  const authResult = authorizationOutcome(authorization);
+  if (!authResult.ok) {
+    return authResult.response;
+  }
+  const log = await services.markNotificationAsRead(authResult.tenantId, logId, authResult.userId);
+  if (log === null) {
+    return response(404);
+  }
+  return response(200, { notificationLog: log });
 }

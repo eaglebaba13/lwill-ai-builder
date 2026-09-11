@@ -3,13 +3,14 @@ import {
   handleCreateNotificationLog,
   handleGetNotificationLog,
   handleListNotificationLogs,
+  handleMarkNotificationAsRead,
   type NotificationLogAuthorization,
   type NotificationLogRouteServices,
 } from "../lib/communication/notification-log-route-handlers";
 
-function request(body?: unknown): Request {
+function request(body?: unknown, method?: string): Request {
   return new Request("https://builder.lwill.in/api/notification-logs", {
-    method: body === undefined ? "GET" : "POST",
+    method: method ?? (body === undefined ? "GET" : "POST"),
     headers: { "content-type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
@@ -21,6 +22,7 @@ function createServices(authorization: NotificationLogAuthorization): Notificati
     listNotificationLogs: vi.fn().mockResolvedValue([{ id: "log-1" }]),
     getNotificationLog: vi.fn().mockResolvedValue({ id: "log-1" }),
     createNotificationLog: vi.fn().mockResolvedValue({ id: "log-1" }),
+    markNotificationAsRead: vi.fn().mockResolvedValue({ id: "log-1", readAt: new Date().toISOString() }),
   };
 }
 
@@ -47,7 +49,7 @@ describe("notification log route handlers: authentication/authorization gating",
 
 describe("notification log route handlers: permission code forwarding", () => {
   it("passes 'notification.read' to authorize for list and get operations", async () => {
-    const services = createServices({ outcome: "authorized", tenantId: "tenant-1" });
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1", userId: "user-1" });
     await handleListNotificationLogs(request(), services);
     expect(services.authorize).toHaveBeenCalledWith("notification.read");
 
@@ -56,7 +58,7 @@ describe("notification log route handlers: permission code forwarding", () => {
   });
 
   it("passes 'notification.write' to authorize for create operation", async () => {
-    const services = createServices({ outcome: "authorized", tenantId: "tenant-1" });
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1", userId: "user-1" });
     await handleCreateNotificationLog(request({ channel: "email", body: "Hello", status: "sent" }), services);
     expect(services.authorize).toHaveBeenCalledWith("notification.write");
   });
@@ -64,7 +66,7 @@ describe("notification log route handlers: permission code forwarding", () => {
 
 describe("notification log route handlers: input validation", () => {
   it("rejects invalid create input", async () => {
-    const services = createServices({ outcome: "authorized", tenantId: "tenant-1" });
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1", userId: "user-1" });
     expect((await handleCreateNotificationLog(request({}), services)).status).toBe(400);
     expect((await handleCreateNotificationLog(request({ channel: "" }), services)).status).toBe(400);
     expect((await handleCreateNotificationLog(request({ channel: "email", body: "" }), services)).status).toBe(400);
@@ -72,14 +74,14 @@ describe("notification log route handlers: input validation", () => {
   });
 
   it("rejects unknown keys in create input", async () => {
-    const services = createServices({ outcome: "authorized", tenantId: "tenant-1" });
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1", userId: "user-1" });
     expect(
       (await handleCreateNotificationLog(request({ channel: "email", body: "Hello", status: "sent", tenantId: "attacker" }), services)).status,
     ).toBe(400);
   });
 
   it("accepts create with valid optional fields", async () => {
-    const services = createServices({ outcome: "authorized", tenantId: "tenant-1" });
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1", userId: "user-1" });
     const result = await handleCreateNotificationLog(
       request({
         recipientId: "user-1",
@@ -106,7 +108,7 @@ describe("notification log route handlers: input validation", () => {
   });
 
   it("returns 404 for non-existent log", async () => {
-    const services = createServices({ outcome: "authorized", tenantId: "tenant-1" });
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1", userId: "user-1" });
     vi.mocked(services.getNotificationLog).mockResolvedValue(null);
     expect((await handleGetNotificationLog(request(), services, "missing")).status).toBe(404);
   });
@@ -114,19 +116,54 @@ describe("notification log route handlers: input validation", () => {
 
 describe("notification log route handlers: authorized operations", () => {
   it("returns 200 with log list for authorized caller", async () => {
-    const services = createServices({ outcome: "authorized", tenantId: "tenant-1" });
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1", userId: "user-1" });
     vi.mocked(services.listNotificationLogs).mockResolvedValue([
       { id: "log-1", channel: "email", status: "sent" },
       { id: "log-2", channel: "sms", status: "delivered" },
     ]);
     const result = await handleListNotificationLogs(request(), services);
     expect(result.status).toBe(200);
-    expect(services.listNotificationLogs).toHaveBeenCalledWith("tenant-1");
+    expect(services.listNotificationLogs).toHaveBeenCalledWith("tenant-1", "user-1");
   });
 
   it("returns 200 with log for authorized get", async () => {
-    const services = createServices({ outcome: "authorized", tenantId: "tenant-1" });
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1", userId: "user-1" });
     const result = await handleGetNotificationLog(request(), services, "l1");
     expect(result.status).toBe(200);
+  });
+});
+
+describe("notification log route handlers: mark as read", () => {
+  it("returns 401 for unauthenticated mark-as-read", async () => {
+    const services = createServices({ outcome: "unauthenticated" });
+    expect((await handleMarkNotificationAsRead(request(), services, "l1")).status).toBe(401);
+    expect(services.markNotificationAsRead).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 for forbidden mark-as-read", async () => {
+    const services = createServices({ outcome: "forbidden" });
+    expect((await handleMarkNotificationAsRead(request(), services, "l1")).status).toBe(403);
+    expect(services.markNotificationAsRead).not.toHaveBeenCalled();
+  });
+
+  it("passes notification.read permission and tenant/user to mark-as-read", async () => {
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1", userId: "user-1" });
+    await handleMarkNotificationAsRead(request(), services, "l1");
+    expect(services.authorize).toHaveBeenCalledWith("notification.read");
+    expect(services.markNotificationAsRead).toHaveBeenCalledWith("tenant-1", "l1", "user-1");
+  });
+
+  it("returns 200 with the updated notification log on mark-as-read", async () => {
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1", userId: "user-1" });
+    const result = await handleMarkNotificationAsRead(request(), services, "l1");
+    expect(result.status).toBe(200);
+    const body = await result.json();
+    expect(body.notificationLog.id).toBe("log-1");
+  });
+
+  it("returns 404 when mark-as-read targets a non-existent or cross-tenant log", async () => {
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1", userId: "user-1" });
+    vi.mocked(services.markNotificationAsRead).mockResolvedValue(null);
+    expect((await handleMarkNotificationAsRead(request(), services, "missing")).status).toBe(404);
   });
 });

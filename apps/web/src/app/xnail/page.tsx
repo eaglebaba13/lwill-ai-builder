@@ -457,7 +457,7 @@ export default function Home() {
   const [editingTemplateChannel, setEditingTemplateChannel] = useState("");
   const [editingTemplateSubject, setEditingTemplateSubject] = useState("");
   const [editingTemplateBody, setEditingTemplateBody] = useState("");
-  const [notificationLogs, setNotificationLogs] = useState<Array<{ id: string; channel: string; subject: string | null; body: string; status: string; sentAt: string | null }>>([]);
+  const [notificationLogs, setNotificationLogs] = useState<Array<{ id: string; channel: string; subject: string | null; body: string; status: string; sentAt: string | null; readAt: string | null }>>([]);
   const [isLoadingNotificationLogs, setIsLoadingNotificationLogs] = useState(false);
   const [notificationLogError, setNotificationLogError] = useState<string | null>(null);
   const [notificationPreferences, setNotificationPreferences] = useState<Array<{ id: string; channel: string; isEnabled: boolean }>>([]);
@@ -2058,7 +2058,7 @@ export default function Home() {
         if (!result.ok) {
           throw new Error("Notification logs request failed");
         }
-        const body = await result.json() as { notificationLogs?: Array<{ id: string; channel: string; subject: string | null; body: string; status: string; sentAt: string | null }> };
+        const body = await result.json() as { notificationLogs?: Array<{ id: string; channel: string; subject: string | null; body: string; status: string; sentAt: string | null; readAt: string | null }> };
         const loaded = Array.isArray(body.notificationLogs) ? body.notificationLogs : [];
         setNotificationLogs(loaded);
       })
@@ -3019,6 +3019,31 @@ export default function Home() {
     }
     const body = await result.json() as { eventSubscription: { id: string; eventType: string; notificationTemplateId: string | null; isEnabled: boolean } };
     setEventSubscriptions((current) => current.map((item) => (item.id === body.eventSubscription.id ? body.eventSubscription : item)));
+  };
+
+  const markNotificationAsRead = async (logId: string) => {
+    setNotificationLogError(null);
+    const result = await fetch(`/api/notification-logs/${encodeURIComponent(logId)}`, {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    if (result.status === 401) {
+      setNotificationLogs([]);
+      setAuthenticated(false);
+      return;
+    }
+    if (result.status === 403) {
+      setNotificationLogError("You are not authorized to update notification logs.");
+      return;
+    }
+    if (!result.ok) {
+      setNotificationLogError("Notification could not be marked as read.");
+      return;
+    }
+    const updated = await result.json() as { notificationLog: { id: string; readAt: string | null } };
+    setNotificationLogs((current) => current.map((log) => (log.id === updated.notificationLog.id ? { ...log, readAt: updated.notificationLog.readAt } : log)));
   };
 
   const saveNotificationPreference = async (channel = notificationPreferenceChannel, enabled = notificationPreferenceEnabled) => {
@@ -8186,15 +8211,28 @@ export default function Home() {
               {!isLoadingNotificationLogs && notificationLogError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{notificationLogError}</div> : null}
               {!isLoadingNotificationLogs && !notificationLogError && notificationLogs.length === 0 ? <div className="text-sm text-[#a39a86]">No notification logs yet.</div> : null}
               {notificationLogs.map((log) => (
-                <div key={log.id} className="flex items-center justify-between rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
-                  <div>
-                    <div className="font-medium">{log.channel}</div>
-                    <div className="text-sm text-[#a39a86]">{log.subject ?? "No subject"}</div>
-                    <div className="text-sm text-[#a39a86]">{log.body}</div>
+                <div key={log.id} className={`flex items-center justify-between rounded-xl border p-3 ${log.readAt === null ? "border-[rgba(212,175,55,0.25)] bg-[#1a170f]" : "border-[rgba(212,175,55,0.1)] bg-[#17150f]"}`}>
+                  <div className="flex items-start gap-2">
+                    {log.readAt === null ? <span className="mt-1 inline-block h-2 w-2 flex-shrink-0 rounded-full bg-[#d1af3c]" title="Unread" /> : null}
+                    <div>
+                      <div className="font-medium">{log.channel}</div>
+                      <div className="text-sm text-[#a39a86]">{log.subject ?? "No subject"}</div>
+                      <div className="text-sm text-[#a39a86]">{log.body}</div>
+                    </div>
                   </div>
-                  <div className="text-right text-sm text-[#a39a86]">
+                  <div className="flex flex-col items-end gap-2 text-right text-sm text-[#a39a86]">
                     <div>{log.status}</div>
                     <div>{log.sentAt ? new Date(log.sentAt).toLocaleString() : "Not sent"}</div>
+                    {log.readAt === null ? (
+                      <button
+                        onClick={() => void markNotificationAsRead(log.id)}
+                        className="rounded-lg border border-[rgba(212,175,55,0.3)] bg-[rgba(212,175,55,0.08)] px-2 py-1 text-xs text-[#d1af3c] hover:bg-[rgba(212,175,55,0.15)]"
+                      >
+                        Mark as read
+                      </button>
+                    ) : (
+                      <span className="text-xs text-[#6b6455]">Read</span>
+                    )}
                   </div>
                 </div>
               ))}

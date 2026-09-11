@@ -35,14 +35,15 @@ async function authorize(permissionCode: string): Promise<NotificationLogAuthori
   if (!decision.allowed) {
     return { outcome: "forbidden" };
   }
-  return { outcome: "authorized", tenantId: context.tenantContext.tenantId };
+  return { outcome: "authorized", tenantId: context.tenantContext.tenantId, userId: context.user.userId };
 }
 
 export function createNotificationLogRouteServices(): NotificationLogRouteServices {
   return {
     authorize,
-    listNotificationLogs: (tenantId) => notificationLogService.listNotificationLogs({ tenantId }),
+    listNotificationLogs: (tenantId, recipientId) => notificationLogService.listNotificationLogs({ tenantId, recipientId }),
     getNotificationLog: (tenantId, logId) => notificationLogService.getNotificationLog({ tenantId, logId }),
     createNotificationLog: (tenantId, input) => notificationLogService.createNotificationLog({ tenantId, ...input }),
+    markNotificationAsRead: (tenantId, logId, recipientId) => notificationLogService.markNotificationAsRead({ tenantId, logId, recipientId }),
   };
 }
