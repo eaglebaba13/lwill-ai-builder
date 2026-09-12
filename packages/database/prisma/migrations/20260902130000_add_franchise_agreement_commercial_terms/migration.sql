@@ -9,15 +9,15 @@
 
 -- 1. Add commercial term columns
 ALTER TABLE "FranchiseAgreement" 
-  ADD COLUMN IF NOT EXISTS "minimumGuaranteeCents" Int,
-  ADD COLUMN IF NOT EXISTS "mgFormulaRateBp" Int,
-  ADD COLUMN IF NOT EXISTS "mgFormulaBase" String,
-  ADD COLUMN IF NOT EXISTS "variableReturnRateBp" Int,
-  ADD COLUMN IF NOT EXISTS "variableReturnBasis" String,
-  ADD COLUMN IF NOT EXISTS "payoutRule" String,
-  ADD COLUMN IF NOT EXISTS "termsSnapshot" Json,
-  ADD COLUMN IF NOT EXISTS "effectiveFrom" DateTime,
-  ADD COLUMN IF NOT EXISTS "effectiveTo" DateTime;
+  ADD COLUMN IF NOT EXISTS "minimumGuaranteeCents" INTEGER,
+  ADD COLUMN IF NOT EXISTS "mgFormulaRateBp" INTEGER,
+  ADD COLUMN IF NOT EXISTS "mgFormulaBase" TEXT,
+  ADD COLUMN IF NOT EXISTS "variableReturnRateBp" INTEGER,
+  ADD COLUMN IF NOT EXISTS "variableReturnBasis" TEXT,
+  ADD COLUMN IF NOT EXISTS "payoutRule" TEXT,
+  ADD COLUMN IF NOT EXISTS "termsSnapshot" JSONB,
+  ADD COLUMN IF NOT EXISTS "effectiveFrom" TIMESTAMP,
+  ADD COLUMN IF NOT EXISTS "effectiveTo" TIMESTAMP;
 
 -- 2. Backfill existing ₹3.10L agreements with historical fixed MG terms
 --    These agreements have fixed MG = ₹15,000/month (1500000 cents).
