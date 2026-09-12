@@ -30,6 +30,8 @@ model Tenant {
   authenticationSessions AuthenticationSession[]
   customers        Customer[]
   leads          Lead[]
+  pipelines      Pipeline[]
+  opportunities  Opportunity[]
   services         Service[]
   appointments     Appointment[]
   staff            Staff[]
@@ -337,9 +339,71 @@ model Lead {
 
   tenant               Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   convertedToCustomer  Customer? @relation(fields: [convertedToCustomerId], references: [id], onDelete: SetNull)
+  opportunities        Opportunity[]
 
   @@unique([tenantId, id])
   @@index([tenantId, status])
+}
+
+model Pipeline {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @db.Uuid
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  stages    Stage[]
+  opportunities Opportunity[]
+
+  @@unique([tenantId, id])
+  @@index([tenantId, isActive])
+}
+
+model Stage {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @db.Uuid
+  pipelineId String   @db.Uuid
+  name       String
+  position   Int
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  pipeline   Pipeline @relation(fields: [tenantId, pipelineId], references: [tenantId, id], onDelete: Restrict)
+  opportunities Opportunity[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, pipelineId, position])
+  @@index([tenantId, pipelineId])
+}
+
+model Opportunity {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @db.Uuid
+  pipelineId   String    @db.Uuid
+  stageId      String    @db.Uuid
+  name         String
+  customerId   String?   @db.Uuid
+  leadId       String?   @db.Uuid
+  valueCents   Int       @default(0)
+  status       String    @default("OPEN")
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  pipeline     Pipeline  @relation(fields: [tenantId, pipelineId], references: [tenantId, id], onDelete: Restrict)
+  stage        Stage     @relation(fields: [tenantId, stageId], references: [tenantId, id], onDelete: Restrict)
+  customer     Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  lead         Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, id])
+  @@index([tenantId, status])
+  @@index([tenantId, pipelineId])
+  @@index([tenantId, stageId])
 }
 
 model Customer {
@@ -358,6 +422,7 @@ model Customer {
   memberships Membership[]
   invoices Invoice[]
   convertedLeads Lead[]
+  opportunities Opportunity[]
 
   @@unique([tenantId, id])
   @@index([tenantId, isActive])

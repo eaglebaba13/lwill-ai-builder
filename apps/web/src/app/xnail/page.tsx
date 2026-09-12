@@ -180,7 +180,7 @@ function KpiCard({ definition, context }: { readonly definition: RoleDashboardCo
   );
 }
 
-const ALL_TABS = ["Overview", "Customers", "Leads", "Services", "Packages", "Memberships", "Inventory", "Staff", "Attendance", "Appointments", "Billing", "Branches", "Reports", "Settings", "Notifications", "Users & Access", "Gateway Accounts", "Marketplace", "Franchise Overview", "Financials", "Territories", "Partners", "Agreements", "Outlets"] as const;
+const ALL_TABS = ["Overview", "Customers", "Leads", "Pipeline", "Services", "Packages", "Memberships", "Inventory", "Staff", "Attendance", "Appointments", "Billing", "Branches", "Reports", "Settings", "Notifications", "Users & Access", "Gateway Accounts", "Marketplace", "Franchise Overview", "Financials", "Territories", "Partners", "Agreements", "Outlets"] as const;
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<(typeof ALL_TABS)[number]>("Overview");
@@ -221,6 +221,20 @@ export default function Home() {
   const [leadEmail, setLeadEmail] = useState("");
   const [leadPhone, setLeadPhone] = useState("");
   const [leadSource, setLeadSource] = useState("");
+  type PipelineRecord = { id: string; tenantId: string; name: string; isActive: boolean };
+  type StageRecord = { id: string; tenantId: string; pipelineId: string; name: string; position: number; isActive: boolean };
+  type OpportunityRecord = { id: string; tenantId: string; pipelineId: string; stageId: string; name: string; customerId: string | null; leadId: string | null; valueCents: number; status: string; notes: string | null; pipeline?: PipelineRecord; stage?: StageRecord };
+  const [pipelines, setPipelines] = useState<PipelineRecord[]>([]);
+  const [stages, setStages] = useState<StageRecord[]>([]);
+  const [opportunities, setOpportunities] = useState<OpportunityRecord[]>([]);
+  const [pipelineName, setPipelineName] = useState("");
+  const [stageName, setStageName] = useState("");
+  const [stagePosition, setStagePosition] = useState(0);
+  const [oppName, setOppName] = useState("");
+  const [oppStageId, setOppStageId] = useState("");
+  const [oppValue, setOppValue] = useState("");
+  const [opportunityError, setOpportunityError] = useState<string | null>(null);
+  const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null);
   const [services, setServices] = useState<ServiceRecord[]>([]);
   const [isLoadingServices, setIsLoadingServices] = useState(false);
   const [serviceError, setServiceError] = useState<string | null>(null);
@@ -801,6 +815,16 @@ export default function Home() {
       .catch(() => {
         if (mounted) setLeads([]);
       });
+    return () => { mounted = false; };
+  }, [authenticated]);
+
+  useEffect(() => {
+    if (authenticated !== true) return;
+    let mounted = true;
+    void Promise.all([
+      fetch("/api/pipelines", { credentials: "same-origin" }).then(async (r) => { if (!mounted || !r.ok) return []; const b = await r.json() as { pipelines?: PipelineRecord[] }; return Array.isArray(b.pipelines) ? b.pipelines : []; }),
+      fetch("/api/opportunities", { credentials: "same-origin" }).then(async (r) => { if (!mounted || !r.ok) return []; const b = await r.json() as { opportunities?: OpportunityRecord[] }; return Array.isArray(b.opportunities) ? b.opportunities : []; }),
+    ]).then(([p, o]) => { if (mounted) { setPipelines(p); setOpportunities(o); } }).catch(() => {});
     return () => { mounted = false; };
   }, [authenticated]);
 
@@ -3311,6 +3335,58 @@ export default function Home() {
     });
   };
 
+  const addPipeline = async () => {
+    if (!pipelineName.trim()) return;
+    setOpportunityError(null);
+    const result = await fetch("/api/pipelines", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: pipelineName }) });
+    if (result.status === 401) { setAuthenticated(false); return; }
+    if (!result.ok) { setOpportunityError("Pipeline could not be created."); return; }
+    const body = await result.json() as { pipeline: PipelineRecord };
+    setPipelines((current) => [...current, body.pipeline]);
+    setPipelineName("");
+  };
+
+  const addStage = async () => {
+    if (!stageName.trim() || !selectedPipelineId) return;
+    setOpportunityError(null);
+    const result = await fetch("/api/stages", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ pipelineId: selectedPipelineId, name: stageName, position: stagePosition }) });
+    if (result.status === 401) { setAuthenticated(false); return; }
+    if (!result.ok) { setOpportunityError("Stage could not be created."); return; }
+    const body = await result.json() as { stage: StageRecord };
+    setStages((current) => [...current, body.stage]);
+    setStageName("");
+    setStagePosition((p) => p + 1);
+  };
+
+  const addOpportunity = async () => {
+    if (!oppName.trim() || !selectedPipelineId || !oppStageId) return;
+    setOpportunityError(null);
+    const result = await fetch("/api/opportunities", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ pipelineId: selectedPipelineId, stageId: oppStageId, name: oppName, valueCents: Math.round(parseFloat(oppValue || "0") * 100) || 0 }) });
+    if (result.status === 401) { setAuthenticated(false); return; }
+    if (!result.ok) { setOpportunityError("Opportunity could not be created."); return; }
+    const body = await result.json() as { opportunity: OpportunityRecord };
+    setOpportunities((current) => [...current, body.opportunity]);
+    setOppName("");
+    setOppValue("");
+  };
+
+  const moveOpportunity = async (opportunityId: string, newStageId: string) => {
+    setOpportunityError(null);
+    const result = await fetch(`/api/opportunities/${opportunityId}/move`, { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ stageId: newStageId }) });
+    if (result.status === 401) { setAuthenticated(false); return; }
+    if (!result.ok) { setOpportunityError("Opportunity could not be moved."); return; }
+    const body = await result.json() as { opportunity: OpportunityRecord };
+    setOpportunities((current) => current.map((item) => (item.id === opportunityId ? { ...item, stageId: body.opportunity.stageId } : item)));
+  };
+
+  const loadStagesForPipeline = async (pipelineId: string) => {
+    setSelectedPipelineId(pipelineId);
+    const result = await fetch(`/api/stages?pipelineId=${pipelineId}`, { credentials: "same-origin" });
+    if (!result.ok) return;
+    const body = await result.json() as { stages?: StageRecord[] };
+    setStages(Array.isArray(body.stages) ? body.stages : []);
+  };
+
   const addService = async () => {
     if (!serviceName.trim()) return;
     setServiceError(null);
@@ -5051,6 +5127,84 @@ export default function Home() {
                 <input placeholder="Phone (optional)" value={leadPhone} onChange={(e) => setLeadPhone(e.target.value)} className="premium-input w-full" />
                 <input placeholder="Source (optional)" value={leadSource} onChange={(e) => setLeadSource(e.target.value)} className="premium-input w-full" />
                 <button onClick={() => void addLead()} className="premium-btn-primary w-full py-2">Add lead</button>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {activeTab === "Pipeline" ? (
+          <section className="mt-6 space-y-6">
+            {opportunityError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{opportunityError}</div> : null}
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+                <h3 className="text-lg font-semibold">Pipelines</h3>
+                <div className="mt-3 space-y-2">
+                  {pipelines.length === 0 ? <div className="text-sm text-[#a39a86]">No pipelines yet.</div> : null}
+                  {pipelines.map((p) => (
+                    <button key={p.id} onClick={() => void loadStagesForPipeline(p.id)} className={`block w-full rounded-lg border p-2 text-left text-sm transition-colors ${selectedPipelineId === p.id ? "border-[rgba(212,175,55,0.4)] bg-[rgba(212,175,55,0.08)]" : "border-[rgba(212,175,55,0.1)] bg-[#17150f] hover:bg-[rgba(212,175,55,0.05)]"}`}>
+                      {p.name}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-3 flex gap-2">
+                  <input placeholder="Pipeline name" value={pipelineName} onChange={(e) => setPipelineName(e.target.value)} className="premium-input flex-1" />
+                  <button onClick={() => void addPipeline()} className="premium-btn-primary px-3 py-1 text-sm">Add</button>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+                <h3 className="text-lg font-semibold">Stages</h3>
+                <div className="mt-3 space-y-2">
+                  {!selectedPipelineId ? <div className="text-sm text-[#a39a86]">Select a pipeline first.</div> : null}
+                  {selectedPipelineId && stages.length === 0 ? <div className="text-sm text-[#a39a86]">No stages yet.</div> : null}
+                  {stages.sort((a, b) => a.position - b.position).map((s) => (
+                    <div key={s.id} className="rounded-lg border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-2 text-sm">
+                      <span className="text-[#6b6455]">#{s.position}</span> {s.name}
+                    </div>
+                  ))}
+                </div>
+                {selectedPipelineId ? (
+                  <div className="mt-3 flex gap-2">
+                    <input placeholder="Stage name" value={stageName} onChange={(e) => setStageName(e.target.value)} className="premium-input flex-1" />
+                    <button onClick={() => void addStage()} className="premium-btn-primary px-3 py-1 text-sm">Add</button>
+                  </div>
+                ) : null}
+              </div>
+              <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+                <h3 className="text-lg font-semibold">New opportunity</h3>
+                <div className="mt-3 space-y-2">
+                  <input placeholder="Opportunity name" value={oppName} onChange={(e) => setOppName(e.target.value)} className="premium-input w-full" />
+                  <input placeholder="Value (₹)" type="number" value={oppValue} onChange={(e) => setOppValue(e.target.value)} className="premium-input w-full" />
+                  <select value={oppStageId} onChange={(e) => setOppStageId(e.target.value)} className="premium-input w-full">
+                    <option value="">Select stage</option>
+                    {stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                  <button onClick={() => void addOpportunity()} className="premium-btn-primary w-full py-2 text-sm">Create opportunity</button>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+              <h3 className="text-lg font-semibold">Opportunities</h3>
+              <div className="mt-4 space-y-3">
+                {opportunities.length === 0 ? <div className="text-sm text-[#a39a86]">No opportunities yet.</div> : null}
+                {opportunities.map((opp) => (
+                  <div key={opp.id} className="flex items-center justify-between rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
+                    <div>
+                      <div className="font-medium">{opp.name}</div>
+                      <div className="text-sm text-[#a39a86]">{opp.pipeline?.name ?? "Unknown pipeline"} · Stage: {opp.stage?.name ?? "Unknown"}</div>
+                      {opp.valueCents > 0 ? <div className="text-xs text-[#d4af37]">₹{(opp.valueCents / 100).toLocaleString()}</div> : null}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`rounded-full px-2 py-0.5 text-xs ${opp.status === "WON" ? "bg-[rgba(76,175,80,0.15)] text-[#4caf50]" : opp.status === "LOST" ? "bg-[rgba(209,85,74,0.15)] text-[#d1554a]" : "bg-[rgba(212,175,55,0.12)] text-[#d4af37]"}`}>
+                        {opp.status}
+                      </span>
+                      {selectedPipelineId && stages.length > 1 && opp.status === "OPEN" ? (
+                        <select value={opp.stageId} onChange={(e) => void moveOpportunity(opp.id, e.target.value)} className="premium-input py-1 text-xs">
+                          {stages.sort((a, b) => a.position - b.position).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                        </select>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </section>
