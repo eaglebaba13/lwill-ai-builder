@@ -29,6 +29,7 @@ model Tenant {
   roles             Role[]
   authenticationSessions AuthenticationSession[]
   customers        Customer[]
+  leads          Lead[]
   services         Service[]
   appointments     Appointment[]
   staff            Staff[]
@@ -321,6 +322,26 @@ model FranchiseRevenueDistribution {
   @@index([tenantId, beneficiary])
 }
 
+model Lead {
+  id                   String    @id @default(uuid()) @db.Uuid
+  tenantId             String    @db.Uuid
+  name                 String
+  email                String?
+  phone                String?
+  source               String?
+  status               String    @default("ACTIVE")
+  convertedToCustomerId String?  @db.Uuid
+  convertedAt          DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  tenant               Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  convertedToCustomer  Customer? @relation(fields: [convertedToCustomerId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, id])
+  @@index([tenantId, status])
+}
+
 model Customer {
   id        String   @id @default(uuid()) @db.Uuid
   tenantId  String   @db.Uuid
@@ -336,6 +357,7 @@ model Customer {
   appointments Appointment[]
   memberships Membership[]
   invoices Invoice[]
+  convertedLeads Lead[]
 
   @@unique([tenantId, id])
   @@index([tenantId, isActive])

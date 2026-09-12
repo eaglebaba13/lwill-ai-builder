@@ -29,6 +29,18 @@ type CustomerRecord = {
   isActive: boolean;
 };
 
+type LeadRecord = {
+  id: string;
+  tenantId: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  source: string | null;
+  status: string;
+  convertedToCustomerId: string | null;
+  convertedAt: string | null;
+};
+
 type ServiceRecord = {
   id: string;
   tenantId: string;
@@ -168,7 +180,7 @@ function KpiCard({ definition, context }: { readonly definition: RoleDashboardCo
   );
 }
 
-const ALL_TABS = ["Overview", "Customers", "Services", "Packages", "Memberships", "Inventory", "Staff", "Attendance", "Appointments", "Billing", "Branches", "Reports", "Settings", "Notifications", "Users & Access", "Gateway Accounts", "Marketplace", "Franchise Overview", "Financials", "Territories", "Partners", "Agreements", "Outlets"] as const;
+const ALL_TABS = ["Overview", "Customers", "Leads", "Services", "Packages", "Memberships", "Inventory", "Staff", "Attendance", "Appointments", "Billing", "Branches", "Reports", "Settings", "Notifications", "Users & Access", "Gateway Accounts", "Marketplace", "Franchise Overview", "Financials", "Territories", "Partners", "Agreements", "Outlets"] as const;
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<(typeof ALL_TABS)[number]>("Overview");
@@ -202,6 +214,13 @@ export default function Home() {
   const [customers, setCustomers] = useState<CustomerRecord[]>([]);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
   const [customerError, setCustomerError] = useState<string | null>(null);
+  const [leads, setLeads] = useState<LeadRecord[]>([]);
+  const [isLoadingLeads, setIsLoadingLeads] = useState(false);
+  const [leadError, setLeadError] = useState<string | null>(null);
+  const [leadName, setLeadName] = useState("");
+  const [leadEmail, setLeadEmail] = useState("");
+  const [leadPhone, setLeadPhone] = useState("");
+  const [leadSource, setLeadSource] = useState("");
   const [services, setServices] = useState<ServiceRecord[]>([]);
   const [isLoadingServices, setIsLoadingServices] = useState(false);
   const [serviceError, setServiceError] = useState<string | null>(null);
@@ -759,6 +778,30 @@ export default function Home() {
       mounted = false;
       window.clearTimeout(loadingTimer);
     };
+  }, [authenticated]);
+
+  useEffect(() => {
+    if (authenticated !== true) {
+      return;
+    }
+
+    let mounted = true;
+    void fetch("/api/leads", { credentials: "same-origin" })
+      .then(async (result) => {
+        if (!mounted) return;
+        if (result.status === 401) {
+          setLeads([]);
+          setAuthenticated(false);
+          return;
+        }
+        if (!result.ok) return;
+        const body = await result.json() as { leads?: LeadRecord[] };
+        setLeads(Array.isArray(body.leads) ? body.leads : []);
+      })
+      .catch(() => {
+        if (mounted) setLeads([]);
+      });
+    return () => { mounted = false; };
   }, [authenticated]);
 
   useEffect(() => {
@@ -3231,6 +3274,43 @@ export default function Home() {
     setEditingCustomerId(null);
   };
 
+  const addLead = async () => {
+    if (!leadName.trim()) return;
+    setLeadError(null);
+    const result = await fetch("/api/leads", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: leadName, email: leadEmail || null, phone: leadPhone || null, source: leadSource || null }),
+    });
+    if (result.status === 401) { setLeads([]); setAuthenticated(false); return; }
+    if (!result.ok) { setLeadError("Lead could not be saved."); return; }
+    const body = await result.json() as { lead: LeadRecord };
+    setLeads((current) => [body.lead, ...current]);
+    setLeadName("");
+    setLeadEmail("");
+    setLeadPhone("");
+    setLeadSource("");
+  };
+
+  const convertLead = async (leadId: string) => {
+    setLeadError(null);
+    const result = await fetch(`/api/leads/${leadId}/convert`, {
+      method: "POST",
+      credentials: "same-origin",
+    });
+    if (result.status === 401) { setAuthenticated(false); return; }
+    if (!result.ok) { setLeadError("Lead could not be converted."); return; }
+    const body = await result.json() as { lead: LeadRecord; customer: { id: string } };
+    setLeads((current) => current.map((item) => (item.id === leadId ? body.lead : item)));
+    setCustomers((current) => {
+      void fetch("/api/customers", { credentials: "same-origin" })
+        .then(async (r) => { if (r.ok) { const b = await r.json() as { customers?: CustomerRecord[] }; if (b.customers) setCustomers(b.customers); } })
+        .catch(() => {});
+      return current;
+    });
+  };
+
   const addService = async () => {
     if (!serviceName.trim()) return;
     setServiceError(null);
@@ -4927,6 +5007,51 @@ export default function Home() {
                   </div>
                 </div>
               )}
+            </div>
+          </section>
+        ) : null}
+
+        {activeTab === "Leads" ? (
+          <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+              <h2 className="text-xl font-semibold">Lead pipeline</h2>
+              <div className="mt-4 space-y-3">
+                {isLoadingLeads ? <div className="text-sm text-[#a39a86]">Loading leads...</div> : null}
+                {!isLoadingLeads && leadError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{leadError}</div> : null}
+                {!isLoadingLeads && !leadError && leads.length === 0 ? <div className="text-sm text-[#a39a86]">No leads yet.</div> : null}
+                {leads.map((lead) => (
+                  <div key={lead.id} className="flex items-center justify-between rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
+                    <div>
+                      <div className="font-medium">{lead.name}</div>
+                      <div className="text-sm text-[#a39a86]">{lead.email ?? "No email"} · {lead.phone ?? "No phone"}</div>
+                      {lead.source ? <div className="text-xs text-[#6b6455]">Source: {lead.source}</div> : null}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`rounded-full px-2 py-0.5 text-xs ${lead.status === "CONVERTED" ? "bg-[rgba(76,175,80,0.15)] text-[#4caf50]" : "bg-[rgba(212,175,55,0.12)] text-[#d4af37]"}`}>
+                        {lead.status}
+                      </span>
+                      {lead.status === "ACTIVE" ? (
+                        <button onClick={() => void convertLead(lead.id)} className="rounded-lg border border-[rgba(212,175,55,0.3)] bg-[rgba(212,175,55,0.08)] px-2 py-1 text-xs text-[#d1af3c] hover:bg-[rgba(212,175,55,0.15)]">
+                          Convert
+                        </button>
+                      ) : null}
+                      {lead.status === "CONVERTED" && lead.convertedToCustomerId ? (
+                        <span className="text-xs text-[#6b6455]">→ Customer</span>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+              <h2 className="text-xl font-semibold">Add lead</h2>
+              <div className="mt-4 space-y-3">
+                <input placeholder="Name" value={leadName} onChange={(e) => setLeadName(e.target.value)} className="premium-input w-full" />
+                <input placeholder="Email (optional)" value={leadEmail} onChange={(e) => setLeadEmail(e.target.value)} className="premium-input w-full" />
+                <input placeholder="Phone (optional)" value={leadPhone} onChange={(e) => setLeadPhone(e.target.value)} className="premium-input w-full" />
+                <input placeholder="Source (optional)" value={leadSource} onChange={(e) => setLeadSource(e.target.value)} className="premium-input w-full" />
+                <button onClick={() => void addLead()} className="premium-btn-primary w-full py-2">Add lead</button>
+              </div>
             </div>
           </section>
         ) : null}
