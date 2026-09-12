@@ -180,7 +180,7 @@ function KpiCard({ definition, context }: { readonly definition: RoleDashboardCo
   );
 }
 
-const ALL_TABS = ["Overview", "Customers", "Leads", "Pipeline", "Services", "Packages", "Memberships", "Inventory", "Staff", "Attendance", "Appointments", "Billing", "Branches", "Reports", "Settings", "Notifications", "Users & Access", "Gateway Accounts", "Marketplace", "Franchise Overview", "Financials", "Territories", "Partners", "Agreements", "Outlets"] as const;
+const ALL_TABS = ["Overview", "Customers", "Leads", "Pipeline", "Follow-ups", "Services", "Packages", "Memberships", "Inventory", "Staff", "Attendance", "Appointments", "Billing", "Branches", "Reports", "Settings", "Notifications", "Users & Access", "Gateway Accounts", "Marketplace", "Franchise Overview", "Financials", "Territories", "Partners", "Agreements", "Outlets"] as const;
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<(typeof ALL_TABS)[number]>("Overview");
@@ -235,6 +235,11 @@ export default function Home() {
   const [oppValue, setOppValue] = useState("");
   const [opportunityError, setOpportunityError] = useState<string | null>(null);
   const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null);
+  type FollowupRecord = { id: string; tenantId: string; title: string; notes: string | null; dueAt: string; status: string; leadId: string | null; customerId: string | null; opportunityId: string | null };
+  const [followups, setFollowups] = useState<FollowupRecord[]>([]);
+  const [followupTitle, setFollowupTitle] = useState("");
+  const [followupDueAt, setFollowupDueAt] = useState("");
+  const [followupError, setFollowupError] = useState<string | null>(null);
   const [services, setServices] = useState<ServiceRecord[]>([]);
   const [isLoadingServices, setIsLoadingServices] = useState(false);
   const [serviceError, setServiceError] = useState<string | null>(null);
@@ -825,6 +830,16 @@ export default function Home() {
       fetch("/api/pipelines", { credentials: "same-origin" }).then(async (r) => { if (!mounted || !r.ok) return []; const b = await r.json() as { pipelines?: PipelineRecord[] }; return Array.isArray(b.pipelines) ? b.pipelines : []; }),
       fetch("/api/opportunities", { credentials: "same-origin" }).then(async (r) => { if (!mounted || !r.ok) return []; const b = await r.json() as { opportunities?: OpportunityRecord[] }; return Array.isArray(b.opportunities) ? b.opportunities : []; }),
     ]).then(([p, o]) => { if (mounted) { setPipelines(p); setOpportunities(o); } }).catch(() => {});
+    return () => { mounted = false; };
+  }, [authenticated]);
+
+  useEffect(() => {
+    if (authenticated !== true) return;
+    let mounted = true;
+    void fetch("/api/followups", { credentials: "same-origin" })
+      .then(async (r) => { if (!mounted || !r.ok) return []; const b = await r.json() as { followups?: FollowupRecord[] }; return Array.isArray(b.followups) ? b.followups : []; })
+      .then((f) => { if (mounted) setFollowups(f); })
+      .catch(() => {});
     return () => { mounted = false; };
   }, [authenticated]);
 
@@ -3387,6 +3402,26 @@ export default function Home() {
     setStages(Array.isArray(body.stages) ? body.stages : []);
   };
 
+  const addFollowup = async () => {
+    if (!followupTitle.trim() || !followupDueAt.trim()) return;
+    setFollowupError(null);
+    const result = await fetch("/api/followups", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: followupTitle, dueAt: followupDueAt }) });
+    if (result.status === 401) { setAuthenticated(false); return; }
+    if (!result.ok) { setFollowupError("Follow-up could not be created."); return; }
+    const body = await result.json() as { followup: FollowupRecord };
+    setFollowups((current) => [...current, body.followup]);
+    setFollowupTitle("");
+    setFollowupDueAt("");
+  };
+
+  const completeFollowup = async (followupId: string) => {
+    setFollowupError(null);
+    const result = await fetch(`/api/followups/${followupId}`, { method: "PATCH", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ status: "COMPLETED" }) });
+    if (result.status === 401) { setAuthenticated(false); return; }
+    if (!result.ok) { setFollowupError("Follow-up could not be updated."); return; }
+    setFollowups((current) => current.map((f) => (f.id === followupId ? { ...f, status: "COMPLETED" } : f)));
+  };
+
   const addService = async () => {
     if (!serviceName.trim()) return;
     setServiceError(null);
@@ -5201,6 +5236,43 @@ export default function Home() {
                         <select value={opp.stageId} onChange={(e) => void moveOpportunity(opp.id, e.target.value)} className="premium-input py-1 text-xs">
                           {stages.sort((a, b) => a.position - b.position).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                         </select>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {activeTab === "Follow-ups" ? (
+          <section className="mt-6 space-y-6">
+            {followupError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{followupError}</div> : null}
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+              <h3 className="text-lg font-semibold">New follow-up</h3>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <input placeholder="Follow-up title" value={followupTitle} onChange={(e) => setFollowupTitle(e.target.value)} className="premium-input flex-1 min-w-[200px]" />
+                <input type="datetime-local" value={followupDueAt} onChange={(e) => setFollowupDueAt(e.target.value)} className="premium-input" />
+                <button onClick={() => void addFollowup()} className="premium-btn-primary px-3 py-1 text-sm">Add</button>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+              <h3 className="text-lg font-semibold">Follow-ups</h3>
+              <div className="mt-4 space-y-3">
+                {followups.length === 0 ? <div className="text-sm text-[#a39a86]">No follow-ups yet.</div> : null}
+                {followups.map((f) => (
+                  <div key={f.id} className="flex items-center justify-between rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
+                    <div>
+                      <div className="font-medium">{f.title}</div>
+                      <div className="text-sm text-[#a39a86]">Due: {new Date(f.dueAt).toLocaleString()}</div>
+                      {f.notes ? <div className="text-xs text-[#a39a86] mt-1">{f.notes}</div> : null}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`rounded-full px-2 py-0.5 text-xs ${f.status === "COMPLETED" ? "bg-[rgba(76,175,80,0.15)] text-[#4caf50]" : f.status === "CANCELLED" ? "bg-[rgba(209,85,74,0.15)] text-[#d1554a]" : "bg-[rgba(212,175,55,0.12)] text-[#d4af37]"}`}>
+                        {f.status}
+                      </span>
+                      {f.status === "PENDING" ? (
+                        <button onClick={() => void completeFollowup(f.id)} className="rounded-lg border border-[rgba(76,175,80,0.3)] bg-[rgba(76,175,80,0.08)] px-2 py-0.5 text-xs text-[#4caf50] transition-colors hover:bg-[rgba(76,175,80,0.15)]">Complete</button>
                       ) : null}
                     </div>
                   </div>

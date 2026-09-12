@@ -33,6 +33,7 @@ model Tenant {
   pipelines      Pipeline[]
   opportunities  Opportunity[]
   stages         Stage[]
+  followups      Followup[]
   services         Service[]
   appointments     Appointment[]
   staff            Staff[]
@@ -341,6 +342,7 @@ model Lead {
   tenant               Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   convertedToCustomer  Customer? @relation(fields: [convertedToCustomerId], references: [id], onDelete: SetNull)
   opportunities        Opportunity[]
+  followups            Followup[]
 
   @@unique([tenantId, id])
   @@index([tenantId, status])
@@ -400,11 +402,38 @@ model Opportunity {
   stage        Stage     @relation(fields: [tenantId, stageId], references: [tenantId, id], onDelete: Restrict)
   customer     Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
   lead         Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  followups    Followup[]
 
   @@unique([tenantId, id])
   @@index([tenantId, status])
   @@index([tenantId, pipelineId])
   @@index([tenantId, stageId])
+}
+
+model Followup {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @db.Uuid
+  title        String
+  notes        String?
+  dueAt        DateTime
+  status       String    @default("PENDING")
+  leadId       String?   @db.Uuid
+  customerId   String?   @db.Uuid
+  opportunityId String?  @db.Uuid
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  lead        Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  customer    Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  opportunity Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, id])
+  @@index([tenantId, status])
+  @@index([tenantId, dueAt])
+  @@index([tenantId, leadId])
+  @@index([tenantId, customerId])
+  @@index([tenantId, opportunityId])
 }
 
 model Customer {
@@ -424,6 +453,7 @@ model Customer {
   invoices Invoice[]
   convertedLeads Lead[]
   opportunities Opportunity[]
+  followups     Followup[]
 
   @@unique([tenantId, id])
   @@index([tenantId, isActive])
