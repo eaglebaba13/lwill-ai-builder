@@ -32,6 +32,7 @@ model Tenant {
   leads          Lead[]
   pipelines      Pipeline[]
   opportunities  Opportunity[]
+  stages         Stage[]
   services         Service[]
   appointments     Appointment[]
   staff            Staff[]
