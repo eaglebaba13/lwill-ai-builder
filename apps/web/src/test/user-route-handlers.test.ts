@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import {
   handleGetUser,
   handleListUsers,
+  handleCreateUser,
   handleUpdateUser,
   type UserAuthorization,
   type UserRouteServices,
@@ -29,6 +30,7 @@ function createServices(authorization: UserAuthorization): UserRouteServices {
     authorize: vi.fn().mockResolvedValue(authorization),
     listUsers: vi.fn().mockResolvedValue([{ id: "user-1" }]),
     getUser: vi.fn().mockResolvedValue({ id: "user-1" }),
+    createUser: vi.fn().mockResolvedValue({ id: "user-new", email: "new@example.com", displayName: "New User", membershipId: "m-1" }),
     updateUser: vi.fn().mockResolvedValue({ id: "user-1" }),
   };
 }
@@ -115,5 +117,63 @@ describe("user-runtime authorize(): authentication vs authorization outcome", ()
     const { createUserRouteServices } = await import("../lib/crm/user-runtime");
     const services = createUserRouteServices();
     expect(await services.authorize("tenant.manage")).toEqual({ outcome: "authorized", tenantId: "tenant-1", userId: "user-1" });
+  });
+});
+
+describe("user route handlers: createUser", () => {
+  it("returns 401 for unauthenticated", async () => {
+    const services = createServices({ outcome: "unauthenticated" });
+    expect((await handleCreateUser(request({ email: "a@b.com", displayName: "A", password: "12345678" }), services)).status).toBe(401);
+  });
+
+  it("returns 201 for valid create", async () => {
+    const services = createServices({ outcome: "authorized", tenantId: "t1", userId: "u1" });
+    const result = await handleCreateUser(request({ email: "new@example.com", displayName: "New User", password: "12345678" }), services);
+    expect(result.status).toBe(201);
+    const body = await result.json();
+    expect(body.user.email).toBe("new@example.com");
+  });
+
+  it("passes tenant.manage permission", async () => {
+    const services = createServices({ outcome: "authorized", tenantId: "t1", userId: "u1" });
+    await handleCreateUser(request({ email: "a@b.com", displayName: "A", password: "12345678" }), services);
+    expect(services.authorize).toHaveBeenCalledWith("tenant.manage");
+  });
+
+  it("returns 400 for missing email", async () => {
+    const services = createServices({ outcome: "authorized", tenantId: "t1", userId: "u1" });
+    expect((await handleCreateUser(request({ displayName: "A", password: "12345678" }), services)).status).toBe(400);
+  });
+
+  it("returns 400 for invalid email", async () => {
+    const services = createServices({ outcome: "authorized", tenantId: "t1", userId: "u1" });
+    expect((await handleCreateUser(request({ email: "not-an-email", displayName: "A", password: "12345678" }), services)).status).toBe(400);
+  });
+
+  it("returns 400 for short password", async () => {
+    const services = createServices({ outcome: "authorized", tenantId: "t1", userId: "u1" });
+    expect((await handleCreateUser(request({ email: "a@b.com", displayName: "A", password: "short" }), services)).status).toBe(400);
+  });
+
+  it("returns 400 for missing displayName", async () => {
+    const services = createServices({ outcome: "authorized", tenantId: "t1", userId: "u1" });
+    expect((await handleCreateUser(request({ email: "a@b.com", password: "12345678" }), services)).status).toBe(400);
+  });
+
+  it("returns 400 for unknown fields", async () => {
+    const services = createServices({ outcome: "authorized", tenantId: "t1", userId: "u1" });
+    expect((await handleCreateUser(request({ email: "a@b.com", displayName: "A", password: "12345678", unknown: true }), services)).status).toBe(400);
+  });
+
+  it("returns 409 for duplicate email", async () => {
+    const services = createServices({ outcome: "authorized", tenantId: "t1", userId: "u1" });
+    (services as { createUser: unknown }).createUser = vi.fn().mockRejectedValue(new Error("A user with this email already exists"));
+    expect((await handleCreateUser(request({ email: "dup@example.com", displayName: "A", password: "12345678" }), services)).status).toBe(409);
+  });
+
+  it("returns 400 for invalid JSON", async () => {
+    const services = createServices({ outcome: "authorized", tenantId: "t1", userId: "u1" });
+    const badRequest = new Request("https://builder.lwill.in/api/users", { method: "POST", body: "not-json" });
+    expect((await handleCreateUser(badRequest, services)).status).toBe(400);
   });
 });

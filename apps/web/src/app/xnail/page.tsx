@@ -509,6 +509,12 @@ export default function Home() {
   const [isAssigningRole, setIsAssigningRole] = useState(false);
   const [roleAssignmentError, setRoleAssignmentError] = useState<string | null>(null);
   const [roleAssignmentSuccess, setRoleAssignmentSuccess] = useState<string | null>(null);
+  const [addUserEmail, setAddUserEmail] = useState("");
+  const [addUserDisplayName, setAddUserDisplayName] = useState("");
+  const [addUserPassword, setAddUserPassword] = useState("");
+  const [addUserRoleId, setAddUserRoleId] = useState("");
+  const [addUserError, setAddUserError] = useState<string | null>(null);
+  const [addUserSuccess, setAddUserSuccess] = useState<string | null>(null);
   const [notificationTemplates, setNotificationTemplates] = useState<Array<{ id: string; name: string; channel: string; subject: string | null; body: string; isActive: boolean }>>([]);
   const [isLoadingNotificationTemplates, setIsLoadingNotificationTemplates] = useState(false);
   const [notificationTemplateError, setNotificationTemplateError] = useState<string | null>(null);
@@ -3071,6 +3077,38 @@ export default function Home() {
     setRoleAssignmentBusinessUnitId("");
     setRoleAssignmentBranchId("");
     setIsAssigningRole(false);
+    setProfileVersion((version) => version + 1);
+  };
+
+  const addUser = async () => {
+    if (!addUserEmail.trim() || !addUserDisplayName.trim() || !addUserPassword.trim()) {
+      setAddUserError("Email, display name, and password are required.");
+      return;
+    }
+    if (addUserPassword.length < 8) {
+      setAddUserError("Password must be at least 8 characters.");
+      return;
+    }
+    setAddUserError(null);
+    setAddUserSuccess(null);
+    const result = await fetch("/api/users", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: addUserEmail, displayName: addUserDisplayName, password: addUserPassword, roleId: addUserRoleId || null }),
+    });
+    if (result.status === 401) { setAuthenticated(false); return; }
+    if (result.status === 409) { setAddUserError("A user with this email already exists."); return; }
+    if (!result.ok) {
+      const body = await result.json().catch(() => ({}));
+      setAddUserError(body?.error ?? "User could not be created.");
+      return;
+    }
+    setAddUserSuccess("User created successfully.");
+    setAddUserEmail("");
+    setAddUserDisplayName("");
+    setAddUserPassword("");
+    setAddUserRoleId("");
     setProfileVersion((version) => version + 1);
   };
 
@@ -8711,6 +8749,25 @@ export default function Home() {
                 <div className="text-xs text-[#a39a86]">Roles</div>
                 <div className="mt-1 text-2xl font-bold text-[#d4af37]">{roleAssignmentRoles.length}</div>
               </div>
+            </div>
+
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+              <h3 className="text-lg font-semibold text-[#f5f1e6]">Add User</h3>
+              <p className="mt-1 text-sm text-[#a39a86]">Create a new user account for this tenant.</p>
+              {addUserError ? <div className="mt-3 rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{addUserError}</div> : null}
+              {addUserSuccess ? <div className="mt-3 rounded-xl border border-[rgba(63,174,106,0.3)] bg-[rgba(63,174,106,0.12)] p-3 text-sm text-[#3fae6a]">{addUserSuccess}</div> : null}
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <input placeholder="Email address" type="email" value={addUserEmail} onChange={(e) => setAddUserEmail(e.target.value)} className="premium-input" />
+                <input placeholder="Display name" value={addUserDisplayName} onChange={(e) => setAddUserDisplayName(e.target.value)} className="premium-input" />
+                <input placeholder="Password (min 8 characters)" type="password" value={addUserPassword} onChange={(e) => setAddUserPassword(e.target.value)} className="premium-input" />
+                <select value={addUserRoleId} onChange={(e) => setAddUserRoleId(e.target.value)} className="premium-input">
+                  <option value="">No role (assign later)</option>
+                  {roleAssignmentRoles.map((role) => (
+                    <option key={role.id} value={role.id}>{role.name}</option>
+                  ))}
+                </select>
+              </div>
+              <button onClick={() => void addUser()} className="mt-3 premium-btn-primary px-4 py-2 text-sm">Create User</button>
             </div>
 
             <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">

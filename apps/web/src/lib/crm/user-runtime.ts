@@ -5,6 +5,7 @@ import { createAuthorizationService } from "@lwill/authorization-service/src/aut
 import { loadPermissionGrants } from "@lwill/authorization-prisma/src/load-permission-grants";
 import { prisma } from "../../../../../packages/database/src/client";
 import { createUserService } from "../../../../../packages/authentication-context-prisma/src/user-service";
+import { createPasswordHash } from "../../../../../packages/authentication-context-prisma/src/auth-persistence";
 import type {
   UserAuthorization,
   UserRouteServices,
@@ -43,6 +44,8 @@ export function createUserRouteServices(): UserRouteServices {
     authorize,
     listUsers: (tenantId) => userService.listUsers({ tenantId }),
     getUser: (tenantId, userId) => userService.getUser({ tenantId, userId }),
+    createUser: (tenantId, input, actorUserId) =>
+      userService.createUser({ tenantId, input, actorUserId, hashPassword: createPasswordHash }),
     updateUser: (tenantId, userId, input, actorUserId) =>
       userService.updateUser({ tenantId, userId, input, actorUserId }),
   };

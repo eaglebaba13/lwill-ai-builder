@@ -13,9 +13,22 @@ export interface UserUpdateInput {
   readonly isActive?: boolean;
 }
 
+export interface UserCreateInput {
+  readonly email: string;
+  readonly displayName: string;
+  readonly password: string;
+  readonly roleId?: string | null;
+}
+
 export interface UserService {
   listUsers(args: { tenantId: string }): Promise<readonly UserRecord[]>;
   getUser(args: { tenantId: string; userId: string }): Promise<UserRecord | null>;
+  createUser(args: {
+    tenantId: string;
+    input: UserCreateInput;
+    actorUserId: string;
+    hashPassword?: (password: string) => Promise<string>;
+  }): Promise<UserRecord>;
   updateUser(args: {
     tenantId: string;
     userId: string;
@@ -34,10 +47,21 @@ interface UserPrismaClient {
       where: { tenantId_userId: { tenantId: string; userId: string } };
       include?: { user: { select: { id: true; email: true; displayName: true; isActive: true; createdAt: true; updatedAt: true } } };
     }): Promise<{ id: string; user: UserRecord } | null>;
+    create(args: { data: { tenantId: string; userId: string; isActive: true } }): Promise<{ id: string }>;
   };
   readonly user: {
-    findUnique(args: { where: { id: string }; select: { id: true; email: true; displayName: true; isActive: true; createdAt: true; updatedAt: true } }): Promise<UserRecord | null>;
+    findUnique(args: { where: { id: string } | { email: string }; select: { id: true; email: true; displayName: true; isActive: true; createdAt: true; updatedAt: true } }): Promise<UserRecord | null>;
+    create(args: { data: { email: string; displayName: string; isActive: true } }): Promise<UserRecord>;
     update(args: { where: { id: string }; data: { displayName?: string | null; isActive?: boolean } }): Promise<UserRecord>;
+  };
+  readonly passwordCredential: {
+    create(args: { data: { userId: string; passwordHash: string } }): Promise<unknown>;
+  };
+  readonly membershipRole: {
+    create(args: { data: { tenantId: string; membershipId: string; roleId: string } }): Promise<unknown>;
+  };
+  readonly role: {
+    findFirst(args: { where: { tenantId: string; id: string; isActive: true }; select: { id: true } }): Promise<{ id: string } | null>;
   };
   readonly auditLog: {
     create(args: { data: { tenantId: string; actorUserId: string; action: string; entityType: string; entityId: string; metadata: Record<string, unknown> } }): Promise<unknown>;
@@ -62,6 +86,54 @@ export function createUserService(prisma: UserPrismaClient): UserService {
         return null;
       }
       return { ...membership.user, membershipId: membership.id };
+    },
+    async createUser({ tenantId, input, actorUserId, hashPassword }) {
+      const existing = await prisma.user.findUnique({ where: { email: input.email }, select: { id: true, email: true, displayName: true, isActive: true, createdAt: true, updatedAt: true } });
+      if (existing !== null) {
+        throw new Error("A user with this email already exists");
+      }
+
+      const user = await prisma.user.create({
+        data: { email: input.email, displayName: input.displayName, isActive: true },
+      });
+
+      const hash = hashPassword ? await hashPassword(input.password) : input.password;
+      await prisma.passwordCredential.create({
+        data: { userId: user.id, passwordHash: hash },
+      });
+
+      const membership = await prisma.tenantMembership.create({
+        data: { tenantId, userId: user.id, isActive: true },
+      });
+
+      if (input.roleId) {
+        const role = await prisma.role.findFirst({
+          where: { tenantId, id: input.roleId, isActive: true },
+          select: { id: true },
+        });
+        if (role !== null) {
+          await prisma.membershipRole.create({
+            data: { tenantId, membershipId: membership.id, roleId: role.id },
+          });
+        }
+      }
+
+      try {
+        await prisma.auditLog.create({
+          data: {
+            tenantId,
+            actorUserId,
+            action: "user.created",
+            entityType: "User",
+            entityId: user.id,
+            metadata: { email: input.email, displayName: input.displayName, roleId: input.roleId ?? null },
+          },
+        });
+      } catch {
+        // Audit logging is best-effort
+      }
+
+      return { ...user, membershipId: membership.id };
     },
     async updateUser({ tenantId, userId, input, actorUserId }) {
       const membership = await prisma.tenantMembership.findUnique({
