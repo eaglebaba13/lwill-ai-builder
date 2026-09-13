@@ -35,6 +35,9 @@ model Tenant {
   stages         Stage[]
   followups      Followup[]
   communications Communication[]
+  tags           Tag[]
+  crmNotes       CrmNote[]
+  attachments    Attachment[]
   services         Service[]
   appointments     Appointment[]
   staff            Staff[]
@@ -344,7 +347,9 @@ model Lead {
   convertedToCustomer  Customer? @relation(fields: [convertedToCustomerId], references: [id], onDelete: SetNull)
   opportunities        Opportunity[]
   followups            Followup[]
-  communications       Communication[]
+  communications Communication[]
+  crmNotes       CrmNote[]
+  attachments    Attachment[]
 
   @@unique([tenantId, id])
   @@index([tenantId, status])
@@ -406,6 +411,8 @@ model Opportunity {
   lead         Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
   followups    Followup[]
   communications Communication[]
+  crmNotes       CrmNote[]
+  attachments    Attachment[]
 
   @@unique([tenantId, id])
   @@index([tenantId, status])
@@ -468,6 +475,81 @@ model Communication {
   @@index([tenantId, opportunityId])
 }
 
+model Tag {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @db.Uuid
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant    @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  links  TagLink[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, name])
+  @@index([tenantId, name])
+}
+
+model TagLink {
+  id         String   @id @default(uuid()) @db.Uuid
+  tagId      String   @db.Uuid
+  entityType String
+  entityId   String   @db.Uuid
+  createdAt  DateTime @default(now())
+
+  tag Tag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([tagId, entityType, entityId])
+  @@index([entityType, entityId])
+}
+
+model CrmNote {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @db.Uuid
+  body         String
+  leadId       String?   @db.Uuid
+  customerId   String?   @db.Uuid
+  opportunityId String?  @db.Uuid
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  lead        Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  customer    Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  opportunity Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, id])
+  @@index([tenantId, leadId])
+  @@index([tenantId, customerId])
+  @@index([tenantId, opportunityId])
+  @@index([tenantId, createdAt])
+}
+
+model Attachment {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @db.Uuid
+  name         String
+  url          String
+  mimeType     String?
+  sizeBytes    Int?
+  leadId       String?   @db.Uuid
+  customerId   String?   @db.Uuid
+  opportunityId String?  @db.Uuid
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  lead        Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  customer    Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  opportunity Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, id])
+  @@index([tenantId, leadId])
+  @@index([tenantId, customerId])
+  @@index([tenantId, opportunityId])
+  @@index([tenantId, createdAt])
+}
+
 model Customer {
   id        String   @id @default(uuid()) @db.Uuid
   tenantId  String   @db.Uuid
@@ -487,6 +569,8 @@ model Customer {
   opportunities Opportunity[]
   followups     Followup[]
   communications Communication[]
+  crmNotes       CrmNote[]
+  attachments    Attachment[]
 
   @@unique([tenantId, id])
   @@index([tenantId, isActive])

@@ -180,7 +180,7 @@ function KpiCard({ definition, context }: { readonly definition: RoleDashboardCo
   );
 }
 
-const ALL_TABS = ["Overview", "Customers", "Leads", "Pipeline", "Follow-ups", "Communications", "Services", "Packages", "Memberships", "Inventory", "Staff", "Attendance", "Appointments", "Billing", "Branches", "Reports", "Settings", "Notifications", "Users & Access", "Gateway Accounts", "Marketplace", "Franchise Overview", "Financials", "Territories", "Partners", "Agreements", "Outlets"] as const;
+const ALL_TABS = ["Overview", "Customers", "Leads", "Pipeline", "Follow-ups", "Communications", "Tags & Notes", "Services", "Packages", "Memberships", "Inventory", "Staff", "Attendance", "Appointments", "Billing", "Branches", "Reports", "Settings", "Notifications", "Users & Access", "Gateway Accounts", "Marketplace", "Franchise Overview", "Financials", "Territories", "Partners", "Agreements", "Outlets"] as const;
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<(typeof ALL_TABS)[number]>("Overview");
@@ -248,6 +248,17 @@ export default function Home() {
   const [commSubject, setCommSubject] = useState("");
   const [commContactName, setCommContactName] = useState("");
   const [commError, setCommError] = useState<string | null>(null);
+  type TagRecord = { id: string; tenantId: string; name: string };
+  type CrmNoteRecord = { id: string; tenantId: string; body: string; leadId: string | null; customerId: string | null; opportunityId: string | null; createdAt: string };
+  type AttachmentRecord = { id: string; tenantId: string; name: string; url: string; mimeType: string | null; sizeBytes: number | null; leadId: string | null; customerId: string | null; opportunityId: string | null; createdAt: string };
+  const [tags, setTags] = useState<TagRecord[]>([]);
+  const [crmNotes, setCrmNotes] = useState<CrmNoteRecord[]>([]);
+  const [attachments, setAttachments] = useState<AttachmentRecord[]>([]);
+  const [tagName, setTagName] = useState("");
+  const [noteBody, setNoteBody] = useState("");
+  const [attName, setAttName] = useState("");
+  const [attUrl, setAttUrl] = useState("");
+  const [tagError, setTagError] = useState<string | null>(null);
   const [services, setServices] = useState<ServiceRecord[]>([]);
   const [isLoadingServices, setIsLoadingServices] = useState(false);
   const [serviceError, setServiceError] = useState<string | null>(null);
@@ -858,6 +869,17 @@ export default function Home() {
       .then(async (r) => { if (!mounted || !r.ok) return []; const b = await r.json() as { communications?: CommunicationRecord[] }; return Array.isArray(b.communications) ? b.communications : []; })
       .then((c) => { if (mounted) setCommunications(c); })
       .catch(() => {});
+    return () => { mounted = false; };
+  }, [authenticated]);
+
+  useEffect(() => {
+    if (authenticated !== true) return;
+    let mounted = true;
+    void Promise.all([
+      fetch("/api/tags", { credentials: "same-origin" }).then(async (r) => { if (!mounted || !r.ok) return []; const b = await r.json() as { tags?: TagRecord[] }; return Array.isArray(b.tags) ? b.tags : []; }),
+      fetch("/api/crm-notes", { credentials: "same-origin" }).then(async (r) => { if (!mounted || !r.ok) return []; const b = await r.json() as { notes?: CrmNoteRecord[] }; return Array.isArray(b.notes) ? b.notes : []; }),
+      fetch("/api/attachments", { credentials: "same-origin" }).then(async (r) => { if (!mounted || !r.ok) return []; const b = await r.json() as { attachments?: AttachmentRecord[] }; return Array.isArray(b.attachments) ? b.attachments : []; }),
+    ]).then(([t, n, a]) => { if (mounted) { setTags(t); setCrmNotes(n); setAttachments(a); } }).catch(() => {});
     return () => { mounted = false; };
   }, [authenticated]);
 
@@ -3453,6 +3475,40 @@ export default function Home() {
     setCommContactName("");
   };
 
+  const addTag = async () => {
+    if (!tagName.trim()) return;
+    setTagError(null);
+    const result = await fetch("/api/tags", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: tagName }) });
+    if (result.status === 401) { setAuthenticated(false); return; }
+    if (!result.ok) { setTagError("Tag could not be created."); return; }
+    const body = await result.json() as { tag: TagRecord };
+    setTags((current) => [...current, body.tag]);
+    setTagName("");
+  };
+
+  const addCrmNote = async () => {
+    if (!noteBody.trim()) return;
+    setTagError(null);
+    const result = await fetch("/api/crm-notes", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ body: noteBody }) });
+    if (result.status === 401) { setAuthenticated(false); return; }
+    if (!result.ok) { setTagError("Note could not be created."); return; }
+    const resp = await result.json() as { note: CrmNoteRecord };
+    setCrmNotes((current) => [resp.note, ...current]);
+    setNoteBody("");
+  };
+
+  const addAttachment = async () => {
+    if (!attName.trim() || !attUrl.trim()) return;
+    setTagError(null);
+    const result = await fetch("/api/attachments", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ name: attName, url: attUrl }) });
+    if (result.status === 401) { setAuthenticated(false); return; }
+    if (!result.ok) { setTagError("Attachment could not be recorded."); return; }
+    const resp = await result.json() as { attachment: AttachmentRecord };
+    setAttachments((current) => [resp.attachment, ...current]);
+    setAttName("");
+    setAttUrl("");
+  };
+
   const addService = async () => {
     if (!serviceName.trim()) return;
     setServiceError(null);
@@ -5357,6 +5413,60 @@ export default function Home() {
                     <div className="mt-1 text-sm text-[#a39a86]">{c.body}</div>
                   </div>
                 ))}
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {activeTab === "Tags & Notes" ? (
+          <section className="mt-6 space-y-6">
+            {tagError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{tagError}</div> : null}
+            <div className="grid gap-4 sm:grid-cols-3">
+              <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+                <h3 className="text-lg font-semibold">Tags</h3>
+                <div className="mt-3 space-y-2">
+                  {tags.length === 0 ? <div className="text-sm text-[#a39a86]">No tags yet.</div> : null}
+                  {tags.map((t) => (
+                    <div key={t.id} className="rounded-lg border border-[rgba(212,175,55,0.1)] bg-[#17150f] px-3 py-1.5 text-sm">{t.name}</div>
+                  ))}
+                </div>
+                <div className="mt-3 flex gap-2">
+                  <input placeholder="Tag name" value={tagName} onChange={(e) => setTagName(e.target.value)} className="premium-input flex-1" />
+                  <button onClick={() => void addTag()} className="premium-btn-primary px-3 py-1 text-sm">Add</button>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+                <h3 className="text-lg font-semibold">Notes</h3>
+                <div className="mt-3 space-y-2">
+                  {crmNotes.length === 0 ? <div className="text-sm text-[#a39a86]">No notes yet.</div> : null}
+                  {crmNotes.slice(0, 10).map((n) => (
+                    <div key={n.id} className="rounded-lg border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-2 text-sm">
+                      <div>{n.body}</div>
+                      <div className="text-xs text-[#6b6455] mt-1">{new Date(n.createdAt).toLocaleString()}</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3">
+                  <textarea placeholder="Add a note..." value={noteBody} onChange={(e) => setNoteBody(e.target.value)} className="premium-input w-full" rows={2} />
+                  <button onClick={() => void addCrmNote()} className="premium-btn-primary mt-2 w-full py-1 text-sm">Add note</button>
+                </div>
+              </div>
+              <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+                <h3 className="text-lg font-semibold">Attachments</h3>
+                <div className="mt-3 space-y-2">
+                  {attachments.length === 0 ? <div className="text-sm text-[#a39a86]">No attachments yet.</div> : null}
+                  {attachments.slice(0, 10).map((a) => (
+                    <div key={a.id} className="rounded-lg border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-2 text-sm">
+                      <a href={a.url} target="_blank" rel="noopener noreferrer" className="text-[#d4af37] hover:underline">{a.name}</a>
+                      {a.mimeType ? <span className="ml-2 text-xs text-[#6b6455]">{a.mimeType}</span> : null}
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 space-y-2">
+                  <input placeholder="File name" value={attName} onChange={(e) => setAttName(e.target.value)} className="premium-input w-full" />
+                  <input placeholder="File URL" value={attUrl} onChange={(e) => setAttUrl(e.target.value)} className="premium-input w-full" />
+                  <button onClick={() => void addAttachment()} className="premium-btn-primary w-full py-1 text-sm">Add attachment</button>
+                </div>
               </div>
             </div>
           </section>
