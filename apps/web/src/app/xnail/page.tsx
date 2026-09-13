@@ -560,6 +560,18 @@ export default function Home() {
   const [branchPerformance, setBranchPerformance] = useState<Array<{ branchId: string; branchName: string; staffCount: number; attendanceCount: number }>>([]);
   const [isLoadingBranchPerformance, setIsLoadingBranchPerformance] = useState(false);
   const [branchPerformanceError, setBranchPerformanceError] = useState<string | null>(null);
+  type LeadSourceRow = { source: string; count: number };
+  type FunnelRow = { stageName: string; position: number; count: number; valueCents: number };
+  type ConversionReport = { totalLeads: number; convertedLeads: number; conversionRate: number };
+  type PendingFollowupRow = { id: string; title: string; dueAt: string; entityName: string | null; entityType: string | null };
+  type CustomerGrowthRow = { month: string; count: number };
+  const [crmLeadSource, setCrmLeadSource] = useState<LeadSourceRow[]>([]);
+  const [crmSalesFunnel, setCrmSalesFunnel] = useState<FunnelRow[]>([]);
+  const [crmConversion, setCrmConversion] = useState<ConversionReport | null>(null);
+  const [crmPendingFollowups, setCrmPendingFollowups] = useState<PendingFollowupRow[]>([]);
+  const [crmCustomerGrowth, setCrmCustomerGrowth] = useState<CustomerGrowthRow[]>([]);
+  const [crmReportsLoading, setCrmReportsLoading] = useState(false);
+  const [crmReportsError, setCrmReportsError] = useState<string | null>(null);
   const [franchiseOverview, setFranchiseOverview] = useState<{
     branches: Array<{ branchId: string; branchName: string; isActive: boolean; createdAt: string }>;
     sales: { invoiceCount: number; totalRevenueCents: number; dailyTrend: Array<{ date: string; invoiceCount: number; totalRevenueCents: number }> };
@@ -2514,6 +2526,27 @@ export default function Home() {
           setIsLoadingBranchPerformance(false);
         }
       });
+
+    setCrmReportsLoading(true);
+    setCrmReportsError(null);
+    void Promise.all([
+      fetch("/api/reports/crm/lead-source", { credentials: "same-origin" }).then(async (r) => { if (!mounted || !r.ok) return []; return (await r.json() as LeadSourceRow[]); }),
+      fetch("/api/reports/crm/sales-funnel", { credentials: "same-origin" }).then(async (r) => { if (!mounted || !r.ok) return []; return (await r.json() as FunnelRow[]); }),
+      fetch("/api/reports/crm/conversion", { credentials: "same-origin" }).then(async (r) => { if (!mounted || !r.ok) return null; return (await r.json() as ConversionReport); }),
+      fetch("/api/reports/crm/pending-followups", { credentials: "same-origin" }).then(async (r) => { if (!mounted || !r.ok) return []; return (await r.json() as PendingFollowupRow[]); }),
+      fetch("/api/reports/crm/customer-growth", { credentials: "same-origin" }).then(async (r) => { if (!mounted || !r.ok) return []; return (await r.json() as CustomerGrowthRow[]); }),
+    ]).then(([ls, sf, cv, pf, cg]) => {
+      if (!mounted) return;
+      setCrmLeadSource(Array.isArray(ls) ? ls : []);
+      setCrmSalesFunnel(Array.isArray(sf) ? sf : []);
+      setCrmConversion(cv);
+      setCrmPendingFollowups(Array.isArray(pf) ? pf : []);
+      setCrmCustomerGrowth(Array.isArray(cg) ? cg : []);
+    }).catch(() => {
+      if (mounted) setCrmReportsError("CRM reports could not be loaded.");
+    }).finally(() => {
+      if (mounted) setCrmReportsLoading(false);
+    });
 
     return () => {
       mounted = false;
@@ -8238,6 +8271,89 @@ export default function Home() {
                   ))}
                 </div>
               </div>
+            ) : null}
+            {crmReportsLoading ? <div className="text-sm text-[#a39a86]">Loading CRM reports...</div> : null}
+            {!crmReportsLoading && crmReportsError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{crmReportsError}</div> : null}
+            {!crmReportsLoading && !crmReportsError ? (
+              <>
+                {crmConversion !== null ? (
+                  <div className="mt-6 rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5 md:col-span-2 lg:col-span-4">
+                    <h2 className="text-xl font-semibold">CRM Overview</h2>
+                    <div className="mt-4 grid gap-4 md:grid-cols-3">
+                      <div className="rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
+                        <div className="text-xs uppercase tracking-[0.18em] text-[#a39a86]">Total Leads</div>
+                        <div className="mt-2 text-2xl font-semibold">{crmConversion.totalLeads}</div>
+                      </div>
+                      <div className="rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
+                        <div className="text-xs uppercase tracking-[0.18em] text-[#a39a86]">Converted</div>
+                        <div className="mt-2 text-2xl font-semibold">{crmConversion.convertedLeads}</div>
+                      </div>
+                      <div className="rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
+                        <div className="text-xs uppercase tracking-[0.18em] text-[#a39a86]">Conversion Rate</div>
+                        <div className="mt-2 text-2xl font-semibold">{crmConversion.conversionRate}%</div>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+                {crmLeadSource.length > 0 ? (
+                  <div className="mt-6 rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+                    <h2 className="text-xl font-semibold">Lead Source</h2>
+                    <div className="mt-4 space-y-3">
+                      {crmLeadSource.map((row) => (
+                        <div key={row.source} className="flex items-center justify-between rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
+                          <div className="font-medium">{row.source}</div>
+                          <div className="text-sm text-[#a39a86]">{row.count} lead{row.count === 1 ? "" : "s"}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                {crmSalesFunnel.length > 0 ? (
+                  <div className="mt-6 rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+                    <h2 className="text-xl font-semibold">Sales Funnel</h2>
+                    <div className="mt-4 space-y-3">
+                      {crmSalesFunnel.map((row) => (
+                        <div key={row.stageName} className="flex items-center justify-between rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
+                          <div>
+                            <div className="font-medium">{row.stageName}</div>
+                            <div className="text-sm text-[#a39a86]">{row.count} opportunit{row.count === 1 ? "y" : "ies"}</div>
+                          </div>
+                          <div className="text-right text-sm text-[#a39a86]">₹{row.valueCents / 100}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                {crmPendingFollowups.length > 0 ? (
+                  <div className="mt-6 rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+                    <h2 className="text-xl font-semibold">Pending Follow-ups</h2>
+                    <div className="mt-4 space-y-3">
+                      {crmPendingFollowups.slice(0, 10).map((f) => (
+                        <div key={f.id} className="flex items-center justify-between rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
+                          <div>
+                            <div className="font-medium">{f.title}</div>
+                            {f.entityType ? <div className="text-xs text-[#a39a86]">{f.entityType}</div> : null}
+                          </div>
+                          <div className="text-xs text-[#a39a86]">Due: {new Date(f.dueAt).toLocaleDateString()}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                {crmCustomerGrowth.length > 0 ? (
+                  <div className="mt-6 rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+                    <h2 className="text-xl font-semibold">Customer Growth</h2>
+                    <div className="mt-4 space-y-3">
+                      {crmCustomerGrowth.map((row) => (
+                        <div key={row.month} className="flex items-center justify-between rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
+                          <div className="font-medium">{row.month}</div>
+                          <div className="text-sm text-[#a39a86]">{row.count} customer{row.count === 1 ? "" : "s"}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </>
             ) : null}
           </section>
         ) : null}
