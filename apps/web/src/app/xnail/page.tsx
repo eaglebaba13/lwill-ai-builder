@@ -180,7 +180,7 @@ function KpiCard({ definition, context }: { readonly definition: RoleDashboardCo
   );
 }
 
-const ALL_TABS = ["Overview", "Customers", "Leads", "Pipeline", "Follow-ups", "Services", "Packages", "Memberships", "Inventory", "Staff", "Attendance", "Appointments", "Billing", "Branches", "Reports", "Settings", "Notifications", "Users & Access", "Gateway Accounts", "Marketplace", "Franchise Overview", "Financials", "Territories", "Partners", "Agreements", "Outlets"] as const;
+const ALL_TABS = ["Overview", "Customers", "Leads", "Pipeline", "Follow-ups", "Communications", "Services", "Packages", "Memberships", "Inventory", "Staff", "Attendance", "Appointments", "Billing", "Branches", "Reports", "Settings", "Notifications", "Users & Access", "Gateway Accounts", "Marketplace", "Franchise Overview", "Financials", "Territories", "Partners", "Agreements", "Outlets"] as const;
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<(typeof ALL_TABS)[number]>("Overview");
@@ -240,6 +240,14 @@ export default function Home() {
   const [followupTitle, setFollowupTitle] = useState("");
   const [followupDueAt, setFollowupDueAt] = useState("");
   const [followupError, setFollowupError] = useState<string | null>(null);
+  type CommunicationRecord = { id: string; tenantId: string; channel: string; direction: string; contactName: string | null; subject: string | null; body: string; communicatedAt: string; leadId: string | null; customerId: string | null; opportunityId: string | null };
+  const [communications, setCommunications] = useState<CommunicationRecord[]>([]);
+  const [commChannel, setCommChannel] = useState("email");
+  const [commDirection, setCommDirection] = useState("outbound");
+  const [commBody, setCommBody] = useState("");
+  const [commSubject, setCommSubject] = useState("");
+  const [commContactName, setCommContactName] = useState("");
+  const [commError, setCommError] = useState<string | null>(null);
   const [services, setServices] = useState<ServiceRecord[]>([]);
   const [isLoadingServices, setIsLoadingServices] = useState(false);
   const [serviceError, setServiceError] = useState<string | null>(null);
@@ -839,6 +847,16 @@ export default function Home() {
     void fetch("/api/followups", { credentials: "same-origin" })
       .then(async (r) => { if (!mounted || !r.ok) return []; const b = await r.json() as { followups?: FollowupRecord[] }; return Array.isArray(b.followups) ? b.followups : []; })
       .then((f) => { if (mounted) setFollowups(f); })
+      .catch(() => {});
+    return () => { mounted = false; };
+  }, [authenticated]);
+
+  useEffect(() => {
+    if (authenticated !== true) return;
+    let mounted = true;
+    void fetch("/api/communications", { credentials: "same-origin" })
+      .then(async (r) => { if (!mounted || !r.ok) return []; const b = await r.json() as { communications?: CommunicationRecord[] }; return Array.isArray(b.communications) ? b.communications : []; })
+      .then((c) => { if (mounted) setCommunications(c); })
       .catch(() => {});
     return () => { mounted = false; };
   }, [authenticated]);
@@ -3422,6 +3440,19 @@ export default function Home() {
     setFollowups((current) => current.map((f) => (f.id === followupId ? { ...f, status: "COMPLETED" } : f)));
   };
 
+  const addCommunication = async () => {
+    if (!commBody.trim()) return;
+    setCommError(null);
+    const result = await fetch("/api/communications", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ channel: commChannel, direction: commDirection, contactName: commContactName || null, subject: commSubject || null, body: commBody, communicatedAt: new Date().toISOString() }) });
+    if (result.status === 401) { setAuthenticated(false); return; }
+    if (!result.ok) { setCommError("Communication could not be recorded."); return; }
+    const body = await result.json() as { communication: CommunicationRecord };
+    setCommunications((current) => [body.communication, ...current]);
+    setCommBody("");
+    setCommSubject("");
+    setCommContactName("");
+  };
+
   const addService = async () => {
     if (!serviceName.trim()) return;
     setServiceError(null);
@@ -5275,6 +5306,55 @@ export default function Home() {
                         <button onClick={() => void completeFollowup(f.id)} className="rounded-lg border border-[rgba(76,175,80,0.3)] bg-[rgba(76,175,80,0.08)] px-2 py-0.5 text-xs text-[#4caf50] transition-colors hover:bg-[rgba(76,175,80,0.15)]">Complete</button>
                       ) : null}
                     </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {activeTab === "Communications" ? (
+          <section className="mt-6 space-y-6">
+            {commError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{commError}</div> : null}
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+              <h3 className="text-lg font-semibold">Log communication</h3>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <select value={commChannel} onChange={(e) => setCommChannel(e.target.value)} className="premium-input">
+                  <option value="email">Email</option>
+                  <option value="whatsapp">WhatsApp</option>
+                  <option value="sms">SMS</option>
+                  <option value="phone">Phone</option>
+                  <option value="in_person">In person</option>
+                  <option value="other">Other</option>
+                </select>
+                <select value={commDirection} onChange={(e) => setCommDirection(e.target.value)} className="premium-input">
+                  <option value="outbound">Outbound</option>
+                  <option value="inbound">Inbound</option>
+                </select>
+                <input placeholder="Contact name (optional)" value={commContactName} onChange={(e) => setCommContactName(e.target.value)} className="premium-input" />
+                <input placeholder="Subject (optional)" value={commSubject} onChange={(e) => setCommSubject(e.target.value)} className="premium-input" />
+                <textarea placeholder="Message body" value={commBody} onChange={(e) => setCommBody(e.target.value)} className="premium-input sm:col-span-2" rows={3} />
+                <button onClick={() => void addCommunication()} className="premium-btn-primary px-3 py-1 text-sm sm:col-span-2">Log communication</button>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+              <h3 className="text-lg font-semibold">Communication history</h3>
+              <div className="mt-4 space-y-3">
+                {communications.length === 0 ? <div className="text-sm text-[#a39a86]">No communications yet.</div> : null}
+                {communications.map((c) => (
+                  <div key={c.id} className="rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className={`rounded-full px-2 py-0.5 text-xs ${c.direction === "inbound" ? "bg-[rgba(76,175,80,0.15)] text-[#4caf50]" : "bg-[rgba(212,175,55,0.12)] text-[#d4af37]"}`}>
+                          {c.direction}
+                        </span>
+                        <span className="rounded-full px-2 py-0.5 text-xs bg-[rgba(100,100,100,0.2)] text-[#a39a86]">{c.channel}</span>
+                        {c.contactName ? <span className="text-sm text-[#a39a86]">{c.contactName}</span> : null}
+                      </div>
+                      <div className="text-xs text-[#6b6455]">{new Date(c.communicatedAt).toLocaleString()}</div>
+                    </div>
+                    {c.subject ? <div className="mt-1 font-medium text-sm">{c.subject}</div> : null}
+                    <div className="mt-1 text-sm text-[#a39a86]">{c.body}</div>
                   </div>
                 ))}
               </div>
