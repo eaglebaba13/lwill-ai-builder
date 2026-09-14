@@ -3062,7 +3062,9 @@ export default function Home() {
         ? { kind: "business-unit" as const, businessUnitId: roleAssignmentBusinessUnitId }
         : scopeType === "BRANCH"
           ? { kind: "branch" as const, businessUnitId: roleAssignmentBusinessUnitId, branchId: roleAssignmentBranchId }
-          : { kind: "tenant" as const };
+          : scopeType === "TERRITORY"
+            ? { kind: "territory" as const, territoryId: roleAssignmentTerritoryId }
+            : { kind: "tenant" as const };
 
     const result = await fetch("/api/membership-roles", {
       method: "POST",

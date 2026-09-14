@@ -11,12 +11,13 @@ export interface MembershipRoleCreateInput {
   readonly scope:
     | { readonly kind: "tenant" }
     | { readonly kind: "business-unit"; readonly businessUnitId: string }
-    | { readonly kind: "branch"; readonly businessUnitId: string; readonly branchId: string };
+    | { readonly kind: "branch"; readonly businessUnitId: string; readonly branchId: string }
+    | { readonly kind: "territory"; readonly territoryId: string };
 }
 
 export interface MembershipRoleRemoveInput {
   readonly assignmentId: string;
-  readonly scope: { readonly kind: "tenant" } | { readonly kind: "business-unit" } | { readonly kind: "branch" };
+  readonly scope: { readonly kind: "tenant" } | { readonly kind: "business-unit" } | { readonly kind: "branch" } | { readonly kind: "territory" };
 }
 
 export interface MembershipRoleRouteServices {
@@ -52,7 +53,7 @@ function parseScope(input: unknown): MembershipRoleCreateInput["scope"] | null {
   }
   const record = input as Record<string, unknown>;
   const kind = record.kind;
-  if (kind !== "tenant" && kind !== "business-unit" && kind !== "branch") {
+  if (kind !== "tenant" && kind !== "business-unit" && kind !== "branch" && kind !== "territory") {
     return null;
   }
   if (kind === "tenant") {
@@ -63,6 +64,12 @@ function parseScope(input: unknown): MembershipRoleCreateInput["scope"] | null {
       return null;
     }
     return { kind: "business-unit", businessUnitId: record.businessUnitId };
+  }
+  if (kind === "territory") {
+    if (typeof record.territoryId !== "string") {
+      return null;
+    }
+    return { kind: "territory", territoryId: record.territoryId };
   }
   if (typeof record.businessUnitId !== "string" || typeof record.branchId !== "string") {
     return null;
