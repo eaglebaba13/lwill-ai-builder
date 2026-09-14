@@ -85,7 +85,7 @@ interface SettlementPrismaClient {
   };
   readonly franchiseSettlement: {
     create(args: { data: Record<string, unknown> }): Promise<FranchiseSettlementRecord>;
-    findUnique(args: { where: { id: string }; include?: Record<string, unknown> }): Promise<Record<string, unknown> | null>;
+    findUnique(args: { where: { id: string }; include?: Record<string, unknown> }): Promise<FranchiseSettlementRecord | null>;
     findMany(args: { where: Record<string, unknown>; orderBy?: Record<string, unknown> }): Promise<readonly FranchiseSettlementRecord[]>;
     update(args: { where: { id: string }; data: Record<string, unknown> }): Promise<FranchiseSettlementRecord>;
   };
