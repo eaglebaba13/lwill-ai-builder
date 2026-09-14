@@ -1,10 +1,11 @@
 # LWILL AI BUILDER — Franchise Settlement Business Decision Sheet
 
 **Document ID:** LWILL-DOC-025-SETTLEMENT-BUSINESS-DECISIONS  
-**Version:** 1.0  
-**Status:** Draft — Pending Business/Finance/Legal Approval  
+**Version:** 2.0  
+**Status:** APPROVED — Business Baseline Complete  
 **Branch:** `phase-1d-native-auth`  
-**Created:** 2026-09-14
+**Created:** 2026-09-14  
+**Updated:** 2026-09-14
 
 **Purpose:** Make every unresolved franchise settlement and payment decision explicit so business, finance, and legal can approve or reject it before engineering implementation begins.
 
@@ -18,22 +19,6 @@
 - `docs/LWILL-DOC-023-Finance-Accounting-SRS-v1.0.txt`
 - `docs/franchise-agreements/X NAILS  Franchise Agreement - Kushwaha.txt`
 - `docs/franchise-agreements/X NAILS  Franchise Agreement - HUF.txt`
-
----
-
-## How to Use This Document
-
-1. Read each FR-SET decision.
-2. Review the source evidence.
-3. Select an option or write a modification.
-4. Record the decision in the **Decision** field.
-5. Sign in the **Approval Summary** table at the end.
-
-**Decision field options:**
-- **APPROVE OPTION A** — accept Option A as written
-- **APPROVE OPTION B** — accept Option B as written
-- **MODIFY** — write the approved modification in the notes
-- **DEFER** — postpone to a future phase
 
 ---
 
@@ -84,7 +69,36 @@ Franchise settlement must remain architecturally separate from customer invoice 
 
 ---
 
-## FR-SET-001: Settlement Period
+## Approved Settlement Baseline
+
+All 20 FR-SET decisions are approved. Summary:
+
+| FR-SET | Decision | Approved Option | Key Rule |
+|--------|----------|-----------------|----------|
+| 001 | Settlement Period | **A** | Calendar month, 1st–last day. Statement/payment due by 5th Working Day of succeeding month. |
+| 002 | Statement Content | **B** | Full statement: period, gross sales, GST, net sales, MG, variable return, higher-of payout, royalty, line-item breakdown, previous balance, adjustments, amount paid, outstanding balance. |
+| 003 | Settlement = Payout | **A** | Settlement amount = existing payout calculation result. No duplicate formulas. |
+| 004 | Settlement Lifecycle | **B** | CALCULATED → APPROVED → PARTIALLY_PAID → PAID |
+| 005 | Approval Workflow | **B** | Two-step: Accountant generates → Tenant Admin approves. |
+| 006 | Payment Methods | **B** | Bank Transfer, UPI. No cash, cheque, or configurable methods. |
+| 007 | Payment Statuses | **B** | PENDING → CONFIRMED / FAILED. No REVERSED. |
+| 008 | Partial Payment | **B** | Allowed. Multiple payments per settlement until fully paid. |
+| 009 | Outstanding Balance | **B** | Tracked and carries forward. No additional carry-forward rules. |
+| 010 | Reconciliation | **A** | No automated reconciliation. Manual verification by Finance. Bank reconciliation is DOC-023/ADR-016. |
+| 011 | Adjustments | **B** | Manual categorized adjustments allowed. Operational losses/depreciation/business losses PROHIBITED per agreement clause 2.4A. Adjustment category taxonomy: NOT SPECIFIED. |
+| 012 | Refund Workflow | **A** | Manual, outside platform. Platform may track agreement-defined refund amount/timing where supported. No termination/refund workflow in settlement phase. |
+| 013 | Franchise-Sale Commission | **A** | Included in monthly settlement when agreement-defined commission trigger occurs. "Successful franchise sold" definition: NOT SPECIFIED. |
+| 014 | Renewal Fee | **A** | Manual. Platform tracks agreement dates. No renewal workflow in settlement phase. |
+| 015 | Tax Treatment | **A** | Settlement does NOT calculate GST/TDS/tax. Records gross amounts. Finance handles tax externally. **This does NOT mean taxes are legally inapplicable.** |
+| 016 | Dispute Workflow | **A** | No software dispute workflow. Disputes handled externally per agreement/legal process. |
+| 017 | Settlement Reversal | **B** | Supported with audit. Reversed settlement remains historically recorded, never deleted. Reversal accounting behavior: NOT SPECIFIED. |
+| 018 | Settlement RBAC | **C** | Four permissions: `settlement.view`, `settlement.generate`, `settlement.approve`, `settlement.pay`. Role mapping: NOT YET ASSIGNED. |
+| 019 | Settlement Data Model | **APPROVED** | Entities: `FranchiseSettlement`, `FranchiseSettlementLine`, `FranchisePayment`. See detailed requirements below. |
+| 020 | Finance/GL | **A** | No GL integration. No accounting entries. DOC-023 Finance/GL is separate future implementation. |
+
+---
+
+## FR-SET-001: Settlement Period — APPROVED
 
 ### Source Evidence
 
@@ -96,11 +110,11 @@ Both agreements (clause 2.3 / 2.4):
 
 > *"The Company shall provide complete revenue statements on or before the 5th Working Day of every succeeding month."*
 
-### Current Status
+### Decision
 
-**REQUIRES APPROVAL**
+**APPROVE OPTION A**
 
-The agreement implies monthly calculation and monthly statement/payment, but does not explicitly define a "settlement period" as a system concept.
+Calendar month: settlement period = 1st to last day of each calendar month. Statement and payment due by 5th Working Day of the following month.
 
 ### Implementation Impact
 
@@ -110,26 +124,9 @@ The settlement period determines:
 - Outstanding balance carry-forward periods
 - Reporting period on statements
 
-### Proposed Options
-
-| Option | Description |
-|--------|-------------|
-| **A** | Calendar month: settlement period = 1st to last day of each calendar month. Statement and payment due by 5th Working Day of the following month. |
-| **B** | Custom period: configurable start/end dates per settlement. More flexible but more complex. |
-
-### Approving Authority
-
-**BUSINESS / FINANCE**
-
-### Decision
-
-**APPROVE OPTION A / APPROVE OPTION B / MODIFY / DEFER**
-
-Notes: _______________________________________________________
-
 ---
 
-## FR-SET-002: Statement Content
+## FR-SET-002: Statement Content — APPROVED
 
 ### Source Evidence
 
@@ -139,174 +136,79 @@ Both agreements (clause 2.3):
 Both agreements (clause 2.4):
 > *"The Company shall provide complete revenue statements"*
 
-### Current Status
-
-**REQUIRES APPROVAL**
-
-The agreement requires "detailed" and "complete" statements but does not specify exact fields.
-
-### Implementation Impact
-
-Statement content determines what the settlement system displays to franchise partners. Incomplete statements may cause disputes.
-
-### Fields Derivable from Existing Commercial Rules
-
-| Field | Source |
-|-------|--------|
-| Reporting period | Agreement clause 2.3 |
-| Gross Sales | Agreement clause 2.2A |
-| GST | NP-01 (approved) |
-| Net Sales | NP-01 (approved) |
-| Revenue Distribution (Franchise Owner 20%) | Agreement clause 2.2A |
-| MG | Agreement clause 2.3 |
-| Variable Return | NP-02 (approved) |
-| Higher-of Payout | NP-02 (approved) |
-| Territory Royalty | Agreement clause 2.2C |
-| Amount Payable | Derived |
-
-### Fields Requiring Explicit Approval
-
-| Field | Status |
-|-------|--------|
-| Line-item breakdown (MG, variable, royalty as separate lines) | **REQUIRES APPROVAL** |
-| Previous period balance / carry-forward | **NOT SPECIFIED** |
-| Adjustments detail | **NOT SPECIFIED** |
-| Amount already paid | **NOT SPECIFIED** |
-| Outstanding balance | **NOT SPECIFIED** |
-| Payment method / reference | **NOT SPECIFIED** |
-| Digital signature / authorization mark | **NOT SPECIFIED** |
-
-### Proposed Options
-
-| Option | Description |
-|--------|-------------|
-| **A** | Minimal: period, gross sales, GST, net sales, MG, variable return, higher-of payout, royalty, total payable. No outstanding balance or previous-period information. |
-| **B** | Full: all of Option A plus line-item breakdown, previous balance, adjustments, amount paid, outstanding balance. |
-
-### Approving Authority
-
-**BUSINESS / FINANCE**
-
 ### Decision
 
-**APPROVE OPTION A / APPROVE OPTION B / MODIFY / DEFER**
+**APPROVE OPTION B**
 
-Notes: _______________________________________________________
+Full statement:
+- period
+- gross sales
+- GST
+- net sales
+- MG
+- variable return
+- higher-of payout
+- royalty
+- line-item breakdown
+- previous balance
+- adjustments
+- amount paid
+- outstanding balance
+
+Do not add fields beyond these unless already required by another approved source.
 
 ---
 
-## FR-SET-003: Settlement Relationship to Payout
+## FR-SET-003: Settlement Relationship to Payout — APPROVED
 
 ### Source Evidence
 
 Both agreements (clause 2.3):
 > *"the Company shall calculate the total amount payable to the Franchise Partner, including revenue sharing, franchise commissions, royalties and all other earnings under this Agreement."*
 
-### Current Status
-
-**REQUIRES APPROVAL**
-
-The existing payout report calculates the total eligible amount. The question is whether this calculated amount IS the settlement amount, or whether additional steps (adjustments, commissions, deductions) intervene.
-
-### Implementation Impact
-
-Determines whether settlement is a direct wrapper around the payout calculation or requires additional business logic.
-
-### Proposed Options
-
-| Option | Description |
-|--------|-------------|
-| **A** | Settlement amount = payout calculation result. The existing payout report produces the final settlement amount. No additional calculation steps. |
-| **B** | Settlement amount = payout calculation + additional components (commission, adjustments, etc.). Requires defining the additional components first. |
-
-### Approving Authority
-
-**BUSINESS / FINANCE**
-
 ### Decision
 
-**APPROVE OPTION A / APPROVE OPTION B / MODIFY / DEFER**
+**APPROVE OPTION A**
 
-Notes: _______________________________________________________
+Settlement amount = existing payout calculation result. Settlement must consume the existing commercial calculation engine. Do not duplicate or redesign commercial formulas.
 
 ---
 
-## FR-SET-004: Settlement Lifecycle
+## FR-SET-004: Settlement Lifecycle — APPROVED
 
 ### Source Evidence
 
 No authoritative source defines settlement lifecycle states.
 
-### Current Status
-
-**NOT SPECIFIED**
-
-### Implementation Impact
-
-Without defined lifecycle states, the settlement engine cannot track whether a settlement is draft, calculated, approved, paid, or disputed. This is the foundational design decision for the settlement system.
-
-### Proposed Options
-
-| Option | States | Description |
-|--------|--------|-------------|
-| **A** | CALCULATED → APPROVED → PAID | Minimal: settlement is calculated, then approved for payment, then marked paid when payment is recorded. |
-| **B** | CALCULATED → APPROVED → PARTIALLY_PAID → PAID | Adds partial payment support. |
-| **C** | CALCULATED → SUBMITTED → APPROVED → PARTIALLY_PAID → PAID → DISPUTED → REVERSED | Full lifecycle with dispute and reversal. Most complex. |
-| **D** | Custom | Business defines the exact states needed. |
-
-**Note:** The states listed above are examples only. Each state must be explicitly approved.
-
-### Approving Authority
-
-**BUSINESS / FINANCE / TECHNICAL**
-
 ### Decision
 
-**APPROVE OPTION A / APPROVE OPTION B / APPROVE OPTION C / APPROVE OPTION D / MODIFY / DEFER**
+**APPROVE OPTION B**
 
-Notes: _______________________________________________________
+Settlement lifecycle: CALCULATED → APPROVED → PARTIALLY_PAID → PAID
+
+Do not add DISPUTED, REVERSED, SUBMITTED, FAILED or other settlement states.
 
 ---
 
-## FR-SET-005: Approval Workflow
+## FR-SET-005: Approval Workflow — APPROVED
 
 ### Source Evidence
 
 No authoritative source defines who generates, reviews, or approves settlements.
 
-### Current Status
-
-**NOT SPECIFIED**
-
-### Implementation Impact
-
-Without an approval workflow, settlements cannot be authorized for payment. This affects:
-- Who can generate a settlement
-- Who can approve it for payment
-- Whether multiple approval levels exist
-- Whether the franchise partner can view or dispute
-
-### Proposed Options
-
-| Option | Description |
-|--------|-------------|
-| **A** | Single-step: Tenant Admin (or authorized role) generates and approves in one step. Simplest. |
-| **B** | Two-step: Accountant generates → Tenant Admin approves. Separation of duties. |
-| **C** | Three-step: Accountant generates → Finance Manager reviews → Tenant Admin approves. Maximum control. |
-
-### Approving Authority
-
-**BUSINESS**
-
 ### Decision
 
-**APPROVE OPTION A / APPROVE OPTION B / APPROVE OPTION C / MODIFY / DEFER**
+**APPROVE OPTION B**
 
-Notes: _______________________________________________________
+Two-step approval:
+- Accountant generates settlement
+- Tenant Admin approves settlement
+
+Do not introduce additional approval levels.
 
 ---
 
-## FR-SET-006: Payment Methods
+## FR-SET-006: Payment Methods — APPROVED
 
 ### Source Evidence
 
@@ -314,40 +216,19 @@ No authoritative source specifies how franchise partners are paid.
 
 ADR 016 (line 440): *"Payment method taxonomy: NOT SPECIFIED — APPROVAL REQUIRED. Current implementation uses free-text `method` field."*
 
-### Current Status
-
-**NOT SPECIFIED**
-
-### Implementation Impact
-
-Payment method determines:
-- How payments are recorded in the system
-- What reference information is captured
-- Whether gateway integration is needed
-- Whether proof of payment is required
-
-### Proposed Options
-
-| Option | Methods | Description |
-|--------|---------|-------------|
-| **A** | Bank Transfer (NEFT/RTGS/IMPS) only | Single method, simplest to implement. Requires bank reference number. |
-| **B** | Bank Transfer + UPI | Adds UPI as a second method. Requires UPI reference. |
-| **C** | Bank Transfer + UPI + Cash | Adds cash. Cash payments require manual confirmation. |
-| **D** | Configurable list | Admin can configure available methods per tenant. Most flexible. |
-
-### Approving Authority
-
-**BUSINESS / FINANCE**
-
 ### Decision
 
-**APPROVE OPTION A / APPROVE OPTION B / APPROVE OPTION C / APPROVE OPTION D / MODIFY / DEFER**
+**APPROVE OPTION B**
 
-Notes: _______________________________________________________
+Payment methods:
+- Bank Transfer
+- UPI
+
+Do not add cash, cheque or configurable payment methods.
 
 ---
 
-## FR-SET-007: Payment Statuses
+## FR-SET-007: Payment Statuses — APPROVED
 
 ### Source Evidence
 
@@ -355,37 +236,17 @@ No authoritative source defines payment status states.
 
 ADR 016 (line 437): *"Payment status model (PAID/PARTIAL/OUTSTANDING/REFUNDED): NOT SPECIFIED — APPROVAL REQUIRED."*
 
-### Current Status
-
-**NOT SPECIFIED**
-
-### Implementation Impact
-
-Payment status determines how the system tracks whether a settlement has been fulfilled.
-
-### Proposed Options
-
-| Option | States | Description |
-|--------|--------|-------------|
-| **A** | CONFIRMED only | Every recorded payment is immediately confirmed. Simplest. No failed/reversed states. |
-| **B** | PENDING → CONFIRMED / FAILED | Adds pending state for async payment confirmation. |
-| **C** | PENDING → CONFIRMED → REVERSED | Adds reversal capability. |
-
-**Note:** States listed are examples only.
-
-### Approving Authority
-
-**BUSINESS / FINANCE**
-
 ### Decision
 
-**APPROVE OPTION A / APPROVE OPTION B / APPROVE OPTION C / MODIFY / DEFER**
+**APPROVE OPTION B**
 
-Notes: _______________________________________________________
+Payment lifecycle: PENDING → CONFIRMED / FAILED
+
+Do not add REVERSED unless separately approved in a future decision.
 
 ---
 
-## FR-SET-008: Partial Payment
+## FR-SET-008: Partial Payment — APPROVED
 
 ### Source Evidence
 
@@ -393,41 +254,15 @@ No authoritative source addresses whether a franchise settlement may be partiall
 
 The agreement uses singular "pay" (clause 2.3): *"the Company shall pay the higher actual earnings"* — which could imply full payment, but is not explicit.
 
-### Current Status
-
-**NOT SPECIFIED**
-
-### Implementation Impact
-
-If partial payments are supported:
-- Outstanding balance tracking is required
-- Settlement status must support PARTIALLY_PAID
-- Multiple payment records per settlement are needed
-
-If partial payments are NOT supported:
-- Each settlement is either fully paid or unpaid
-- Simpler implementation
-
-### Proposed Options
-
-| Option | Description |
-|--------|-------------|
-| **A** | Full payment only: each settlement must be paid in full. No partial payments. |
-| **B** | Partial payments allowed: settlement can be paid in installments. Outstanding balance tracked. |
-
-### Approving Authority
-
-**BUSINESS / FINANCE**
-
 ### Decision
 
-**APPROVE OPTION A / APPROVE OPTION B / MODIFY / DEFER**
+**APPROVE OPTION B**
 
-Notes: _______________________________________________________
+Partial payments are allowed. A settlement may receive multiple payments until fully paid.
 
 ---
 
-## FR-SET-009: Outstanding Balance
+## FR-SET-009: Outstanding Balance — APPROVED
 
 ### Source Evidence
 
@@ -435,37 +270,15 @@ No explicit source requires outstanding balance tracking across periods.
 
 Agreement clause 6.1 mentions "outstanding dues, damages or liabilities" in refund context, which implies outstanding amounts can exist.
 
-### Current Status
-
-**NOT SPECIFIED**
-
-### Implementation Impact
-
-If outstanding balances are tracked:
-- Each settlement records total payable, total paid, and outstanding
-- Outstanding from one period can carry forward to the next
-- Reporting can show total outstanding per partner
-
-### Proposed Options
-
-| Option | Description |
-|--------|-------------|
-| **A** | No carry-forward: each settlement is independent. Outstanding from one period does not affect the next. |
-| **B** | Carry-forward: outstanding balance from period N becomes opening balance for period N+1. |
-
-### Approving Authority
-
-**BUSINESS / FINANCE**
-
 ### Decision
 
-**APPROVE OPTION A / APPROVE OPTION B / MODIFY / DEFER**
+**APPROVE OPTION B**
 
-Notes: _______________________________________________________
+Outstanding balance is tracked and carries forward. Do not invent additional carry-forward rules beyond tracking the outstanding obligation.
 
 ---
 
-## FR-SET-010: Reconciliation
+## FR-SET-010: Reconciliation — APPROVED
 
 ### Source Evidence
 
@@ -475,76 +288,34 @@ ADR 016 (line 447): *"DOC-023 bank reconciliation is a separate Finance capabili
 
 No source defines franchise-specific reconciliation.
 
-### Current Status
-
-**NOT SPECIFIED**
-
-### Implementation Impact
-
-Reconciliation ensures that recorded payments match actual bank transactions. Without it, there is no automated way to verify that recorded payments were actually received.
-
-### Proposed Options
-
-| Option | Description |
-|--------|-------------|
-| **A** | No automated reconciliation: payments are recorded manually with reference numbers. Manual verification by finance team. |
-| **B** | Basic matching: system matches payment reference against bank statement upload. |
-| **C** | Full reconciliation: integrated with bank API for automated matching. Requires bank integration (not currently available). |
-
-### Approving Authority
-
-**FINANCE / TECHNICAL**
-
 ### Decision
 
-**APPROVE OPTION A / APPROVE OPTION B / APPROVE OPTION C / MODIFY / DEFER**
+**APPROVE OPTION A**
 
-Notes: _______________________________________________________
+No automated reconciliation in the settlement engine. Payments are recorded with references and manually verified by Finance. Bank reconciliation remains a separate Finance capability under DOC-023 / ADR-016.
 
 ---
 
-## FR-SET-011: Adjustments
+## FR-SET-011: Adjustments — APPROVED
 
 ### Source Evidence
 
 Both agreements (clause 2.4A):
 > *"Any operational losses, depreciation, business losses, or other liabilities incurred by the Company in operating the outlet shall not be adjusted, deducted, or recovered from the Franchise Partner's investment or refund amount. The Franchise Partner shall not be responsible for such liabilities."*
 
-### Current Status
-
-**PARTIALLY SPECIFIED**
-
-Operational loss adjustment is explicitly prohibited. Other adjustment types are not specified.
-
-### Implementation Impact
-
-The system needs to know:
-- What adjustment categories are permitted
-- Who can create adjustments
-- How adjustments affect the settlement amount
-- Whether adjustments require approval
-
-### Proposed Options
-
-| Option | Description |
-|--------|-------------|
-| **A** | No adjustments: settlement amount is always the calculated payout. No manual adjustments permitted. |
-| **B** | Manual adjustments with categories: authorized users can add debit/credit adjustments with mandatory description and category. Operational loss adjustments prohibited (per agreement). |
-| **C** | Defer adjustment handling to a future phase. |
-
-### Approving Authority
-
-**BUSINESS / FINANCE / LEGAL**
-
 ### Decision
 
-**APPROVE OPTION A / APPROVE OPTION B / APPROVE OPTION C / MODIFY / DEFER**
+**APPROVE OPTION B**
 
-Notes: _______________________________________________________
+Manual categorized adjustments are allowed.
+
+**PROHIBITED:** Operational losses, depreciation, business losses, or other liabilities described by the agreement as non-recoverable from the Franchise Partner's investment/refund must NOT be deducted as settlement adjustments.
+
+**NOT SPECIFIED:** Adjustment-category taxonomy. If a category is required during implementation but not specified, stop and report it as NOT SPECIFIED.
 
 ---
 
-## FR-SET-012: Refund Workflow
+## FR-SET-012: Refund Workflow — APPROVED
 
 ### Source Evidence
 
@@ -560,82 +331,32 @@ Both agreements (clause 6.1):
 Both agreements (clause 2.3 / MG Default):
 > *"In the event the Franchise Partner does not receive the applicable Commission or Minimum Guarantee (MG) for two (2) consecutive months, the same shall be treated as a material breach... the Franchise Partner shall have the right to terminate the Agreement and shall be entitled to an immediate refund of 90% of the Franchise Investment."*
 
-### Current Status
-
-**PARTIALLY SPECIFIED**
-
-Refund amounts and timing are specified. The refund workflow (how it is initiated, approved, processed, and recorded) is NOT SPECIFIED.
-
-### Implementation Impact
-
-Refund processing requires:
-- Agreement termination workflow (not currently implemented)
-- Refund calculation (90% or 50% of investment, minus outstanding)
-- Refund approval
-- Refund payment recording
-- 30 Working Day SLA tracking
-
-### Proposed Options
-
-| Option | Description |
-|--------|-------------|
-| **A** | Manual refund: refund is calculated by the system but processed and recorded manually outside the platform. |
-| **B** | Platform refund workflow: system tracks refund request → approval → payment → confirmation. |
-
-### Approving Authority
-
-**BUSINESS / FINANCE**
-
 ### Decision
 
-**APPROVE OPTION A / APPROVE OPTION B / MODIFY / DEFER**
+**APPROVE OPTION A**
 
-Notes: _______________________________________________________
+Refund remains manually processed outside the platform. The platform may document/track the agreement-defined refund amount and timing only where already supported by existing requirements. Do not implement a termination/refund workflow in this settlement phase.
 
 ---
 
-## FR-SET-013: Franchise-Sale Commission Settlement
+## FR-SET-013: Franchise-Sale Commission Settlement — APPROVED
 
 ### Source Evidence
 
 Both agreements (clause 2.2C):
 > *"₹15,000 (Rupees Fifteen Thousand Only) for every successful franchise sold in the territory allotted to the Franchise Partner, payable by the Company to the Franchise Partner."*
 
-### Current Status
-
-**PARTIALLY SPECIFIED**
-
-Amount and trigger are specified. Settlement integration, payment timing, cancellation behavior, and tax treatment are NOT SPECIFIED.
-
-### Implementation Impact
-
-Commission settlement requires:
-- Defining what constitutes a "successful franchise sold"
-- Recording commission events
-- Including commission in settlement statements
-- Commission reversal if franchise is cancelled/refunded
-
-### Proposed Options
-
-| Option | Description |
-|--------|-------------|
-| **A** | Commission included in monthly settlement: when a new franchise is sold in the territory, ₹15,000 is added as a line item to that month's settlement. |
-| **B** | Commission settled separately: commission is paid as a one-time payment outside the monthly settlement cycle. |
-| **C** | Defer commission settlement to a future phase. Commission is tracked but not settled through the platform. |
-
-### Approving Authority
-
-**BUSINESS / FINANCE**
-
 ### Decision
 
-**APPROVE OPTION A / APPROVE OPTION B / APPROVE OPTION C / MODIFY / DEFER**
+**APPROVE OPTION A**
 
-Notes: _______________________________________________________
+Franchise-sale commission is included in the monthly settlement when the agreement-defined commission trigger has occurred.
+
+**NOT SPECIFIED:** Exact definition of "successful franchise sold", cancellation/reversal behavior, tax treatment. These remain NOT SPECIFIED unless already defined by an authoritative source.
 
 ---
 
-## FR-SET-014: Renewal Fee Settlement
+## FR-SET-014: Renewal Fee Settlement — APPROVED
 
 ### Source Evidence
 
@@ -644,159 +365,61 @@ Both agreements (clause 7.5):
 
 > *"Upon payment of the renewal fee and execution of the renewal documents, the Agreement shall be extended for a further three (3) years on the prevailing renewal terms and conditions."*
 
-### Current Status
-
-**PARTIALLY SPECIFIED**
-
-Fee amount and renewal period are specified. Payment workflow, approval, and "prevailing terms" definition are NOT SPECIFIED.
-
-### Implementation Impact
-
-Renewal requires:
-- Agreement expiry detection
-- Renewal offer generation
-- Renewal fee collection
-- New agreement creation with prevailing terms
-- Linking renewal to existing partner/outlet
-
-### Proposed Options
-
-| Option | Description |
-|--------|-------------|
-| **A** | Manual renewal: renewal is managed outside the platform. System only tracks agreement end dates. |
-| **B** | Platform renewal workflow: system detects upcoming expiry → generates renewal offer → records payment → creates new agreement. |
-
-### Approving Authority
-
-**BUSINESS**
-
 ### Decision
 
-**APPROVE OPTION A / APPROVE OPTION B / MODIFY / DEFER**
+**APPROVE OPTION A**
 
-Notes: _______________________________________________________
+Renewal remains manually handled. The platform may continue to track agreement dates. Do not implement a renewal workflow in this settlement phase.
 
 ---
 
-## FR-SET-015: GST/TDS/Tax Treatment
+## FR-SET-015: GST/TDS/Tax Treatment — APPROVED
 
 ### Source Evidence
 
 ADR 014 (line 301): *"Tax treatment of royalty, sharing, reimbursements, and settlement transactions"* — listed as NOT SPECIFIED.
 
-### Current Status
-
-**NOT SPECIFIED — requires Finance/Legal decision.**
-
-### Implementation Impact
-
-Tax treatment determines:
-- Whether GST is charged on franchise payouts
-- Whether TDS is withheld on payments to franchise partners
-- Whether settlement amounts are gross or net of tax
-- Whether tax invoices are generated
-- Accounting entries for tax liabilities
-
-**This is a compliance-critical decision that must be made by Finance/Legal. Engineering cannot proceed without it.**
-
-### Proposed Options
-
-| Option | Description |
-|--------|-------------|
-| **A** | No tax in settlement: settlement records gross amounts only. Tax handling is managed outside the platform by the finance team. |
-| **B** | GST inclusive: settlement includes GST calculation and tax invoice generation. Requires GST rate determination. |
-| **C** | TDS applicable: settlement deducts TDS before payment. Requires TDS rate and section determination. |
-| **D** | Full tax: both GST and TDS handled by the platform. |
-
-### Approving Authority
-
-**FINANCE / LEGAL**
-
 ### Decision
 
-**APPROVE OPTION A / APPROVE OPTION B / APPROVE OPTION C / APPROVE OPTION D / MODIFY / DEFER**
+**APPROVE OPTION A**
 
-Notes: _______________________________________________________
+Settlement does NOT calculate GST/TDS/tax. Settlement records gross settlement amounts without platform tax calculation. Finance handles applicable tax externally until a formal tax specification is approved.
+
+**CRITICAL CLARIFICATION:** This does NOT mean taxes are legally inapplicable. It means tax calculation/withholding is outside this settlement implementation.
 
 ---
 
-## FR-SET-016: Dispute Workflow
+## FR-SET-016: Dispute Workflow — APPROVED
 
 ### Source Evidence
 
 Both agreements (clause 10): Disputes referred to arbitration under the Arbitration and Conciliation Act, 1996. This is a legal clause, not a software workflow.
 
-### Current Status
-
-**NOT SPECIFIED**
-
-The arbitration clause is a legal mechanism. No software dispute workflow is defined.
-
-### Implementation Impact
-
-A software dispute workflow would allow:
-- Franchise partner to flag a settlement as disputed
-- Dispute to pause payment obligations
-- Resolution tracking
-- Escalation to arbitration if unresolved
-
-### Proposed Options
-
-| Option | Description |
-|--------|-------------|
-| **A** | No software dispute workflow: disputes are handled externally per the arbitration clause. |
-| **B** | Basic dispute flag: franchise partner can flag a settlement as "disputed" with a reason. Flag pauses payment obligation. Resolution is manual. |
-| **C** | Full dispute workflow: dispute submission → evidence upload → review → resolution → settlement update. |
-
-### Approving Authority
-
-**BUSINESS / LEGAL**
-
 ### Decision
 
-**APPROVE OPTION A / APPROVE OPTION B / APPROVE OPTION C / MODIFY / DEFER**
+**APPROVE OPTION A**
 
-Notes: _______________________________________________________
+No software dispute workflow. Disputes remain handled externally according to the agreement/legal process.
 
 ---
 
-## FR-SET-017: Settlement Reversal
+## FR-SET-017: Settlement Reversal — APPROVED
 
 ### Source Evidence
 
 No authoritative source defines settlement reversal rules.
 
-### Current Status
-
-**NOT SPECIFIED**
-
-### Implementation Impact
-
-Reversal would allow a settled/paid settlement to be rolled back. This is needed if:
-- A calculation error is discovered after approval
-- A payment is recorded incorrectly
-- A dispute results in settlement cancellation
-
-### Proposed Options
-
-| Option | Description |
-|--------|-------------|
-| **A** | No reversal: once approved, a settlement cannot be reversed. Errors are corrected via adjustments in the next period. |
-| **B** | Reversal with audit: authorized users can reverse a settlement. Reversal creates an audit trail. Reversed settlements are marked, not deleted. |
-
-### Approving Authority
-
-**BUSINESS / FINANCE**
-
 ### Decision
 
-**APPROVE OPTION A / APPROVE OPTION B / MODIFY / DEFER**
+**APPROVE OPTION B**
 
-Notes: _______________________________________________________
+Settlement reversal is supported with audit. A reversed settlement must remain historically recorded and must never be deleted.
+
+**NOT SPECIFIED:** Complete reversal accounting behavior or reversal state model beyond this approval. If implementation requires additional reversal rules, report them as NOT SPECIFIED before coding.
 
 ---
 
-## FR-SET-018: Settlement RBAC
+## FR-SET-018: Settlement RBAC — APPROVED
 
 ### Source Evidence
 
@@ -804,183 +427,172 @@ No authoritative source defines settlement-specific permissions.
 
 Current franchise permissions: `franchise.read`, `franchise.write`.
 
-### Current Status
-
-**NOT SPECIFIED**
-
-### Implementation Impact
-
-Settlement operations require permissions beyond the existing `franchise.read`/`franchise.write`:
-- Who can view settlements
-- Who can generate settlements
-- Who can approve settlements
-- Who can record payments
-- Who can view settlement financial details
-
-### Proposed Options
-
-| Option | Permissions | Description |
-|--------|-------------|-------------|
-| **A** | Reuse `franchise.read`/`franchise.write` | No new permissions. Existing franchise permissions cover settlement operations. |
-| **B** | Add `settlement.view`, `settlement.manage` | Two new permissions: view (read-only) and manage (generate/approve/pay). |
-| **C** | Add `settlement.view`, `settlement.generate`, `settlement.approve`, `settlement.pay` | Four granular permissions for full separation of duties. |
-
-### Approving Authority
-
-**BUSINESS / TECHNICAL**
-
 ### Decision
 
-**APPROVE OPTION A / APPROVE OPTION B / APPROVE OPTION C / MODIFY / DEFER**
+**APPROVE OPTION C**
 
-Notes: _______________________________________________________
+Settlement permissions:
+- `settlement.view`
+- `settlement.generate`
+- `settlement.approve`
+- `settlement.pay`
+
+**NOT YET ASSIGNED:** Do not automatically assign these permissions to roles yet unless the repository already contains an authoritative role mapping. If role mapping is absent, identify it for the implementation design phase.
 
 ---
 
-## FR-SET-019: Settlement Data Model
+## FR-SET-019: Settlement Data Model — APPROVED
 
 ### Source Evidence
 
 No authoritative source defines the settlement data model.
 
-### Current Status
-
-**NOT SPECIFIED**
-
-### Implementation Impact
-
-The data model determines what the settlement system can store and track. This is the technical foundation for all settlement features.
-
-### Proposed Entities
-
-| Entity | Purpose | Status |
-|--------|---------|--------|
-| `FranchiseSettlement` | Formal financial obligation for a period | **PROPOSED** |
-| `FranchiseSettlementLine` | Individual components (MG, variable, royalty, commission, adjustment) | **PROPOSED** |
-| `FranchisePayment` | Payment records linked to settlement (separate from Invoice Payment) | **PROPOSED** |
-
-### Key Design Decisions
-
-| Decision | Impact |
-|----------|--------|
-| Settlement is per-partner-per-period | Prevents duplicate settlements |
-| Settlement lines are immutable after approval | Ensures historical reproducibility (HR-01) |
-| FranchisePayment is separate from Invoice Payment | Preserves ADR 016 boundary |
-| Terms snapshot captured at settlement generation | Preserves HR-02 |
-
-### Approving Authority
-
-**TECHNICAL / BUSINESS**
-
 ### Decision
 
-**APPROVE AS PROPOSED / MODIFY / DEFER**
+**APPROVE AS PROPOSED**
 
-Notes: _______________________________________________________
+Approved settlement-domain entities:
+
+| Entity | Purpose |
+|--------|---------|
+| `FranchiseSettlement` | Formal financial obligation for a period |
+| `FranchiseSettlementLine` | Individual components (MG, variable, royalty, commission, adjustment) |
+| `FranchisePayment` | Payment records linked to settlement (separate from Invoice Payment) |
+
+Architectural requirements:
+- Tenant isolated
+- Settlement linked to FranchiseAgreement / FranchisePartner as appropriate
+- Settlement lines preserve calculation breakdown
+- Terms snapshot captured at settlement generation
+- Historical settlement calculation must remain reproducible
+- FranchisePayment remains separate from Invoice Payment
+- Approved settlement data must be immutable except through explicitly supported controlled operations
+- Duplicate settlement generation must be prevented
+- Integer cents for monetary amounts
+- Proper foreign keys and indexes
+- Auditability
+
+**IMPORTANT:** The approved data-model baseline does NOT mean every field in the previous proposal is automatically approved. During implementation design, distinguish: APPROVED / REQUIRED BY EXISTING ARCHITECTURE / TECHNICAL IMPLEMENTATION DETAIL / NOT SPECIFIED.
 
 ---
 
-## FR-SET-020: Finance/GL Prerequisites
+## FR-SET-020: Finance/GL Prerequisites — APPROVED
 
 ### Source Evidence
 
 DOC-023 (Finance SRS) specifies: Chart of Accounts, General Ledger, Accounts Receivable, Accounts Payable, Bank Reconciliation — NONE of which are implemented.
 
-### Current Status
-
-**NOT SPECIFIED**
-
-### Implementation Impact
-
-If franchise settlement must post accounting entries to a general ledger, the GL must exist first. Currently:
-- No GL exists
-- No AR/AP exists
-- No chart of accounts exists
-
-Settlement can operate as a standalone obligation/payment tracker without GL integration, but cannot produce accounting entries.
-
-### Proposed Options
-
-| Option | Description |
-|--------|-------------|
-| **A** | Settlement without GL: settlement operates as a standalone tracker. No accounting entries. Finance team manually enters settlement data into external accounting system. |
-| **B** | Settlement with basic GL: implement minimal GL (journal entries + chart of accounts) alongside settlement. Settlement posts entries to GL. |
-| **C** | Defer settlement until GL is implemented: full DOC-023 Finance module must be built first. |
-
-### Approving Authority
-
-**FINANCE / TECHNICAL**
-
 ### Decision
 
-**APPROVE OPTION A / APPROVE OPTION B / APPROVE OPTION C / MODIFY / DEFER**
+**APPROVE OPTION A**
 
-Notes: _______________________________________________________
+Settlement operates without General Ledger integration. No GL/accounting entries are generated by the settlement engine. Finance can handle accounting externally. DOC-023 Finance/GL remains a separate future implementation.
 
 ---
 
-## Approval Summary
+## Remaining NOT SPECIFIED Items
 
-| FR-SET ID | Decision Question | Proposed Option | Approval Authority | Status |
-|-----------|-------------------|-----------------|-------------------|--------|
-| FR-SET-001 | Settlement period | Calendar month (A) | BUSINESS / FINANCE | **REQUIRES APPROVAL** |
-| FR-SET-002 | Statement content | Minimal (A) or Full (B) | BUSINESS / FINANCE | **REQUIRES APPROVAL** |
-| FR-SET-003 | Settlement = payout? | Direct wrapper (A) | BUSINESS / FINANCE | **REQUIRES APPROVAL** |
-| FR-SET-004 | Settlement lifecycle | Minimal (A), Partial (B), Full (C), Custom (D) | BUSINESS / FINANCE / TECHNICAL | **NOT SPECIFIED** |
-| FR-SET-005 | Approval workflow | Single (A), Two-step (B), Three-step (C) | BUSINESS | **NOT SPECIFIED** |
-| FR-SET-006 | Payment methods | Bank only (A), Bank+UPI (B), Bank+UPI+Cash (C), Configurable (D) | BUSINESS / FINANCE | **NOT SPECIFIED** |
-| FR-SET-007 | Payment statuses | Confirmed only (A), Pending+Confirmed/Failed (B), +Reversed (C) | BUSINESS / FINANCE | **NOT SPECIFIED** |
-| FR-SET-008 | Partial payment | Full only (A), Partial allowed (B) | BUSINESS / FINANCE | **NOT SPECIFIED** |
-| FR-SET-009 | Outstanding balance | No carry-forward (A), Carry-forward (B) | BUSINESS / FINANCE | **NOT SPECIFIED** |
-| FR-SET-010 | Reconciliation | Manual (A), Basic matching (B), Full (C) | FINANCE / TECHNICAL | **NOT SPECIFIED** |
-| FR-SET-011 | Adjustments | None (A), Manual with categories (B), Defer (C) | BUSINESS / FINANCE / LEGAL | **PARTIALLY SPECIFIED** |
-| FR-SET-012 | Refund workflow | Manual (A), Platform workflow (B) | BUSINESS / FINANCE | **PARTIALLY SPECIFIED** |
-| FR-SET-013 | Commission settlement | In monthly (A), Separate (B), Defer (C) | BUSINESS / FINANCE | **PARTIALLY SPECIFIED** |
-| FR-SET-014 | Renewal fee | Manual (A), Platform workflow (B) | BUSINESS | **PARTIALLY SPECIFIED** |
-| FR-SET-015 | Tax treatment | None (A), GST (B), TDS (C), Full (D) | FINANCE / LEGAL | **NOT SPECIFIED** |
-| FR-SET-016 | Dispute workflow | None (A), Basic flag (B), Full (C) | BUSINESS / LEGAL | **NOT SPECIFIED** |
-| FR-SET-017 | Settlement reversal | None (A), With audit (B) | BUSINESS / FINANCE | **NOT SPECIFIED** |
-| FR-SET-018 | Settlement RBAC | Reuse existing (A), 2 new (B), 4 granular (C) | BUSINESS / TECHNICAL | **NOT SPECIFIED** |
-| FR-SET-019 | Settlement data model | As proposed | TECHNICAL / BUSINESS | **NOT SPECIFIED** |
-| FR-SET-020 | Finance/GL prerequisites | Standalone (A), Basic GL (B), Defer (C) | FINANCE / TECHNICAL | **NOT SPECIFIED** |
+The following sub-rules remain unresolved despite their parent FR-SET decision being approved:
 
-### Status Summary
+| Parent Decision | Unresolved Sub-Rule | Status |
+|----------------|---------------------|--------|
+| FR-SET-002 | Digital signature / authorization mark on statements | NOT SPECIFIED |
+| FR-SET-011 | Adjustment-category taxonomy (which categories are permitted) | NOT SPECIFIED |
+| FR-SET-013 | Definition of "successful franchise sold" | NOT SPECIFIED |
+| FR-SET-013 | Commission cancellation/reversal behavior | NOT SPECIFIED |
+| FR-SET-013 | Commission tax treatment | NOT SPECIFIED |
+| FR-SET-017 | Complete reversal accounting behavior | NOT SPECIFIED |
+| FR-SET-017 | Reversal state model details | NOT SPECIFIED |
+| FR-SET-018 | Role → permission mapping (which roles get settlement.* permissions) | NOT SPECIFIED |
+| FR-SET-019 | Final field list per entity (distinguish APPROVED vs IMPLEMENTATION DETAIL) | NOT SPECIFIED |
+| FR-SET-015 | Tax applicability (taxes may still apply legally — just not calculated by platform) | NOT SPECIFIED (external) |
+| FR-SET-020 | GL/accounting entry format (DOC-023 future) | NOT SPECIFIED (future) |
 
-| Status | Count |
-|--------|-------|
-| APPROVED | 0 |
-| AGREEMENT-SPECIFIED | 0 |
-| PARTIALLY SPECIFIED | 4 (FR-SET-011, 012, 013, 014) |
-| NOT SPECIFIED | 13 (FR-SET-004 through 010, 015 through 020) |
-| REQUIRES APPROVAL | 3 (FR-SET-001, 002, 003) |
-
-**No settlement decision has APPROVED status.**
+**Do NOT treat "APPROVED" parent decisions as blanket approval for unspecified sub-rules.**
 
 ---
 
 ## Engineering Gate
 
-**SETTLEMENT IMPLEMENTATION STATUS: BLOCKED — PENDING EXPLICIT BUSINESS/FINANCE/LEGAL APPROVAL**
+**SETTLEMENT BUSINESS BASELINE: APPROVED FOR TECHNICAL DESIGN**
 
-Implementation may begin only after all CRITICAL decisions required by the selected implementation scope are explicitly approved.
+**ENGINEERING IMPLEMENTATION: NOT STARTED**
 
-Minimum decisions required for Phase 1 (Settlement Core):
-- FR-SET-001: Settlement period
-- FR-SET-003: Settlement relationship to payout
-- FR-SET-004: Settlement lifecycle (at least Option A)
-- FR-SET-019: Settlement data model
+Before coding, a final technical implementation/schema review is required.
 
-Minimum decisions required for Phase 2 (Payment):
-- FR-SET-006: Payment methods
-- FR-SET-007: Payment statuses
-- FR-SET-008: Partial payment
+All 20 FR-SET decisions are approved. The business baseline is complete. Engineering may begin technical design.
 
-Minimum decisions required for Phase 3 (Full Settlement):
-- FR-SET-005: Approval workflow
-- FR-SET-009: Outstanding balance
-- FR-SET-015: Tax treatment
-- FR-SET-018: Settlement RBAC
+Minimum technical design deliverables before implementation:
+- Prisma schema for FranchiseSettlement, FranchiseSettlementLine, FranchisePayment
+- Migration strategy
+- Service interface design
+- API route design
+- RBAC permission assignment to roles
+- Adjustment-category taxonomy (if required)
+- Reversal behavior specification (if required beyond audit trail)
 
 ---
 
-*End of decision sheet.*
+## Approval Summary
+
+| FR-SET ID | Decision Question | Approved Option | Status |
+|-----------|-------------------|-----------------|--------|
+| FR-SET-001 | Settlement period | A — Calendar month, 5th WD due | **APPROVED** |
+| FR-SET-002 | Statement content | B — Full statement | **APPROVED** |
+| FR-SET-003 | Settlement = payout | A — Direct wrapper | **APPROVED** |
+| FR-SET-004 | Settlement lifecycle | B — CALCULATED→APPROVED→PARTIALLY_PAID→PAID | **APPROVED** |
+| FR-SET-005 | Approval workflow | B — Two-step (Accountant→Admin) | **APPROVED** |
+| FR-SET-006 | Payment methods | B — Bank Transfer + UPI | **APPROVED** |
+| FR-SET-007 | Payment statuses | B — PENDING→CONFIRMED/FAILED | **APPROVED** |
+| FR-SET-008 | Partial payment | B — Allowed | **APPROVED** |
+| FR-SET-009 | Outstanding balance | B — Tracked, carries forward | **APPROVED** |
+| FR-SET-010 | Reconciliation | A — No automated reconciliation | **APPROVED** |
+| FR-SET-011 | Adjustments | B — Manual categorized (losses PROHIBITED) | **APPROVED** |
+| FR-SET-012 | Refund workflow | A — Manual, outside platform | **APPROVED** |
+| FR-SET-013 | Commission settlement | A — In monthly settlement | **APPROVED** |
+| FR-SET-014 | Renewal fee | A — Manual | **APPROVED** |
+| FR-SET-015 | Tax treatment | A — No platform tax calculation | **APPROVED** |
+| FR-SET-016 | Dispute workflow | A — No software workflow | **APPROVED** |
+| FR-SET-017 | Settlement reversal | B — With audit | **APPROVED** |
+| FR-SET-018 | Settlement RBAC | C — 4 granular permissions | **APPROVED** |
+| FR-SET-019 | Settlement data model | APPROVED — 3 entities | **APPROVED** |
+| FR-SET-020 | Finance/GL | A — No GL integration | **APPROVED** |
+
+### Status Summary
+
+| Status | Count |
+|--------|-------|
+| **APPROVED** | **20** |
+| Remaining NOT SPECIFIED sub-rules | 11 |
+
+---
+
+## Critical Tax Clarification
+
+FR-SET-015 Option A means:
+
+**"Tax calculation is OUTSIDE the settlement engine."**
+
+It does NOT mean:
+
+**"No tax applies."**
+
+This distinction must be preserved in all implementation and documentation.
+
+---
+
+## Critical ADR-016 Boundary
+
+Preserve:
+
+```
+Customer Payment ≠ Gateway Settlement ≠ Franchise Partner Settlement ≠ Marketplace Vendor Settlement ≠ Bank Reconciliation
+```
+
+Existing Invoice Payment remains customer payment only.
+
+FranchisePayment is a separate settlement-domain entity.
+
+---
+
+*End of decision sheet. Version 2.0 — All 20 FR-SET decisions approved.*

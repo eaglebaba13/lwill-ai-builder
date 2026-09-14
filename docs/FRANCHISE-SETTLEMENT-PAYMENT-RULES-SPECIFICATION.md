@@ -2,7 +2,7 @@
 
 **Document ID:** LWILL-DOC-025-SETTLEMENT-PAYMENT-RULES  
 **Version:** 1.0  
-**Status:** Draft — Pending Business/Legal/Finance Approval  
+**Status:** Business Baseline Approved — Pending Technical Design  
 **Branch:** `phase-1d-native-auth`  
 **Created:** 2026-09-14
 
