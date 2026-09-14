@@ -1,3 +1,5 @@
+import { resolveMG, calculateRoyalty, splitRoyaltyEqually, COMMERCIAL_DEFAULTS } from "./franchise-commercial-service";
+
 export interface ReportSummaryRecord {
   readonly sales: {
     readonly invoiceCount: number;
@@ -756,11 +758,11 @@ export function createReportService(prisma: ReportPrismaClient): ReportService {
       const territoryRoyaltyMap = new Map<string, { poolCents: number; eligibleCount: number; individualCents: number }>();
       for (const [territoryId, partners] of allTerritoryPartnerMap.entries()) {
         const sales = territorySalesMap.get(territoryId) ?? 0;
-        const royaltyRateBp = territoryRoyaltyRateBpMap.get(territoryId) ?? 200;
-        const poolCents = Math.round((sales * royaltyRateBp) / 10000);
+        const royaltyRateBp = territoryRoyaltyRateBpMap.get(territoryId) ?? null;
+        const royalty = calculateRoyalty(sales, royaltyRateBp);
         const eligibleCount = partners.size;
-        const individualCents = eligibleCount > 0 ? Math.round(poolCents / eligibleCount) : 0;
-        territoryRoyaltyMap.set(territoryId, { poolCents, eligibleCount, individualCents });
+        const individualCents = splitRoyaltyEqually(royalty.poolCents, eligibleCount);
+        territoryRoyaltyMap.set(territoryId, { poolCents: royalty.poolCents, eligibleCount, individualCents });
       }
 
       const partnerAgreementMap = new Map<string, typeof agreements>();
@@ -775,13 +777,12 @@ export function createReportService(prisma: ReportPrismaClient): ReportService {
             const grossRevenueCents = branchSalesMap.get(outlet.branchId) ?? 0;
             const percentage = distributionMap.get(outlet.id) ?? 0;
             const revenueShareCents = Math.round((grossRevenueCents * percentage) / 100);
-            const investmentCents = investmentMap.get(outlet.branchId);
-            const formulaMGCents = (agreement.mgFormulaRateBp != null && investmentCents != null)
-              ? Math.round((investmentCents * agreement.mgFormulaRateBp) / 10000)
-              : null;
-            const minimumGuaranteeCents = agreement.minimumGuaranteeCents ?? formulaMGCents ?? 1500000;
-            const netSalesVariableReturnCents = Math.round(grossRevenueCents * 0.30);
-            const eligibleRevenueSharePayoutCents = Math.max(minimumGuaranteeCents, netSalesVariableReturnCents);
+            const investmentCents = investmentMap.get(outlet.branchId) ?? null;
+            const agreementCommercial = agreement as unknown as { minimumGuaranteeCents: number | null; mgFormulaRateBp: number | null; mgFormulaBase: string | null; variableReturnRateBp: number | null; payoutRule: string | null };
+            const mg = resolveMG(agreementCommercial, investmentCents);
+            const variableReturnRateBp = agreementCommercial.variableReturnRateBp ?? COMMERCIAL_DEFAULTS.VARIABLE_RETURN_BP;
+            const netSalesVariableReturnCents = Math.round((grossRevenueCents * variableReturnRateBp) / 10000);
+            const eligibleRevenueSharePayoutCents = Math.max(mg.fixedMGCents, netSalesVariableReturnCents);
 
             return {
               agreementId: agreement.id,

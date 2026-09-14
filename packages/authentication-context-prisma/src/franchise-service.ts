@@ -1,3 +1,5 @@
+import { buildTermsSnapshot, validateRevenueDistribution } from "./franchise-commercial-service";
+
 export interface TerritoryRecord {
   readonly id: string;
   readonly tenantId: string;
@@ -378,18 +380,19 @@ export function createFranchiseService(prisma: FranchisePrismaClient): Franchise
       if (input.termsSnapshot !== undefined) {
         data.termsSnapshot = input.termsSnapshot ?? null;
       } else {
-        data.termsSnapshot = {
-          minimumGuaranteeCents: data.minimumGuaranteeCents ?? null,
-          mgFormulaRateBp: data.mgFormulaRateBp ?? null,
-          mgFormulaBase: data.mgFormulaBase ?? null,
-          variableReturnRateBp: data.variableReturnRateBp ?? null,
-          variableReturnBasis: data.variableReturnBasis ?? null,
-          payoutRule: data.payoutRule ?? null,
-          territoryRoyaltyRateBp: data.territoryRoyaltyRateBp ?? null,
-          startDate: data.startDate instanceof Date ? data.startDate.toISOString() : data.startDate,
-          endDate: data.endDate instanceof Date ? data.endDate.toISOString() : data.endDate,
-          capturedAt: new Date().toISOString(),
-        };
+        const investmentCents = data.investmentCents as number | null ?? null;
+        data.termsSnapshot = buildTermsSnapshot(
+          {
+            minimumGuaranteeCents: data.minimumGuaranteeCents as number | null ?? null,
+            mgFormulaRateBp: data.mgFormulaRateBp as number | null ?? null,
+            mgFormulaBase: data.mgFormulaBase as string | null ?? null,
+            variableReturnRateBp: data.variableReturnRateBp as number | null ?? null,
+            variableReturnBasis: data.variableReturnBasis as string | null ?? null,
+            payoutRule: data.payoutRule as string | null ?? null,
+            territoryRoyaltyRateBp: data.territoryRoyaltyRateBp as number | null ?? null,
+          },
+          investmentCents,
+        );
       }
 
       return prisma.franchiseAgreement.create({
