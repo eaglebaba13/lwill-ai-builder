@@ -41,6 +41,7 @@ export const X_NAIL_ROLE_CATALOGUE: readonly RoleCatalogueEntry[] = [
       "supplier.read", "supplier.write",
       "warehouse.read", "warehouse.write",
       "ai.project.read", "ai.project.write",
+      "settlement.view", "settlement.generate", "settlement.approve",
     ],
   },
   {
@@ -71,6 +72,7 @@ export const X_NAIL_ROLE_CATALOGUE: readonly RoleCatalogueEntry[] = [
       "stockTransfer.read", "stockTransfer.write",
       "supplier.read", "supplier.write",
       "warehouse.read", "warehouse.write",
+      "settlement.view", "settlement.generate", "settlement.approve",
     ],
   },
   {
@@ -84,6 +86,7 @@ export const X_NAIL_ROLE_CATALOGUE: readonly RoleCatalogueEntry[] = [
       "invoice.read", "invoice.write",
       "membership.read",
       "report.read",
+      "settlement.view", "settlement.generate",
     ],
   },
   {
@@ -167,6 +170,7 @@ export const X_NAIL_ROLE_CATALOGUE: readonly RoleCatalogueEntry[] = [
       "customer.read",
       "invoice.read",
       "report.read",
+      "settlement.view",
     ],
   },
   {
@@ -180,6 +184,7 @@ export const X_NAIL_ROLE_CATALOGUE: readonly RoleCatalogueEntry[] = [
       "customer.read",
       "invoice.read",
       "report.read",
+      "settlement.view",
     ],
   },
   {
@@ -193,6 +198,7 @@ export const X_NAIL_ROLE_CATALOGUE: readonly RoleCatalogueEntry[] = [
       "customer.read",
       "invoice.read",
       "report.read",
+      "settlement.view",
     ],
   },
   {
@@ -212,6 +218,7 @@ export const X_NAIL_ROLE_CATALOGUE: readonly RoleCatalogueEntry[] = [
       "service.read",
       "package.read",
       "membership.read",
+      "settlement.view",
     ],
   },
   {

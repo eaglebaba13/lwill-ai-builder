@@ -23,6 +23,9 @@ model Tenant {
   franchiseAgreements FranchiseAgreement[]
   franchiseAgreementOutlets FranchiseAgreementOutlet[]
   franchiseRevenueDistributions FranchiseRevenueDistribution[]
+  franchiseSettlements FranchiseSettlement[]
+  franchiseSettlementLines FranchiseSettlementLine[]
+  franchisePayments    FranchisePayment[]
   tenantDomains     TenantDomain[]
   tenantSettings    TenantSetting[]
   tenantMemberships TenantMembership[]
@@ -233,6 +236,7 @@ model FranchisePartner {
   user          User?                   @relation(fields: [userId], references: [id], onDelete: Restrict)
   outletProfiles FranchiseOutletProfile[]
   agreements    FranchiseAgreement[]
+  settlements   FranchiseSettlement[]
 
   @@unique([tenantId, id])
   @@unique([tenantId, userId])
@@ -288,6 +292,7 @@ model FranchiseAgreement {
   partner    FranchisePartner     @relation(fields: [partnerId], references: [id], onDelete: Restrict)
   territory  Territory            @relation(fields: [tenantId, territoryId], references: [tenantId, id], onDelete: Restrict)
   outlets    FranchiseAgreementOutlet[]
+  settlements FranchiseSettlement[]
 
   @@unique([tenantId, id])
   @@index([tenantId, partnerId])
@@ -329,6 +334,83 @@ model FranchiseRevenueDistribution {
   @@unique([tenantId, agreementOutletId, beneficiary])
   @@index([tenantId, agreementOutletId])
   @@index([tenantId, beneficiary])
+}
+
+model FranchiseSettlement {
+  id                   String    @id @default(uuid()) @db.Uuid
+  tenantId             String    @db.Uuid
+  agreementId          String    @db.Uuid
+  partnerId            String    @db.Uuid
+  periodStart          DateTime
+  periodEnd            DateTime
+  status               String    @default("CALCULATED")
+  grossSalesCents      Int       @default(0)
+  gstCents             Int       @default(0)
+  netSalesCents        Int       @default(0)
+  mgCents              Int       @default(0)
+  variableReturnCents  Int       @default(0)
+  payoutCents          Int       @default(0)
+  royaltyCents         Int       @default(0)
+  adjustmentCents      Int       @default(0)
+  totalCents           Int       @default(0)
+  termsSnapshot        Json?
+  generatedAt          DateTime  @default(now())
+  generatedBy          String?
+  approvedAt           DateTime?
+  approvedBy           String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  tenant    Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  agreement FranchiseAgreement @relation(fields: [tenantId, agreementId], references: [tenantId, id], onDelete: Restrict)
+  partner   FranchisePartner   @relation(fields: [tenantId, partnerId], references: [tenantId, id], onDelete: Restrict)
+  lines     FranchiseSettlementLine[]
+  payments  FranchisePayment[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, agreementId, periodStart, periodEnd])
+  @@index([tenantId, partnerId])
+  @@index([tenantId, status])
+  @@index([tenantId, periodStart])
+}
+
+model FranchiseSettlementLine {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @db.Uuid
+  settlementId String   @db.Uuid
+  lineType     String
+  description  String
+  amountCents  Int
+  metadata     Json?
+  createdAt    DateTime @default(now())
+
+  tenant    Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  settlement FranchiseSettlement @relation(fields: [tenantId, settlementId], references: [tenantId, id], onDelete: Cascade)
+
+  @@unique([tenantId, id])
+  @@index([tenantId, settlementId])
+  @@index([tenantId, lineType])
+}
+
+model FranchisePayment {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @db.Uuid
+  settlementId String    @db.Uuid
+  amountCents  Int
+  method       String
+  status       String    @default("PENDING")
+  reference    String?
+  paidAt       DateTime  @default(now())
+  confirmedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  tenant    Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  settlement FranchiseSettlement @relation(fields: [tenantId, settlementId], references: [tenantId, id], onDelete: Restrict)
+
+  @@unique([tenantId, id])
+  @@index([tenantId, settlementId])
+  @@index([tenantId, status])
 }
 
 model Lead {
