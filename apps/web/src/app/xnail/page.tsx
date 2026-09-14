@@ -180,7 +180,7 @@ function KpiCard({ definition, context }: { readonly definition: RoleDashboardCo
   );
 }
 
-const ALL_TABS = ["Overview", "Customers", "Leads", "Pipeline", "Follow-ups", "Communications", "Tags & Notes", "Services", "Packages", "Memberships", "Inventory", "Staff", "Attendance", "Appointments", "Billing", "Branches", "Reports", "Settings", "Notifications", "Users & Access", "Gateway Accounts", "Marketplace", "Franchise Overview", "Financials", "Territories", "Partners", "Agreements", "Outlets"] as const;
+const ALL_TABS = ["Overview", "Customers", "Leads", "Pipeline", "Follow-ups", "Communications", "Tags & Notes", "Services", "Packages", "Memberships", "Inventory", "Staff", "Attendance", "Appointments", "Billing", "Branches", "Reports", "Settings", "Notifications", "Users & Access", "Gateway Accounts", "Marketplace", "Franchise Overview", "Financials", "Territories", "Partners", "Agreements", "Outlets", "Franchise Settlement"] as const;
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<(typeof ALL_TABS)[number]>("Overview");
@@ -644,6 +644,32 @@ export default function Home() {
   const [outlets, setOutlets] = useState<Array<{ id: string; partnerId: string; branchId: string; territoryId: string | null; partnerName: string; branchName: string; territoryName: string | null; outletType: string | null; isActive: boolean }>>([]);
   const [isLoadingOutlets, setIsLoadingOutlets] = useState(false);
   const [outletsError, setOutletsError] = useState<string | null>(null);
+
+  type SettlementRecord = {
+    id: string; tenantId: string; agreementId: string; partnerId: string;
+    periodStart: string; periodEnd: string; status: string;
+    grossSalesCents: number; gstCents: number; netSalesCents: number;
+    mgCents: number; variableReturnCents: number; payoutCents: number;
+    royaltyCents: number; adjustmentCents: number; totalCents: number;
+    termsSnapshot: Record<string, unknown> | null;
+    generatedAt: string; generatedBy: string | null;
+    approvedAt: string | null; approvedBy: string | null;
+  };
+  type SettlementLineRecord = { id: string; lineType: string; description: string; amountCents: number; metadata: Record<string, unknown> | null };
+  const [settlements, setSettlements] = useState<SettlementRecord[]>([]);
+  const [isLoadingSettlements, setIsLoadingSettlements] = useState(false);
+  const [settlementsError, setSettlementsError] = useState<string | null>(null);
+  const [selectedSettlement, setSelectedSettlement] = useState<SettlementRecord | null>(null);
+  const [selectedSettlementLines, setSelectedSettlementLines] = useState<SettlementLineRecord[]>([]);
+  const [settlementDetailLoading, setSettlementDetailLoading] = useState(false);
+  const [showGenerateDialog, setShowGenerateDialog] = useState(false);
+  const [generateAgreementId, setGenerateAgreementId] = useState("");
+  const [generateMonth, setGenerateMonth] = useState("");
+  const [generateError, setGenerateError] = useState<string | null>(null);
+  const [generateLoading, setGenerateLoading] = useState(false);
+  const [approveLoading, setApproveLoading] = useState(false);
+  const [approveError, setApproveError] = useState<string | null>(null);
+  const [showApproveConfirm, setShowApproveConfirm] = useState(false);
 
   const customerMap = new Map(customers.map((customer) => [customer.id, customer.name]));
   const productMap = new Map(products.map((product) => [product.id, product.name]));
@@ -2825,6 +2851,85 @@ export default function Home() {
       .finally(() => { if (mounted) { window.clearTimeout(loadingTimer); setIsLoadingOutlets(false); } });
     return () => { mounted = false; window.clearTimeout(loadingTimer); };
   }, [authenticated, activeTab]);
+
+  useEffect(() => {
+    if (authenticated !== true || activeTab !== "Franchise Settlement") return;
+    let mounted = true;
+    const loadingTimer = window.setTimeout(() => { if (mounted) { setIsLoadingSettlements(true); setSettlementsError(null); } }, 0);
+    void fetch("/api/franchise/settlements", { credentials: "same-origin" })
+      .then(async (r) => {
+        if (!mounted) return;
+        if (r.status === 401) { setSettlements([]); setAuthenticated(false); return; }
+        if (r.status === 403) { setSettlements([]); setSettlementsError("You are not authorized to view settlements."); return; }
+        if (!r.ok) throw new Error("Settlements request failed");
+        const body = await r.json() as { settlements?: SettlementRecord[] };
+        setSettlements(body.settlements ?? []);
+      })
+      .catch(() => { if (mounted) { setSettlements([]); setSettlementsError("Settlements could not be loaded."); } })
+      .finally(() => { if (mounted) { window.clearTimeout(loadingTimer); setIsLoadingSettlements(false); } });
+    return () => { mounted = false; window.clearTimeout(loadingTimer); };
+  }, [authenticated, activeTab]);
+
+  const generateSettlement = async () => {
+    if (!generateAgreementId || !generateMonth) { setGenerateError("Agreement and month are required."); return; }
+    const [year, month] = generateMonth.split("-").map(Number);
+    if (!year || !month) { setGenerateError("Select a valid month."); return; }
+    const periodStart = `${year}-${String(month).padStart(2, "0")}-01`;
+    const lastDay = new Date(year, month, 0).getDate();
+    const periodEnd = `${year}-${String(month).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+    setGenerateError(null);
+    setGenerateLoading(true);
+    const result = await fetch("/api/franchise/settlements/generate", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ agreementId: generateAgreementId, periodStart, periodEnd }),
+    });
+    if (result.status === 401) { setAuthenticated(false); setGenerateLoading(false); return; }
+    if (result.status === 403) { setGenerateError("You are not authorized to generate settlements."); setGenerateLoading(false); return; }
+    if (result.status === 409) { setGenerateError("A settlement already exists for this agreement and month."); setGenerateLoading(false); return; }
+    if (!result.ok) { const body = await result.json().catch(() => ({})); setGenerateError(body?.error ?? "Settlement could not be generated."); setGenerateLoading(false); return; }
+    const body = await result.json() as { settlement: SettlementRecord; lines: SettlementLineRecord[] };
+    setSettlements((current) => [body.settlement, ...current]);
+    setSelectedSettlement(body.settlement);
+    setSelectedSettlementLines(body.lines);
+    setShowGenerateDialog(false);
+    setGenerateAgreementId("");
+    setGenerateMonth("");
+    setGenerateLoading(false);
+  };
+
+  const loadSettlementDetail = async (settlementId: string) => {
+    setSettlementDetailLoading(true);
+    setSelectedSettlement(null);
+    setSelectedSettlementLines([]);
+    try {
+      const result = await fetch(`/api/franchise/settlements/${settlementId}`, { credentials: "same-origin" });
+      if (result.status === 401) { setAuthenticated(false); return; }
+      if (!result.ok) { setSettlementsError("Settlement detail could not be loaded."); return; }
+      const body = await result.json() as { settlement: SettlementRecord; lines: SettlementLineRecord[] };
+      setSelectedSettlement(body.settlement);
+      setSelectedSettlementLines(body.lines);
+    } catch {
+      setSettlementsError("Settlement detail could not be loaded.");
+    } finally {
+      setSettlementDetailLoading(false);
+    }
+  };
+
+  const approveSettlement = async (settlementId: string) => {
+    setApproveError(null);
+    setApproveLoading(true);
+    const result = await fetch(`/api/franchise/settlements/${settlementId}/approve`, {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+    });
+    if (result.status === 401) { setAuthenticated(false); setApproveLoading(false); return; }
+    if (result.status === 403) { setApproveError("You are not authorized to approve settlements."); setApproveLoading(false); return; }
+    if (!result.ok) { const body = await result.json().catch(() => ({})); setApproveError(body?.error ?? "Settlement could not be approved."); setApproveLoading(false); return; }
+    const body = await result.json() as SettlementRecord;
+    setSelectedSettlement(body);
+    setSettlements((current) => current.map((s) => (s.id === settlementId ? body : s)));
+    setShowApproveConfirm(false);
+    setApproveLoading(false);
+  };
 
   const addSetting = async () => {
     if (!settingKey.trim()) return;
@@ -8136,6 +8241,225 @@ export default function Home() {
                     {outlet.outletType ? <div className="mt-1 text-xs text-[#a39a86]">Type: {outlet.outletType}</div> : null}
                   </div>
                 ))}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+
+        {activeTab === "Franchise Settlement" ? (
+          <section className="mt-6 space-y-6">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="font-serif text-2xl font-bold bg-gradient-to-r from-[#9c7a1e] via-[#d4af37] to-[#f1d78c] bg-clip-text text-transparent">Franchise Settlement</h2>
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(212,175,55,0.3)] bg-[#17150f] px-3 py-1 text-xs font-medium text-[#d4af37]">{settlements.length} settlement{settlements.length === 1 ? "" : "s"}</span>
+                <button onClick={() => { setShowGenerateDialog(true); setGenerateError(null); }} className="rounded-lg border border-[rgba(212,175,55,0.3)] bg-[rgba(212,175,55,0.08)] px-3 py-1.5 text-xs font-medium text-[#d4af37] transition-colors hover:bg-[rgba(212,175,55,0.15)]">Generate Settlement</button>
+              </div>
+            </div>
+
+            {approveError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{approveError}</div> : null}
+
+            {/* Generate Dialog */}
+            {showGenerateDialog ? (
+              <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+                <h3 className="text-lg font-semibold text-[#f5f1e6]">Generate Monthly Settlement</h3>
+                <p className="mt-1 text-sm text-[#a39a86]">Select a franchise agreement and calendar month.</p>
+                {generateError ? <div className="mt-3 rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{generateError}</div> : null}
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-xs text-[#a39a86]">Franchise Agreement</label>
+                    <select value={generateAgreementId} onChange={(e) => setGenerateAgreementId(e.target.value)} className="premium-input w-full">
+                      <option value="">Select agreement</option>
+                      {agreements.map((a) => <option key={a.id} value={a.id}>{a.partnerName} — {a.territoryName}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-[#a39a86]">Settlement Month</label>
+                    <input type="month" value={generateMonth} onChange={(e) => setGenerateMonth(e.target.value)} className="premium-input w-full" />
+                  </div>
+                </div>
+                <div className="mt-4 flex gap-2">
+                  <button onClick={() => void generateSettlement()} disabled={generateLoading} className="premium-btn-primary px-4 py-2 text-sm disabled:opacity-50">{generateLoading ? "Generating..." : "Generate"}</button>
+                  <button onClick={() => { setShowGenerateDialog(false); setGenerateError(null); }} className="rounded-lg border border-[rgba(163,154,134,0.3)] bg-[rgba(163,154,134,0.08)] px-4 py-2 text-sm text-[#a39a86] transition-colors hover:bg-[rgba(163,154,134,0.15)]">Cancel</button>
+                </div>
+              </div>
+            ) : null}
+
+            {/* Settlement List */}
+            {isLoadingSettlements ? <div className="text-sm text-[#a39a86]">Loading settlements...</div> : null}
+            {!isLoadingSettlements && settlementsError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-4 text-sm text-[#d1554a]">{settlementsError}</div> : null}
+            {!isLoadingSettlements && !settlementsError && settlements.length === 0 ? <div className="text-sm text-[#a39a86]">No settlements generated yet. Use "Generate Settlement" to create one.</div> : null}
+
+            {/* Settlement Detail View */}
+            {selectedSettlement ? (
+              <div className="rounded-2xl border border-[rgba(212,175,55,0.2)] bg-[#121110] p-6 text-[#f5f1e6]">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="font-serif text-xl font-bold text-[#f5f1e6]">Settlement Statement</h3>
+                    <div className="mt-1 text-sm text-[#a39a86]">
+                      Period: {new Date(selectedSettlement.periodStart).toLocaleDateString()} — {new Date(selectedSettlement.periodEnd).toLocaleDateString()}
+                    </div>
+                    <div className="text-xs text-[#6b6455]">Generated: {new Date(selectedSettlement.generatedAt).toLocaleString()}</div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`rounded-full px-3 py-1 text-xs font-medium ${selectedSettlement.status === "APPROVED" ? "border border-[rgba(63,174,106,0.3)] bg-[rgba(63,174,106,0.12)] text-[#3fae6a]" : "border border-[rgba(212,175,55,0.3)] bg-[rgba(212,175,55,0.12)] text-[#d4af37]"}`}>
+                      {selectedSettlement.status === "APPROVED" ? "Approved — Immutable" : selectedSettlement.status}
+                    </span>
+                    {selectedSettlement.status === "CALCULATED" ? (
+                      <button onClick={() => setShowApproveConfirm(true)} className="rounded-lg border border-[rgba(63,174,106,0.3)] bg-[rgba(63,174,106,0.08)] px-3 py-1 text-xs font-medium text-[#3fae6a] transition-colors hover:bg-[rgba(63,174,106,0.15)]">Approve</button>
+                    ) : null}
+                    <button onClick={() => { setSelectedSettlement(null); setSelectedSettlementLines([]); }} className="rounded-lg border border-[rgba(163,154,134,0.3)] bg-[rgba(163,154,134,0.08)] px-3 py-1 text-xs text-[#a39a86] transition-colors hover:bg-[rgba(163,154,134,0.15)]">Close</button>
+                  </div>
+                </div>
+
+                {selectedSettlement.approvedAt ? (
+                  <div className="mt-2 text-xs text-[#3fae6a]">Approved: {new Date(selectedSettlement.approvedAt).toLocaleString()}</div>
+                ) : null}
+
+                {/* Approve Confirmation */}
+                {showApproveConfirm ? (
+                  <div className="mt-4 rounded-xl border border-[rgba(63,174,106,0.3)] bg-[rgba(63,174,106,0.06)] p-4">
+                    <p className="text-sm text-[#f5f1e6]">Approve this settlement? Once approved, the settlement is treated as immutable.</p>
+                    <div className="mt-3 flex gap-2">
+                      <button onClick={() => void approveSettlement(selectedSettlement.id)} disabled={approveLoading} className="rounded-lg border border-[rgba(63,174,106,0.3)] bg-[rgba(63,174,106,0.15)] px-3 py-1.5 text-xs font-medium text-[#3fae6a] transition-colors hover:bg-[rgba(63,174,106,0.25)] disabled:opacity-50">{approveLoading ? "Approving..." : "Confirm Approval"}</button>
+                      <button onClick={() => setShowApproveConfirm(false)} className="rounded-lg border border-[rgba(163,154,134,0.3)] bg-[rgba(163,154,134,0.08)] px-3 py-1.5 text-xs text-[#a39a86]">Cancel</button>
+                    </div>
+                  </div>
+                ) : null}
+
+                {/* Sales Summary */}
+                <div className="mt-6 grid gap-4 sm:grid-cols-3">
+                  <div className="rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-4">
+                    <div className="text-xs uppercase tracking-[0.18em] text-[#a39a86]">Gross Sales</div>
+                    <div className="mt-1 text-lg font-semibold">₹{(selectedSettlement.grossSalesCents / 100).toLocaleString()}</div>
+                  </div>
+                  <div className="rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-4">
+                    <div className="text-xs uppercase tracking-[0.18em] text-[#a39a86]">GST</div>
+                    <div className="mt-1 text-lg font-semibold">₹{(selectedSettlement.gstCents / 100).toLocaleString()}</div>
+                  </div>
+                  <div className="rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-4">
+                    <div className="text-xs uppercase tracking-[0.18em] text-[#a39a86]">Net Sales</div>
+                    <div className="mt-1 text-lg font-semibold text-[#d4af37]">₹{(selectedSettlement.netSalesCents / 100).toLocaleString()}</div>
+                  </div>
+                </div>
+
+                {/* Commercial Calculation */}
+                <div className="mt-6">
+                  <h4 className="text-sm font-semibold uppercase tracking-[0.18em] text-[#a39a86]">Commercial Calculation</h4>
+                  <div className="mt-3 space-y-2 rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-4">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-[#a39a86]">Minimum Guarantee</span>
+                      <span>₹{(selectedSettlement.mgCents / 100).toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-[#a39a86]">Variable Return</span>
+                      <span>₹{(selectedSettlement.variableReturnCents / 100).toLocaleString()}</span>
+                    </div>
+                    <div className="border-t border-[rgba(212,175,55,0.1)] pt-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium text-[#d4af37]">Payout (Higher-of MG vs Variable)</span>
+                        <span className="font-medium text-[#d4af37]">₹{(selectedSettlement.payoutCents / 100).toLocaleString()}</span>
+                      </div>
+                      <div className="mt-1 text-xs text-[#6b6455]">The payout is the higher of MG and Variable Return — not the sum of both.</div>
+                    </div>
+                    <div className="border-t border-[rgba(212,175,55,0.1)] pt-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-[#a39a86]">Territory Royalty</span>
+                        <span>₹{(selectedSettlement.royaltyCents / 100).toLocaleString()}</span>
+                      </div>
+                    </div>
+                    {selectedSettlement.adjustmentCents !== 0 ? (
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-[#a39a86]">Adjustments</span>
+                        <span>₹{(selectedSettlement.adjustmentCents / 100).toLocaleString()}</span>
+                      </div>
+                    ) : null}
+                    <div className="border-t border-[rgba(212,175,55,0.3)] pt-2">
+                      <div className="flex items-center justify-between text-lg font-bold">
+                        <span className="text-[#d4af37]">Total Settlement</span>
+                        <span className="text-[#d4af37]">₹{(selectedSettlement.totalCents / 100).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Calculation Lines */}
+                {selectedSettlementLines.length > 0 ? (
+                  <div className="mt-6">
+                    <h4 className="text-sm font-semibold uppercase tracking-[0.18em] text-[#a39a86]">Calculation Breakdown</h4>
+                    <div className="mt-3 overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-[rgba(212,175,55,0.1)]">
+                            <th className="py-2 text-left text-xs font-medium uppercase tracking-wider text-[#a39a86]">Type</th>
+                            <th className="py-2 text-left text-xs font-medium uppercase tracking-wider text-[#a39a86]">Description</th>
+                            <th className="py-2 text-right text-xs font-medium uppercase tracking-wider text-[#a39a86]">Amount</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedSettlementLines.map((line) => (
+                            <tr key={line.id} className="border-b border-[rgba(212,175,55,0.05)]">
+                              <td className="py-2">
+                                <span className="rounded-full px-2 py-0.5 text-xs font-medium border border-[rgba(212,175,55,0.2)] bg-[rgba(212,175,55,0.06)] text-[#d4af37]">{line.lineType}</span>
+                              </td>
+                              <td className="py-2 text-[#a39a86]">{line.description}</td>
+                              <td className="py-2 text-right font-medium">₹{(line.amountCents / 100).toLocaleString()}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : null}
+
+                {/* Terms Snapshot */}
+                {selectedSettlement.termsSnapshot ? (
+                  <div className="mt-6">
+                    <h4 className="text-sm font-semibold uppercase tracking-[0.18em] text-[#a39a86]">Terms Snapshot</h4>
+                    <div className="mt-3 rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-4 text-xs text-[#6b6455]">
+                      Captured at generation time. The settlement preserves the commercial terms and sales basis used for this calculation.
+                    </div>
+                  </div>
+                ) : null}
+
+                {settlementDetailLoading ? <div className="mt-4 text-sm text-[#a39a86]">Loading detail...</div> : null}
+              </div>
+            ) : null}
+
+            {/* Settlement List Table */}
+            {!isLoadingSettlements && settlements.length > 0 && !selectedSettlement ? (
+              <div className="rounded-2xl border border-[rgba(212,175,55,0.2)] bg-[#121110] p-5">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-[rgba(212,175,55,0.1)]">
+                        <th className="py-2 text-left text-xs font-medium uppercase tracking-wider text-[#a39a86]">Period</th>
+                        <th className="py-2 text-left text-xs font-medium uppercase tracking-wider text-[#a39a86]">Status</th>
+                        <th className="py-2 text-right text-xs font-medium uppercase tracking-wider text-[#a39a86]">Net Sales</th>
+                        <th className="py-2 text-right text-xs font-medium uppercase tracking-wider text-[#a39a86]">Payout</th>
+                        <th className="py-2 text-right text-xs font-medium uppercase tracking-wider text-[#a39a86]">Royalty</th>
+                        <th className="py-2 text-right text-xs font-medium uppercase tracking-wider text-[#a39a86]">Total</th>
+                        <th className="py-2 text-center text-xs font-medium uppercase tracking-wider text-[#a39a86]">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {settlements.map((s) => (
+                        <tr key={s.id} className="border-b border-[rgba(212,175,55,0.05)] hover:bg-[rgba(212,175,55,0.03)]">
+                          <td className="py-3 text-[#f5f1e6]">{new Date(s.periodStart).toLocaleDateString()} — {new Date(s.periodEnd).toLocaleDateString()}</td>
+                          <td className="py-3">
+                            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${s.status === "APPROVED" ? "border border-[rgba(63,174,106,0.3)] bg-[rgba(63,174,106,0.12)] text-[#3fae6a]" : "border border-[rgba(212,175,55,0.3)] bg-[rgba(212,175,55,0.12)] text-[#d4af37]"}`}>{s.status}</span>
+                          </td>
+                          <td className="py-3 text-right text-[#a39a86]">₹{(s.netSalesCents / 100).toLocaleString()}</td>
+                          <td className="py-3 text-right text-[#a39a86]">₹{(s.payoutCents / 100).toLocaleString()}</td>
+                          <td className="py-3 text-right text-[#a39a86]">₹{(s.royaltyCents / 100).toLocaleString()}</td>
+                          <td className="py-3 text-right font-medium text-[#d4af37]">₹{(s.totalCents / 100).toLocaleString()}</td>
+                          <td className="py-3 text-center">
+                            <button onClick={() => void loadSettlementDetail(s.id)} className="rounded-lg border border-[rgba(212,175,55,0.3)] bg-[rgba(212,175,55,0.08)] px-2 py-1 text-xs text-[#d4af37] transition-colors hover:bg-[rgba(212,175,55,0.15)]">View</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             ) : null}
           </section>
