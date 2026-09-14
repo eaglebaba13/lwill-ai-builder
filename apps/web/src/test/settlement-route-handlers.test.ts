@@ -79,7 +79,7 @@ describe("settlement route handlers: generate", () => {
 
   it("returns service error status", async () => {
     const services = createServices(authorized);
-    services.generateSettlement = vi.fn().mockResolvedValue({ error: "Not found", status: 404 });
+    (services as { generateSettlement: unknown }).generateSettlement = vi.fn().mockResolvedValue({ error: "Not found", status: 404 });
     expect((await handleGenerateSettlement(request({ agreementId: "a1", periodStart: "2026-09-01", periodEnd: "2026-09-30" }), services)).status).toBe(404);
   });
 });
@@ -98,7 +98,7 @@ describe("settlement route handlers: get", () => {
 
   it("returns 404 for missing settlement", async () => {
     const services = createServices(authorized);
-    services.getSettlement = vi.fn().mockResolvedValue(null);
+    (services as { getSettlement: unknown }).getSettlement = vi.fn().mockResolvedValue(null);
     expect((await handleGetSettlement(request(), services, "missing")).status).toBe(404);
   });
 });
@@ -134,7 +134,7 @@ describe("settlement route handlers: approve", () => {
 
   it("returns service error for failed approval", async () => {
     const services = createServices(authorized);
-    services.approveSettlement = vi.fn().mockResolvedValue({ error: "Cannot approve", status: 400 });
+    (services as { approveSettlement: unknown }).approveSettlement = vi.fn().mockResolvedValue({ error: "Cannot approve", status: 400 });
     expect((await handleApproveSettlement(request({}, "POST"), services, "s1")).status).toBe(400);
   });
 });

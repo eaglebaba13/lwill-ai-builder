@@ -73,6 +73,7 @@ export interface SettlementService {
 interface SettlementPrismaClient {
   readonly franchiseAgreement: {
     findUnique(args: { where: { id: string }; include?: Record<string, unknown> }): Promise<Record<string, unknown> | null>;
+    findMany(args: { where: Record<string, unknown>; select?: Record<string, unknown> }): Promise<ReadonlyArray<Record<string, unknown>>>;
   };
   readonly franchiseAgreementOutlet: {
     findMany(args: { where: Record<string, unknown>; select?: Record<string, unknown> }): Promise<ReadonlyArray<Record<string, unknown>>>;
@@ -212,7 +213,7 @@ export function createSettlementService(prisma: SettlementPrismaClient): Settlem
         where: { tenantId, territoryId, isActive: true },
         select: { partnerId: true },
       });
-      const eligiblePartnerCount = new Set(territoryAgreements.map((a) => a.partnerId as string)).size;
+      const eligiblePartnerCount = new Set(territoryAgreements.map((a: Record<string, unknown>) => a.partnerId as string)).size;
 
       const royalty = calculateRoyalty(
         territorySalesCents,
