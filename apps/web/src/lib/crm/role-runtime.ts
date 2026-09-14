@@ -5,6 +5,7 @@ import { createAuthorizationService } from "@lwill/authorization-service/src/aut
 import { loadPermissionGrants } from "@lwill/authorization-prisma/src/load-permission-grants";
 import { prisma } from "../../../../../packages/database/src/client";
 import { createRoleService } from "../../../../../packages/authentication-context-prisma/src/role-service";
+import { getRoleScopeMetadata } from "../../../../../packages/authentication-context-prisma/src/xnail-role-bootstrap";
 import type {
   RoleAuthorization,
   RoleRouteServices,
@@ -38,11 +39,30 @@ async function authorize(permissionCode: string): Promise<RoleAuthorization> {
   return { outcome: "authorized", tenantId: context.tenantContext.tenantId, userId: context.user.userId };
 }
 
+function enrichWithScopeMetadata(roles: readonly unknown[]): unknown[] {
+  return roles.map((role) => {
+    const r = role as { id: string; code: string; name: string; description: string | null; isActive: boolean; permissions: unknown[] };
+    const scopeMeta = getRoleScopeMetadata(r.code);
+    return {
+      ...r,
+      scopeType: scopeMeta?.scopeType ?? "TENANT",
+      requiresScope: scopeMeta?.requiresScope ?? false,
+    };
+  });
+}
+
 export function createRoleRouteServices(): RoleRouteServices {
   return {
     authorize,
-    listRoles: (tenantId) => roleService.listRoles({ tenantId }),
-    getRole: (tenantId, roleId) => roleService.getRole({ tenantId, roleId }),
+    listRoles: async (tenantId) => {
+      const roles = await roleService.listRoles({ tenantId });
+      return enrichWithScopeMetadata(roles);
+    },
+    getRole: async (tenantId, roleId) => {
+      const role = await roleService.getRole({ tenantId, roleId });
+      if (role === null) return null;
+      return enrichWithScopeMetadata([role])[0] ?? null;
+    },
     updateRole: (tenantId, roleId, input, actorUserId) =>
       roleService.updateRole({ tenantId, roleId, input, actorUserId }),
     deleteRole: (tenantId, roleId, actorUserId) =>

@@ -499,13 +499,14 @@ export default function Home() {
   const [availableUpdates, setAvailableUpdates] = useState<Array<{ assetId: string; assetName: string; installedVersion: string; latestVersion: string; latestVersionId: string }>>([]);
   const [roleAssignmentUsers, setRoleAssignmentUsers] = useState<Array<{ id: string; membershipId: string; email: string | null; displayName: string | null; isActive: boolean }>>([]);
   const [isLoadingRoleAssignmentUsers, setIsLoadingRoleAssignmentUsers] = useState(false);
-  const [roleAssignmentRoles, setRoleAssignmentRoles] = useState<Array<{ id: string; code: string; name: string }>>([]);
+  const [roleAssignmentRoles, setRoleAssignmentRoles] = useState<Array<{ id: string; code: string; name: string; scopeType: string; requiresScope: boolean }>>([]);
   const [isLoadingRoleAssignmentRoles, setIsLoadingRoleAssignmentRoles] = useState(false);
   const [roleAssignmentUserId, setRoleAssignmentUserId] = useState("");
   const [roleAssignmentRoleId, setRoleAssignmentRoleId] = useState("");
   const [roleAssignmentScopeKind, setRoleAssignmentScopeKind] = useState<"tenant" | "business-unit" | "branch">("tenant");
   const [roleAssignmentBusinessUnitId, setRoleAssignmentBusinessUnitId] = useState("");
   const [roleAssignmentBranchId, setRoleAssignmentBranchId] = useState("");
+  const [roleAssignmentTerritoryId, setRoleAssignmentTerritoryId] = useState("");
   const [isAssigningRole, setIsAssigningRole] = useState(false);
   const [roleAssignmentError, setRoleAssignmentError] = useState<string | null>(null);
   const [roleAssignmentSuccess, setRoleAssignmentSuccess] = useState<string | null>(null);
@@ -2079,8 +2080,9 @@ export default function Home() {
     void Promise.all([
       fetch("/api/users", { credentials: "same-origin", cache: "no-store" }),
       fetch("/api/roles", { credentials: "same-origin", cache: "no-store" }),
+      fetch("/api/franchise/territories", { credentials: "same-origin", cache: "no-store" }),
     ])
-      .then(async ([usersResult, rolesResult]) => {
+      .then(async ([usersResult, rolesResult, territoriesResult]) => {
         if (!mounted) return;
         completed = true;
 
@@ -2099,9 +2101,13 @@ export default function Home() {
 
         const usersBody = await usersResult.json().catch(() => ({}));
         const rolesBody = await rolesResult.json().catch(() => ({}));
+        const territoriesBody = await territoriesResult.json().catch(() => ({}));
 
         const loadedUsers = Array.isArray(usersBody.users) ? usersBody.users : [];
         const loadedRoles = Array.isArray(rolesBody.roles) ? rolesBody.roles : [];
+        if (Array.isArray(territoriesBody.territories)) {
+          setTerritories(territoriesBody.territories);
+        }
 
         setRoleAssignmentUsers(
           loadedUsers.map((user: { id: string; membershipId: string; email: string | null; displayName: string | null; isActive: boolean }) => ({
@@ -2113,10 +2119,12 @@ export default function Home() {
           })),
         );
         setRoleAssignmentRoles(
-          loadedRoles.map((role: { id: string; code: string; name: string }) => ({
+          loadedRoles.map((role: { id: string; code: string; name: string; scopeType?: string; requiresScope?: boolean }) => ({
             id: role.id,
             code: role.code,
             name: role.name,
+            scopeType: role.scopeType ?? "TENANT",
+            requiresScope: role.requiresScope ?? false,
           })),
         );
       })
@@ -3029,16 +3037,32 @@ export default function Home() {
       setRoleAssignmentError("Select a user and a role.");
       return;
     }
+    const selectedRole = roleAssignmentRoles.find((r) => r.id === roleAssignmentRoleId);
+    if (selectedRole?.requiresScope) {
+      if (selectedRole.scopeType === "BUSINESS_UNIT" && !roleAssignmentBusinessUnitId) {
+        setRoleAssignmentError("Select a business unit for this role.");
+        return;
+      }
+      if (selectedRole.scopeType === "BRANCH" && (!roleAssignmentBusinessUnitId || !roleAssignmentBranchId)) {
+        setRoleAssignmentError("Select a business unit and branch for this role.");
+        return;
+      }
+      if (selectedRole.scopeType === "TERRITORY" && !roleAssignmentTerritoryId) {
+        setRoleAssignmentError("Select a territory for this role.");
+        return;
+      }
+    }
     setRoleAssignmentError(null);
     setRoleAssignmentSuccess(null);
     setIsAssigningRole(true);
 
+    const scopeType = selectedRole?.scopeType ?? "TENANT";
     const scope =
-      roleAssignmentScopeKind === "tenant"
-        ? { kind: "tenant" as const }
-        : roleAssignmentScopeKind === "business-unit"
-          ? { kind: "business-unit" as const, businessUnitId: roleAssignmentBusinessUnitId }
-          : { kind: "branch" as const, businessUnitId: roleAssignmentBusinessUnitId, branchId: roleAssignmentBranchId };
+      scopeType === "BUSINESS_UNIT"
+        ? { kind: "business-unit" as const, businessUnitId: roleAssignmentBusinessUnitId }
+        : scopeType === "BRANCH"
+          ? { kind: "branch" as const, businessUnitId: roleAssignmentBusinessUnitId, branchId: roleAssignmentBranchId }
+          : { kind: "tenant" as const };
 
     const result = await fetch("/api/membership-roles", {
       method: "POST",
@@ -3076,6 +3100,7 @@ export default function Home() {
     setRoleAssignmentScopeKind("tenant");
     setRoleAssignmentBusinessUnitId("");
     setRoleAssignmentBranchId("");
+    setRoleAssignmentTerritoryId("");
     setIsAssigningRole(false);
     setProfileVersion((version) => version + 1);
   };
@@ -8865,43 +8890,86 @@ export default function Home() {
                       </option>
                     ))}
                   </select>
-                  <label className="block text-sm font-medium text-[#5a3b48]" htmlFor="role-scope">Scope</label>
-                  <select
-                    id="role-scope"
-                    value={roleAssignmentScopeKind}
-                    onChange={(event) => setRoleAssignmentScopeKind(event.target.value as "tenant" | "business-unit" | "branch")}
-                    className="w-full rounded-xl border border-[rgba(212,175,55,0.15)] bg-[#17150f] px-3 py-2.5 text-sm"
-                  >
-                    <option value="tenant">Tenant scope</option>
-                    <option value="business-unit">Business unit scope</option>
-                    <option value="branch">Branch scope</option>
-                  </select>
-                  {(roleAssignmentScopeKind === "business-unit" || roleAssignmentScopeKind === "branch") && (
-                    <select
-                      value={roleAssignmentBusinessUnitId}
-                      onChange={(event) => setRoleAssignmentBusinessUnitId(event.target.value)}
-                      className="w-full rounded-xl border border-[rgba(212,175,55,0.15)] bg-[#17150f] px-3 py-2.5 text-sm"
-                    >
-                      <option value="">Select business unit</option>
-                      {businessUnits.map((bu) => (
-                        <option key={bu.id} value={bu.id}>{bu.name}</option>
-                      ))}
-                    </select>
-                  )}
-                  {roleAssignmentScopeKind === "branch" && (
-                    <select
-                      value={roleAssignmentBranchId}
-                      onChange={(event) => setRoleAssignmentBranchId(event.target.value)}
-                      className="w-full rounded-xl border border-[rgba(212,175,55,0.15)] bg-[#17150f] px-3 py-2.5 text-sm"
-                    >
-                      <option value="">Select branch</option>
-                      {branches
-                        .filter((branch) => roleAssignmentBusinessUnitId ? branch.businessUnitId === roleAssignmentBusinessUnitId : true)
-                        .map((branch) => (
-                          <option key={branch.id} value={branch.id}>{branch.name}</option>
-                        ))}
-                    </select>
-                  )}
+                  {(() => {
+                    const selectedRole = roleAssignmentRoles.find((r) => r.id === roleAssignmentRoleId);
+                    const scopeType = selectedRole?.scopeType ?? "TENANT";
+                    const requiresScope = selectedRole?.requiresScope ?? false;
+
+                    if (!requiresScope) return null;
+
+                    if (scopeType === "TERRITORY") {
+                      return (
+                        <>
+                          <label className="block text-sm font-medium text-[#5a3b48]" htmlFor="role-territory">Territory</label>
+                          <select
+                            id="role-territory"
+                            value={roleAssignmentTerritoryId}
+                            onChange={(event) => setRoleAssignmentTerritoryId(event.target.value)}
+                            className="w-full rounded-xl border border-[rgba(212,175,55,0.15)] bg-[#17150f] px-3 py-2.5 text-sm"
+                          >
+                            <option value="">Select territory</option>
+                            {territories.filter((t) => t.isActive).map((territory) => (
+                              <option key={territory.id} value={territory.id}>{territory.name}</option>
+                            ))}
+                          </select>
+                        </>
+                      );
+                    }
+
+                    if (scopeType === "BUSINESS_UNIT") {
+                      return (
+                        <>
+                          <label className="block text-sm font-medium text-[#5a3b48]" htmlFor="role-bu">Business Unit / City</label>
+                          <select
+                            id="role-bu"
+                            value={roleAssignmentBusinessUnitId}
+                            onChange={(event) => setRoleAssignmentBusinessUnitId(event.target.value)}
+                            className="w-full rounded-xl border border-[rgba(212,175,55,0.15)] bg-[#17150f] px-3 py-2.5 text-sm"
+                          >
+                            <option value="">Select business unit</option>
+                            {businessUnits.map((bu) => (
+                              <option key={bu.id} value={bu.id}>{bu.name}</option>
+                            ))}
+                          </select>
+                        </>
+                      );
+                    }
+
+                    if (scopeType === "BRANCH") {
+                      return (
+                        <>
+                          <label className="block text-sm font-medium text-[#5a3b48]" htmlFor="role-bu-branch">Business Unit</label>
+                          <select
+                            id="role-bu-branch"
+                            value={roleAssignmentBusinessUnitId}
+                            onChange={(event) => setRoleAssignmentBusinessUnitId(event.target.value)}
+                            className="w-full rounded-xl border border-[rgba(212,175,55,0.15)] bg-[#17150f] px-3 py-2.5 text-sm"
+                          >
+                            <option value="">Select business unit</option>
+                            {businessUnits.map((bu) => (
+                              <option key={bu.id} value={bu.id}>{bu.name}</option>
+                            ))}
+                          </select>
+                          <label className="block text-sm font-medium text-[#5a3b48]" htmlFor="role-branch">Branch</label>
+                          <select
+                            id="role-branch"
+                            value={roleAssignmentBranchId}
+                            onChange={(event) => setRoleAssignmentBranchId(event.target.value)}
+                            className="w-full rounded-xl border border-[rgba(212,175,55,0.15)] bg-[#17150f] px-3 py-2.5 text-sm"
+                          >
+                            <option value="">Select branch</option>
+                            {branches
+                              .filter((branch) => roleAssignmentBusinessUnitId ? branch.businessUnitId === roleAssignmentBusinessUnitId : true)
+                              .map((branch) => (
+                                <option key={branch.id} value={branch.id}>{branch.name}</option>
+                              ))}
+                          </select>
+                        </>
+                      );
+                    }
+
+                    return null;
+                  })()}
                   <button
                     onClick={assignRole}
                     disabled={isAssigningRole}
