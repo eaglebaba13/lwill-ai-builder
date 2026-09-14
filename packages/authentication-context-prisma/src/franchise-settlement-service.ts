@@ -1,6 +1,7 @@
 import {
   calculatePayout,
   calculateRoyalty,
+  splitRoyaltyEqually,
   buildTermsSnapshot,
   calculateNetSales,
 } from "./franchise-commercial-service";
@@ -126,6 +127,8 @@ export function createSettlementService(prisma: SettlementPrismaClient): Settlem
         return { error: "Period must be exactly one calendar month (1st to last day)", status: 400 };
       }
 
+      const nextMonthStart = new Date(Date.UTC(periodStart.getUTCFullYear(), periodStart.getUTCMonth() + 1, 1));
+
       const agreement = await prisma.franchiseAgreement.findUnique({
         where: { id: input.agreementId },
         include: {
@@ -148,7 +151,7 @@ export function createSettlementService(prisma: SettlementPrismaClient): Settlem
           where: {
             tenantId,
             branchId: { in: branchIds },
-            issuedAt: { gte: periodStart, lte: periodEnd },
+            issuedAt: { gte: periodStart, lt: nextMonthStart },
           },
           select: { totalCents: true, gstCents: true },
         });
@@ -181,13 +184,44 @@ export function createSettlementService(prisma: SettlementPrismaClient): Settlem
         netSalesCents,
       );
 
+      // Royalty: TR-03 requires all operational outlets in territory
+      const territoryId = agreement.territoryId as string;
+      const territoryBranches = await prisma.franchiseAgreementOutlet.findMany({
+        where: { tenantId, agreement: { territoryId } },
+        select: { branchId: true },
+      });
+      const territoryBranchIds = territoryBranches.map((b) => b.branchId as string);
+
+      let territorySalesCents = grossSalesCents;
+      if (territoryBranchIds.length > 0 && territoryBranchIds.some((id) => !branchIds.includes(id))) {
+        const territoryInvoices = await prisma.invoice.findMany({
+          where: {
+            tenantId,
+            branchId: { in: territoryBranchIds },
+            issuedAt: { gte: periodStart, lt: nextMonthStart },
+          },
+          select: { totalCents: true, gstCents: true },
+        });
+        territorySalesCents = 0;
+        for (const inv of territoryInvoices) {
+          territorySalesCents += (inv.totalCents as number) - (inv.gstCents as number);
+        }
+      }
+
+      const territoryAgreements = await prisma.franchiseAgreement.findMany({
+        where: { tenantId, territoryId, isActive: true },
+        select: { partnerId: true },
+      });
+      const eligiblePartnerCount = new Set(territoryAgreements.map((a) => a.partnerId as string)).size;
+
       const royalty = calculateRoyalty(
-        grossSalesCents,
+        territorySalesCents,
         agreement.territoryRoyaltyRateBp as number | null,
       );
+      const individualRoyaltyCents = splitRoyaltyEqually(royalty.poolCents, eligiblePartnerCount);
 
       const adjustmentCents = 0;
-      const totalCents = payout.payableCents + royalty.poolCents + adjustmentCents;
+      const totalCents = payout.payableCents + individualRoyaltyCents + adjustmentCents;
 
       const termsSnapshot = buildTermsSnapshot(
         {
@@ -208,6 +242,12 @@ export function createSettlementService(prisma: SettlementPrismaClient): Settlem
         periodGSTCents: gstCents,
         periodNetSalesCents: netSalesCents,
         applicableBranchIds: branchIds,
+        territoryId,
+        territoryBranchIds,
+        territorySalesCents,
+        royaltyPoolCents: royalty.poolCents,
+        royaltyEligiblePartnerCount: eligiblePartnerCount,
+        individualRoyaltyCents,
         capturedAt: new Date().toISOString(),
       };
 
@@ -215,7 +255,7 @@ export function createSettlementService(prisma: SettlementPrismaClient): Settlem
         { lineType: "MG", description: `Minimum Guarantee (${payout.mgSource})`, amountCents: payout.fixedMGCents, metadata: { source: payout.mgSource } },
         { lineType: "VARIABLE_RETURN", description: `Variable Return (${(agreement.variableReturnRateBp as number | null ?? 3000) / 100}%)`, amountCents: payout.variableReturnCents, metadata: { rateBp: agreement.variableReturnRateBp ?? 3000 } },
         { lineType: "PAYOUT", description: "Higher-of Payout (MG vs Variable)", amountCents: payout.payableCents, metadata: { rule: agreement.payoutRule ?? "HIGHER_OF_FIXED_AND_VARIABLE" } },
-        { lineType: "ROYALTY", description: `Territory Royalty (${royalty.rateBp / 100}%)`, amountCents: royalty.poolCents, metadata: { rateBp: royalty.rateBp } },
+        { lineType: "ROYALTY", description: `Territory Royalty (${royalty.rateBp / 100}%, ${eligiblePartnerCount} partner${eligiblePartnerCount === 1 ? "" : "s"})`, amountCents: individualRoyaltyCents, metadata: { rateBp: royalty.rateBp, poolCents: royalty.poolCents, eligiblePartnerCount, individualCents: individualRoyaltyCents } },
       ];
 
       try {
@@ -234,7 +274,7 @@ export function createSettlementService(prisma: SettlementPrismaClient): Settlem
               mgCents: payout.fixedMGCents,
               variableReturnCents: payout.variableReturnCents,
               payoutCents: payout.payableCents,
-              royaltyCents: royalty.poolCents,
+              royaltyCents: individualRoyaltyCents,
               adjustmentCents,
               totalCents,
               termsSnapshot: snapshotWithSales,

@@ -34,6 +34,12 @@ function createPrisma() {
         }
         return null;
       }),
+      findMany: vi.fn(async ({ where }: { where: Record<string, unknown> }) => {
+        if (where.territoryId === "territory-1") {
+          return [{ partnerId: "partner-1" }, { partnerId: "partner-2" }];
+        }
+        return [];
+      }),
     },
     franchiseAgreementOutlet: {
       findMany: vi.fn(async () => [{ branchId: "branch-1" }, { branchId: "branch-2" }]),
@@ -160,7 +166,7 @@ describe("franchise-settlement-service: generateSettlement", () => {
     expect(result.settlement.payoutCents).toBe(result.settlement.variableReturnCents);
   });
 
-  it("calculates royalty", async () => {
+  it("calculates individual royalty share (pool / eligible partners)", async () => {
     const { prisma } = createPrisma();
     const service = createSettlementService(prisma);
 
@@ -171,7 +177,10 @@ describe("franchise-settlement-service: generateSettlement", () => {
     });
 
     if (!("settlement" in result)) throw new Error("Expected settlement");
-    expect(result.settlement.royaltyCents).toBe(Math.round(15000000 * 200 / 10000));
+    // Territory sales = 15000000, royalty rate = 2% (200bp)
+    // Pool = 15000000 * 200 / 10000 = 300000
+    // 2 eligible partners → individual = 300000 / 2 = 150000
+    expect(result.settlement.royaltyCents).toBe(150000);
   });
 
   it("captures terms snapshot with sales data", async () => {
@@ -288,6 +297,8 @@ describe("franchise-settlement-service: generateSettlement", () => {
     });
 
     if (!("settlement" in result)) throw new Error("Expected settlement");
+    // totalCents = payoutCents + individualRoyaltyCents + adjustmentCents
+    // payoutCents is higher-of(MG, variable), NOT MG + variable
     expect(result.settlement.totalCents).toBe(result.settlement.payoutCents + result.settlement.royaltyCents);
   });
 });
