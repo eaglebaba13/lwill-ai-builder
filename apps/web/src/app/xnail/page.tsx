@@ -8142,21 +8142,124 @@ export default function Home() {
         ) : null}
 
         {activeTab === "Overview" ? (
-          <section className="mt-6 rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
-            <h2 className="text-xl font-semibold">Launch workflow</h2>
-            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <section className="mt-6 space-y-6">
+            {/* KPI Cards */}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
               {[
-                "Login",
-                "Tenant context",
-                "Customer + Service",
-                "Appointment + completion",
-                "Invoice / POS",
-              ].map((step, index) => (
-                <div key={step} className="rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-4">
-                  <div className="text-xs uppercase tracking-[0.2em] text-[#a39a86]">0{index + 1}</div>
-                  <div className="mt-2 font-medium">{step}</div>
+                { label: "Revenue", value: report !== null ? `₹${report.sales.totalRevenueCents / 100}` : "—", sub: report !== null ? `${report.sales.invoiceCount} invoice${report.sales.invoiceCount === 1 ? "" : "s"}` : undefined, loading: isLoadingReport },
+                { label: "Appointments", value: report !== null ? String(report.appointments.total) : "—", sub: report !== null ? report.appointments.statusBreakdown.map((s) => `${s.count} ${s.status.toLowerCase()}`).join(", ") : undefined, loading: isLoadingReport },
+                { label: "Customers", value: report !== null ? String(report.customers.total) : "—", sub: `${customers.length} loaded`, loading: isLoadingReport },
+                { label: "Staff", value: String(staff.length), sub: `${attendance.filter((a) => a.checkOutAt === null).length} checked in`, loading: isLoadingStaff },
+                { label: "Follow-ups", value: String(crmPendingFollowups.length), sub: crmPendingFollowups.length > 0 ? `Next: ${new Date(crmPendingFollowups[0].dueAt).toLocaleDateString()}` : "None pending", loading: false },
+                { label: "Stock Items", value: report !== null ? String(report.inventory.stockItemCount) : "—", sub: report !== null ? `Qty: ${report.inventory.totalQuantity}` : undefined, loading: isLoadingReport },
+              ].map((kpi) => (
+                <div key={kpi.label} className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-4">
+                  <div className="text-xs uppercase tracking-[0.18em] text-[#a39a86]">{kpi.label}</div>
+                  <div className="mt-2 text-2xl font-semibold text-[#f5f1e6]">{kpi.loading ? "…" : kpi.value}</div>
+                  {kpi.sub !== undefined ? <div className="mt-1 text-xs text-[#a39a86]">{kpi.sub}</div> : null}
                 </div>
               ))}
+            </div>
+
+            {/* Today's Operations */}
+            <div className="grid gap-4 lg:grid-cols-2">
+              {/* Appointments */}
+              <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+                <h3 className="font-serif text-lg font-semibold text-[#f5f1e6]">Appointments</h3>
+                {appointments.length === 0 ? (
+                  <div className="mt-3 text-sm text-[#a39a86]">No appointments yet.</div>
+                ) : (
+                  <div className="mt-3 space-y-2">
+                    {appointments.slice(0, 5).map((appt) => {
+                      const customer = customers.find((c) => c.id === appt.customerId);
+                      const service = services.find((s) => s.id === appt.serviceId);
+                      return (
+                        <div key={appt.id} className="flex items-center justify-between rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
+                          <div>
+                            <div className="font-medium text-[#f5f1e6]">{customer?.name ?? "Unknown"}</div>
+                            <div className="text-xs text-[#a39a86]">{service?.name ?? "Service"}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-xs text-[#a39a86]">{new Date(appt.startsAt).toLocaleDateString()}</div>
+                            <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-xs font-medium ${appt.status === "Completed" ? "border border-[rgba(63,174,106,0.3)] bg-[rgba(63,174,106,0.12)] text-[#3fae6a]" : "border border-[rgba(212,175,55,0.3)] bg-[rgba(212,175,55,0.12)] text-[#d4af37]"}`}>{appt.status ?? "Pending"}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Recent Sales / Invoices */}
+              <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+                <h3 className="font-serif text-lg font-semibold text-[#f5f1e6]">Recent Sales</h3>
+                {invoices.length === 0 ? (
+                  <div className="mt-3 text-sm text-[#a39a86]">No invoices yet.</div>
+                ) : (
+                  <div className="mt-3 space-y-2">
+                    {invoices.slice(0, 5).map((inv) => {
+                      const customer = customers.find((c) => c.id === inv.customerId);
+                      return (
+                        <div key={inv.id} className="flex items-center justify-between rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
+                          <div>
+                            <div className="font-medium text-[#f5f1e6]">{customer?.name ?? "Walk-in"}</div>
+                            <div className="text-xs text-[#a39a86]">{new Date(inv.issuedAt).toLocaleDateString()}</div>
+                          </div>
+                          <div className="text-sm font-medium text-[#d4af37]">₹{inv.totalCents / 100}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Business Health */}
+            <div className="grid gap-4 lg:grid-cols-2">
+              {/* Inventory */}
+              <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+                <h3 className="font-serif text-lg font-semibold text-[#f5f1e6]">Inventory</h3>
+                {report !== null ? (
+                  <div className="mt-3 space-y-2">
+                    <div className="flex items-center justify-between rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
+                      <span className="text-sm text-[#a39a86]">Stock Items</span>
+                      <span className="font-medium text-[#f5f1e6]">{report.inventory.stockItemCount}</span>
+                    </div>
+                    <div className="flex items-center justify-between rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
+                      <span className="text-sm text-[#a39a86]">Total Quantity</span>
+                      <span className="font-medium text-[#f5f1e6]">{report.inventory.totalQuantity}</span>
+                    </div>
+                    <div className="flex items-center justify-between rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
+                      <span className="text-sm text-[#a39a86]">Movements</span>
+                      <span className="font-medium text-[#f5f1e6]">{report.inventory.movementCount}</span>
+                    </div>
+                  </div>
+                ) : isLoadingReport ? (
+                  <div className="mt-3 text-sm text-[#a39a86]">Loading…</div>
+                ) : (
+                  <div className="mt-3 text-sm text-[#a39a86]">No inventory data.</div>
+                )}
+              </div>
+
+              {/* Staff & Attendance */}
+              <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
+                <h3 className="font-serif text-lg font-semibold text-[#f5f1e6]">Staff & Attendance</h3>
+                {staff.length === 0 ? (
+                  <div className="mt-3 text-sm text-[#a39a86]">No staff records.</div>
+                ) : (
+                  <div className="mt-3 space-y-2">
+                    {staff.slice(0, 5).map((s) => {
+                      const todayAttendance = attendance.find((a) => a.staffId === s.id && a.checkOutAt === null);
+                      return (
+                        <div key={s.id} className="flex items-center justify-between rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
+                          <div className="font-medium text-[#f5f1e6]">{s.displayName}</div>
+                          <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${todayAttendance ? "border border-[rgba(63,174,106,0.3)] bg-[rgba(63,174,106,0.12)] text-[#3fae6a]" : "border border-[rgba(163,154,134,0.3)] bg-[rgba(163,154,134,0.12)] text-[#a39a86]"}`}>{todayAttendance ? "In" : "Out"}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
           </section>
         ) : null}
