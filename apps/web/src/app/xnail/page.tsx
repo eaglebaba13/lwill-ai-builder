@@ -158,7 +158,7 @@ function KpiCard({ definition, context }: { readonly definition: RoleDashboardCo
       subtitle = "Outlets";
       break;
     case "attendance":
-      value = context.attendance.filter((a) => a.id.startsWith(today)).length;
+      value = context.attendance.filter((a) => a.checkInAt.startsWith(today)).length;
       subtitle = "Today";
       break;
     case "invoices":
