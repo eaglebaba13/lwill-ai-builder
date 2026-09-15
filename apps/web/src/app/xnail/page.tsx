@@ -119,7 +119,7 @@ type KpiContext = {
   readonly customers: Array<{ id: string }>;
   readonly lowStockItems: Array<{ stockItemId: string; productId: string; branchId: string; quantity: number; minQuantity: number; reorderQuantity: number }>;
   readonly branches: Array<{ id: string }>;
-  readonly attendance: Array<{ id: string }>;
+  readonly attendance: Array<{ id: string; checkInAt: string }>;
   readonly purchaseReceipts: Array<{ id: string }>;
 };
 
