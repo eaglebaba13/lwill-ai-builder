@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AppSidebar } from "@/components/app-sidebar";
+import { AppHeader } from "@/components/app-header";
+import { AppSidebar, type SidebarIconKey, type SidebarSection } from "@/components/app-sidebar";
+import { KpiCard as SharedKpiCard } from "@/components/kpi-card";
 import {
   invalidatePendingRefresh,
   loginWithNativeAuthentication,
@@ -123,64 +125,121 @@ type KpiContext = {
   readonly purchaseReceipts: Array<{ id: string }>;
 };
 
+function MetricGlyph({ type }: { readonly type: RoleDashboardConfig["kpis"][number]["source"]["type"] }) {
+  const common = "h-4 w-4";
+
+  switch (type) {
+    case "revenue":
+    case "invoices":
+      return <svg className={common} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 7h16" /><path d="M6 7v12h12V7" /><path d="M9 11h6" /><path d="M9 15h4" /></svg>;
+    case "lowStock":
+    case "purchaseReceipts":
+      return <svg className={common} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 8l8-4 8 4-8 4-8-4Z" /><path d="M4 8v8l8 4 8-4V8" /></svg>;
+    case "staff":
+    case "attendance":
+      return <svg className={common} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>;
+    case "branches":
+      return <svg className={common} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 21V5a2 2 0 0 1 2-2h8v18" /><path d="M14 9h4a2 2 0 0 1 2 2v10" /></svg>;
+    case "customers":
+    case "memberships":
+      return <svg className={common} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M7 8a4 4 0 1 0 0.01 0Z" /><path d="M17 10a3 3 0 1 0 0.01 0Z" /><path d="M3 20a4 4 0 0 1 8 0" /><path d="M14 20a3.5 3.5 0 0 1 7 0" /></svg>;
+    case "appointmentsToday":
+    default:
+      return <svg className={common} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M7 3v4" /><path d="M17 3v4" /><path d="M4 9h16" /><path d="M5 5h14v16H5z" /></svg>;
+  }
+}
+
 function KpiCard({ definition, context }: { readonly definition: RoleDashboardConfig["kpis"][number]; readonly context: KpiContext }) {
   const today = new Date().toISOString().split("T")[0];
   let value: string | number = "";
   let subtitle: string | undefined;
+  let tone: "default" | "gold" | "success" | "warning" | "danger" = "default";
 
   switch (definition.source.type) {
     case "appointmentsToday":
       value = context.appointments.filter((a) => a.startsAt.startsWith(today)).length;
-      subtitle = "Appointments";
+      subtitle = "Appointments scheduled today";
+      tone = "gold";
       break;
     case "revenue":
-      value = `₹${context.invoices.reduce((sum, inv) => sum + inv.totalCents, 0) / 100}`;
-      subtitle = "Gross sales";
+      value = `₹${(context.invoices.reduce((sum, inv) => sum + inv.totalCents, 0) / 100).toLocaleString("en-IN")}`;
+      subtitle = "Gross sales from loaded invoices";
+      tone = "gold";
       break;
     case "memberships":
       value = context.memberships.length;
-      subtitle = "Loyalty";
+      subtitle = "Membership records loaded";
       break;
     case "staff":
       value = context.staff.length;
-      subtitle = "Active";
+      subtitle = "Staff records loaded";
       break;
     case "customers":
       value = context.customers.length;
-      subtitle = "Total";
+      subtitle = "Customer records loaded";
       break;
     case "lowStock":
       value = context.lowStockItems.length;
-      subtitle = "Alerts";
+      subtitle = "Low-stock alerts loaded";
+      tone = context.lowStockItems.length > 0 ? "warning" : "success";
       break;
     case "branches":
       value = context.branches.length;
-      subtitle = "Outlets";
+      subtitle = "Branch records loaded";
       break;
     case "attendance":
       value = context.attendance.filter((a) => a.checkInAt.startsWith(today)).length;
-      subtitle = "Today";
+      subtitle = "Attendance entries today";
       break;
     case "invoices":
       value = context.invoices.length;
-      subtitle = "Total";
+      subtitle = "Invoice records loaded";
       break;
     case "purchaseReceipts":
       value = context.purchaseReceipts.length;
-      subtitle = "Receipts";
+      subtitle = "Purchase receipts loaded";
       break;
   }
 
-  return (
-    <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
-      <div className="text-xs uppercase tracking-[0.18em] text-[#a39a86]">{definition.label}</div>
-      <div className="mt-2 text-3xl font-semibold">{value}</div>
-      {subtitle ? <div className="mt-1 text-sm text-[#a39a86]">{subtitle}</div> : null}
-    </div>
-  );
+  return <SharedKpiCard title={definition.label} value={value} subtitle={subtitle} icon={<MetricGlyph type={definition.source.type} />} tone={tone} meta="Live state" />;
 }
 
 const ALL_TABS = ["Overview", "Customers", "Leads", "Pipeline", "Follow-ups", "Communications", "Tags & Notes", "Services", "Packages", "Memberships", "Inventory", "Staff", "Attendance", "Appointments", "Billing", "Branches", "Reports", "Settings", "Notifications", "Users & Access", "Gateway Accounts", "Marketplace", "Franchise Overview", "Financials", "Territories", "Partners", "Agreements", "Outlets", "Franchise Settlement"] as const;
+type XNailTab = (typeof ALL_TABS)[number];
+
+type NavigationGroup = {
+  readonly label: string;
+  readonly icon: SidebarIconKey;
+  readonly tabs: readonly XNailTab[];
+};
+
+const SIDEBAR_NAVIGATION_GROUPS: readonly NavigationGroup[] = [
+  { label: "Workspace", icon: "overview", tabs: ["Overview"] },
+  { label: "CRM", icon: "crm", tabs: ["Customers", "Leads", "Pipeline", "Follow-ups", "Communications", "Tags & Notes"] },
+  { label: "Operations", icon: "operations", tabs: ["Appointments", "Services", "Packages", "Memberships", "Billing"] },
+  { label: "Inventory", icon: "inventory", tabs: ["Inventory"] },
+  { label: "Team", icon: "team", tabs: ["Staff", "Attendance"] },
+  { label: "Business", icon: "business", tabs: ["Branches", "Reports", "Financials"] },
+  { label: "Franchise", icon: "franchise", tabs: ["Franchise Overview", "Territories", "Partners", "Agreements", "Outlets", "Franchise Settlement"] },
+  { label: "Platform", icon: "platform", tabs: ["Marketplace", "Gateway Accounts"] },
+  { label: "Administration", icon: "admin", tabs: ["Notifications", "Users & Access", "Settings"] },
+] as const;
+
+function buildSidebarSections(visibleTabs: readonly XNailTab[], activeTab: XNailTab, onSelectTab: (tab: XNailTab) => void): SidebarSection[] {
+  const visibleTabSet = new Set<XNailTab>(visibleTabs);
+
+  return SIDEBAR_NAVIGATION_GROUPS.map((group) => ({
+    label: group.label,
+    items: group.tabs
+      .filter((tab) => visibleTabSet.has(tab))
+      .map((tab) => ({
+        label: tab,
+        active: activeTab === tab,
+        icon: group.icon,
+        onClick: () => onSelectTab(tab),
+      })),
+  })).filter((section) => section.items.length > 0);
+}
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<(typeof ALL_TABS)[number]>("Overview");
@@ -5037,6 +5096,21 @@ export default function Home() {
     setBranchBusinessUnitId("");
   };
 
+  const navigationSections = buildSidebarSections(visibleTabs, activeTab, setActiveTab);
+  const todayKey = new Date().toISOString().split("T")[0];
+  const todayAppointments = appointments.filter((appointment) => appointment.startsAt.startsWith(todayKey));
+  const todaysAttendance = attendance.filter((entry) => entry.checkInAt.startsWith(todayKey));
+  const totalRevenueCents = invoices.reduce((sum, invoice) => sum + invoice.totalCents, 0);
+  const paidRevenueCents = invoices.reduce((sum, invoice) => sum + (invoice.paidCents ?? 0), 0);
+  const openInvoiceCount = invoices.filter((invoice) => (invoice.paidCents ?? 0) < invoice.totalCents).length;
+  const activeBranchCount = branches.filter((branch) => branch.isActive).length;
+  const activeStaffCount = staff.filter((member) => member.isActive).length;
+  const activeMembershipCount = memberships.filter((membership) => membership.status?.toLowerCase() === "active").length;
+  const activeServiceCount = services.filter((service) => service.isActive).length;
+  const activePackageCount = packages.filter((pkg) => pkg.isActive).length;
+  const branchContextLabel = activeBranchCount > 0 ? `${activeBranchCount} active branch${activeBranchCount === 1 ? "" : "es"}` : "Branch context pending";
+  const dashboardSubtitle = `${effectiveRole ? effectiveRole.roleName : "Operations"} workspace · ${branchContextLabel}`;
+  const loadedModuleCount = [customers.length, appointments.length, invoices.length, lowStockItems.length, memberships.length, staff.length, branches.length].filter((count) => count > 0).length;
   if (authenticated === null) {
     return null;
   }
@@ -5161,94 +5235,193 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-[#080807] text-[#f5f1e6]">
-      <header className="sticky top-0 z-20 border-b border-[rgba(212,175,55,0.1)] bg-[#0a0a09]/95 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-[#9c7a1e] to-[#d4af37] text-sm font-bold text-[#080807]">X</div>
-            <div>
-              <div className="text-sm font-semibold tracking-tight text-[#f5f1e6]">X Nail</div>
-              <div className="text-[10px] font-medium uppercase tracking-[0.18em] text-[#a39a86]">
-                {effectiveRole ? `${effectiveRole.roleName} dashboard` : "Operations dashboard"}
-              </div>
-            </div>
-            {userProfile?.displayName ? (
-              <div className="truncate text-xs text-[#a39a86] sm:ml-4">{userProfile.displayName}</div>
-            ) : null}
+    <main className="min-h-screen overflow-x-hidden bg-[#080807] text-[#f5f1e6]">
+      <AppHeader
+        eyebrow="X Nail ERP"
+        title={activeTab}
+        subtitle={dashboardSubtitle}
+        commandContent={(
+          <div className="flex h-11 items-center gap-3 rounded-2xl border border-[rgba(212,175,55,0.14)] bg-[#0d0c0a] px-4 text-sm text-[#7a7266] shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+            <svg className="h-4 w-4 shrink-0 text-[#d4af37]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m21 21-4.35-4.35" /><path d="M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14Z" /></svg>
+            <span className="truncate">Command center preview</span>
+            <span className="ml-auto rounded-md border border-[rgba(212,175,55,0.12)] px-1.5 py-0.5 text-[10px] uppercase tracking-[0.12em] text-[#a39a86]">UI</span>
           </div>
+        )}
+        statusContent={effectiveRole ? <span className="premium-badge-success">{`${effectiveRole.roleName} dashboard`}</span> : <span className="premium-badge">Operations</span>}
+        rightContent={(
+          <>
+            {userProfile?.displayName ? <span className="max-w-[12rem] truncate text-sm text-[#a39a86]">{userProfile.displayName}</span> : null}
+            {userRoles.length > 1 ? <span className="premium-badge-warning">{userRoles.length} roles</span> : null}
+            <button type="button" className="premium-btn-secondary px-3 py-2 text-xs" onClick={handleLogout}>Sign out</button>
+          </>
+        )}
+      />
 
-          <div className="flex flex-wrap items-center gap-2 text-sm">
-            {effectiveRole ? (
-              <span className="premium-badge-success">{effectiveRole.roleName}</span>
-            ) : (
-              <span className="premium-badge">X Nail</span>
-            )}
-            {userRoles.length > 1 ? (
-              <span className="premium-badge-warning">{userRoles.length} roles</span>
-            ) : null}
-            <button
-              className="premium-btn-secondary px-3 py-1.5 text-xs"
-              onClick={handleLogout}
-            >
-              Sign out
-            </button>
-          </div>
+      {profileError ? (
+        <div className="mx-auto w-full max-w-[112rem] px-4 pt-4 sm:px-6 lg:px-8">
+          <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] px-3 py-2 text-sm text-[#d1554a]">{profileError}</div>
         </div>
-        {profileError ? (
-          <div className="mx-auto max-w-7xl px-6 pb-4">
-            <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] px-3 py-2 text-sm text-[#d1554a]">{profileError}</div>
-          </div>
-        ) : null}
-      </header>
+      ) : null}
 
-      <div className="mx-auto flex max-w-7xl items-start gap-4 px-4 py-6 sm:gap-6 sm:px-6 sm:py-8">
+      <div className="mx-auto flex w-full max-w-[112rem] items-start gap-4 px-4 py-5 sm:gap-6 sm:px-6 sm:py-7 lg:px-8">
         <AppSidebar
           brandName="X Nail"
-          brandSubtitle="Navigation"
-          items={visibleTabs.map((tab) => ({
-            label: tab,
-            active: activeTab === tab,
-            onClick: () => setActiveTab(tab),
-          }))}
+          brandSubtitle="ERP Preview"
+          sections={navigationSections}
+          workspaceLabel={effectiveRole ? `${effectiveRole.roleName} access` : "Operations access"}
         />
 
-        <div className="min-w-0 flex-1">
-
+        <div className="dashboard-enter min-w-0 flex-1 pb-12">
         {activeTab === "Overview" ? (
-          <section className="grid gap-4 md:grid-cols-4">
-            {effectiveRole ? (
-              effectiveRole.kpis.map((kpi) => (
-                <KpiCard key={kpi.key} definition={kpi} context={{ appointments, invoices, memberships, staff, customers, lowStockItems, branches, attendance, purchaseReceipts }} />
-              ))
-            ) : (
-              <>
-                <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
-                  <div className="text-xs uppercase tracking-[0.18em] text-[#a39a86]">Today</div>
-                  <div className="mt-2 text-3xl font-semibold">
-                    {appointments.filter((appointment) => appointment.startsAt.startsWith(new Date().toISOString().split("T")[0])).length}
+          <section className="space-y-6">
+            <div className="dashboard-card-enter overflow-hidden rounded-2xl border border-[rgba(212,175,55,0.16)] bg-[#0d0c0a] shadow-[0_24px_80px_rgba(0,0,0,0.26)]">
+              <div className="grid gap-6 p-5 sm:p-6 xl:grid-cols-[1.45fr_0.55fr]">
+                <div>
+                  <div className="inline-flex rounded-full border border-[rgba(212,175,55,0.18)] bg-[rgba(212,175,55,0.07)] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#d4af37]">Live tenant preview</div>
+                  <h2 className="mt-4 text-2xl font-semibold tracking-tight text-[#f5f1e6] sm:text-3xl">Operations dashboard</h2>
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-[#a39a86]">
+                    Compact operating view for the current X Nail workspace. Values are drawn from already-loaded application state and remain permission-scoped to the signed-in user.
+                  </p>
+                  <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-xl border border-[rgba(212,175,55,0.10)] bg-[#12110f] p-4">
+                      <div className="text-[11px] uppercase tracking-[0.14em] text-[#7a7266]">Signed in as</div>
+                      <div className="mt-2 truncate text-sm font-semibold text-[#f5f1e6]">{userProfile?.displayName ?? userProfile?.email ?? "Workspace user"}</div>
+                    </div>
+                    <div className="rounded-xl border border-[rgba(212,175,55,0.10)] bg-[#12110f] p-4">
+                      <div className="text-[11px] uppercase tracking-[0.14em] text-[#7a7266]">Effective role</div>
+                      <div className="mt-2 truncate text-sm font-semibold text-[#f5f1e6]">{effectiveRole?.roleName ?? "Operations"}</div>
+                    </div>
+                    <div className="rounded-xl border border-[rgba(212,175,55,0.10)] bg-[#12110f] p-4">
+                      <div className="text-[11px] uppercase tracking-[0.14em] text-[#7a7266]">Workspace</div>
+                      <div className="mt-2 truncate text-sm font-semibold text-[#f5f1e6]">{branchContextLabel}</div>
+                    </div>
                   </div>
-                  <div className="mt-1 text-sm text-[#a39a86]">Appointments</div>
                 </div>
-                <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
-                  <div className="text-xs uppercase tracking-[0.18em] text-[#a39a86]">Revenue</div>
-                  <div className="mt-2 text-3xl font-semibold">₹{invoices.reduce((sum, invoice) => sum + invoice.totalCents, 0) / 100}</div>
-                  <div className="mt-1 text-sm text-[#a39a86]">Gross sales</div>
+
+                <div className="rounded-2xl border border-[rgba(212,175,55,0.12)] bg-[#090908] p-5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[#a39a86]">Platform state</div>
+                      <div className="mt-2 text-3xl font-semibold text-[#d4af37]">{loadedModuleCount}</div>
+                    </div>
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[rgba(212,175,55,0.18)] bg-[rgba(212,175,55,0.08)] text-[#d4af37]">
+                      <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M4 5h7v7H4z" /><path d="M13 5h7v7h-7z" /><path d="M4 14h7v5H4z" /><path d="M13 14h7v5h-7z" /></svg>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-sm leading-6 text-[#a39a86]">Loaded data domains in this browser session. CRM detail modules remain lazy-loaded by active tab.</p>
                 </div>
-                <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
-                  <div className="text-xs uppercase tracking-[0.18em] text-[#a39a86]">Members</div>
-                  <div className="mt-2 text-3xl font-semibold">{memberships.length}</div>
-                  <div className="mt-1 text-sm text-[#a39a86]">Loyalty</div>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {effectiveRole ? (
+                effectiveRole.kpis.map((kpi) => (
+                  <KpiCard key={kpi.key} definition={kpi} context={{ appointments, invoices, memberships, staff, customers, lowStockItems, branches, attendance, purchaseReceipts }} />
+                ))
+              ) : (
+                <>
+                  <SharedKpiCard title="Today" value={todayAppointments.length} subtitle="Appointments scheduled today" icon={<MetricGlyph type="appointmentsToday" />} tone="gold" meta="Live state" />
+                  <SharedKpiCard title="Revenue" value={`₹${(totalRevenueCents / 100).toLocaleString("en-IN")}`} subtitle="Gross sales from loaded invoices" icon={<MetricGlyph type="revenue" />} tone="gold" meta="Live state" />
+                  <SharedKpiCard title="Members" value={memberships.length} subtitle="Membership records loaded" icon={<MetricGlyph type="memberships" />} meta="Live state" />
+                  <SharedKpiCard title="Staff" value={staff.length} subtitle="Staff records loaded" icon={<MetricGlyph type="staff" />} meta="Live state" />
+                </>
+              )}
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-3">
+              <div className="dashboard-card-enter rounded-2xl border border-[rgba(212,175,55,0.14)] bg-[#12110f] p-5 shadow-[0_18px_54px_rgba(0,0,0,0.22)]">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-base font-semibold text-[#f5f1e6]">Today&apos;s floor</h3>
+                  <span className="premium-badge">Operations</span>
                 </div>
-                <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
-                  <div className="text-xs uppercase tracking-[0.18em] text-[#a39a86]">Staff</div>
-                  <div className="mt-2 text-3xl font-semibold">{staff.length}</div>
-                  <div className="mt-1 text-sm text-[#a39a86]">Active</div>
+                <div className="mt-5 space-y-4">
+                  <div className="flex items-center justify-between gap-4 border-b border-[rgba(212,175,55,0.08)] pb-3">
+                    <span className="text-sm text-[#a39a86]">Appointments</span>
+                    <span className="text-sm font-semibold text-[#f5f1e6]">{todayAppointments.length}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4 border-b border-[rgba(212,175,55,0.08)] pb-3">
+                    <span className="text-sm text-[#a39a86]">Attendance check-ins</span>
+                    <span className="text-sm font-semibold text-[#f5f1e6]">{todaysAttendance.length}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-sm text-[#a39a86]">Active services/packages</span>
+                    <span className="text-sm font-semibold text-[#f5f1e6]">{activeServiceCount} / {activePackageCount}</span>
+                  </div>
                 </div>
-              </>
-            )}
+              </div>
+
+              <div className="dashboard-card-enter rounded-2xl border border-[rgba(212,175,55,0.14)] bg-[#12110f] p-5 shadow-[0_18px_54px_rgba(0,0,0,0.22)]">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-base font-semibold text-[#f5f1e6]">Billing posture</h3>
+                  <span className="premium-badge">Loaded invoices</span>
+                </div>
+                <div className="mt-5 grid grid-cols-3 gap-3">
+                  <div className="rounded-xl border border-[rgba(212,175,55,0.09)] bg-[#0d0c0a] p-3">
+                    <div className="text-[11px] uppercase tracking-[0.12em] text-[#7a7266]">Invoices</div>
+                    <div className="mt-2 text-lg font-semibold text-[#f5f1e6]">{invoices.length}</div>
+                  </div>
+                  <div className="rounded-xl border border-[rgba(212,175,55,0.09)] bg-[#0d0c0a] p-3">
+                    <div className="text-[11px] uppercase tracking-[0.12em] text-[#7a7266]">Paid</div>
+                    <div className="mt-2 text-lg font-semibold text-[#3fae6a]">₹{(paidRevenueCents / 100).toLocaleString("en-IN")}</div>
+                  </div>
+                  <div className="rounded-xl border border-[rgba(212,175,55,0.09)] bg-[#0d0c0a] p-3">
+                    <div className="text-[11px] uppercase tracking-[0.12em] text-[#7a7266]">Open</div>
+                    <div className="mt-2 text-lg font-semibold text-[#e0a83b]">{openInvoiceCount}</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="dashboard-card-enter rounded-2xl border border-[rgba(212,175,55,0.14)] bg-[#12110f] p-5 shadow-[0_18px_54px_rgba(0,0,0,0.22)]">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-base font-semibold text-[#f5f1e6]">Network readiness</h3>
+                  <span className="premium-badge">Scope</span>
+                </div>
+                <div className="mt-5 space-y-4">
+                  <div className="flex items-center justify-between gap-4 border-b border-[rgba(212,175,55,0.08)] pb-3">
+                    <span className="text-sm text-[#a39a86]">Active branches</span>
+                    <span className="text-sm font-semibold text-[#f5f1e6]">{activeBranchCount}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4 border-b border-[rgba(212,175,55,0.08)] pb-3">
+                    <span className="text-sm text-[#a39a86]">Active staff</span>
+                    <span className="text-sm font-semibold text-[#f5f1e6]">{activeStaffCount}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-sm text-[#a39a86]">Active memberships</span>
+                    <span className="text-sm font-semibold text-[#f5f1e6]">{activeMembershipCount}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+              <div className="rounded-2xl border border-[rgba(212,175,55,0.14)] bg-[#12110f] p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-base font-semibold text-[#f5f1e6]">Inventory signals</h3>
+                  <span className={lowStockItems.length > 0 ? "premium-badge-warning" : "premium-badge-success"}>{lowStockItems.length > 0 ? "Attention" : "Clear"}</span>
+                </div>
+                <div className="mt-4 text-sm leading-6 text-[#a39a86]">
+                  {lowStockItems.length > 0 ? `${lowStockItems.length} low-stock item${lowStockItems.length === 1 ? "" : "s"} currently loaded for review.` : "No loaded low-stock alerts in the current session."}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-[rgba(212,175,55,0.14)] bg-[#12110f] p-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h3 className="text-base font-semibold text-[#f5f1e6]">Quick access</h3>
+                    <p className="mt-1 text-sm text-[#a39a86]">Visible actions mirror the current permission-filtered navigation.</p>
+                  </div>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {(["Appointments", "Customers", "Billing", "Inventory", "Reports"] as const).filter((tab) => visibleTabs.includes(tab)).map((tab) => (
+                    <button key={tab} type="button" aria-label={`Open ${tab}`} onClick={() => setActiveTab(tab)} className="rounded-xl border border-[rgba(212,175,55,0.14)] bg-[#0d0c0a] px-3 py-2 text-sm font-medium text-[#f5f1e6] transition-colors duration-200 hover:border-[rgba(212,175,55,0.32)] hover:bg-[#171511]">
+                      {tab}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
           </section>
         ) : null}
-
         {activeTab === "Customers" ? (
           <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
             <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
