@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { AppHeader } from "@/components/app-header";
 import { AppSidebar, type SidebarIconKey, type SidebarSection } from "@/components/app-sidebar";
 import { KpiCard as SharedKpiCard } from "@/components/kpi-card";
+import { CrmBadge, CrmEmptyState, CrmPanel, CrmWorkspace } from "@/components/xnail/crm-workspace";
 import {
   invalidatePendingRefresh,
   loginWithNativeAuthentication,
@@ -5109,7 +5110,7 @@ export default function Home() {
   const activeServiceCount = services.filter((service) => service.isActive).length;
   const activePackageCount = packages.filter((pkg) => pkg.isActive).length;
   const branchContextLabel = activeBranchCount > 0 ? `${activeBranchCount} active branch${activeBranchCount === 1 ? "" : "es"}` : "Branch context pending";
-  const dashboardSubtitle = `${effectiveRole ? effectiveRole.roleName : "Operations"} workspace · ${branchContextLabel}`;
+  const dashboardSubtitle = `${effectiveRole ? effectiveRole.roleName : "Operations"} workspace ?? ${branchContextLabel}`;
   const loadedModuleCount = [customers.length, appointments.length, invoices.length, lowStockItems.length, memberships.length, staff.length, branches.length].filter((count) => count > 0).length;
   if (authenticated === null) {
     return null;
@@ -5423,432 +5424,204 @@ export default function Home() {
           </section>
         ) : null}
         {activeTab === "Customers" ? (
-          <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
-              <h2 className="text-xl font-semibold">Customer list</h2>
-              <div className="mt-4 space-y-3">
-                {isLoadingCustomers ? <div className="text-sm text-[#a39a86]">Loading customers...</div> : null}
-                {!isLoadingCustomers && customerError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{customerError}</div> : null}
-                {!isLoadingCustomers && !customerError && customers.length === 0 ? <div className="text-sm text-[#a39a86]">No customers yet.</div> : null}
-                {customers.map((customer) => {
-                  const customerAppointments = appointments.filter((appointment) => appointment.customerId === customer.id);
-                  const sortedAppointments = customerAppointments.slice().sort((a, b) => b.startsAt.localeCompare(a.startsAt));
-                  const lastVisit = sortedAppointments.length > 0 ? sortedAppointments[0].startsAt : null;
-                  const customerInvoiceList = invoices.filter((inv) => inv.customerId === customer.id);
-                  const totalSpendCents = customerInvoiceList.reduce((sum, inv) => sum + inv.totalCents, 0);
+          <CrmWorkspace
+            eyebrow="Customer intelligence"
+            title="Customers"
+            description="A permission-scoped customer workspace for loaded X Nail demo data, with visit context and invoicing history kept clearly separated from production ERP claims."
+            stats={[
+              { label: "Loaded", value: customers.length },
+              { label: "Active", value: customers.filter((customer) => customer.isActive).length, tone: "success" },
+              { label: "Selected", value: selectedCustomerId ? "1" : "None" },
+            ]}
+          >
+            <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
+              <CrmPanel title="Customer list" eyebrow="Directory" description="Select a customer to review their loaded appointment and invoice context.">
+                <div className="space-y-3">
+                  {isLoadingCustomers ? <div className="text-sm text-[#a39a86]">Loading customers...</div> : null}
+                  {!isLoadingCustomers && customerError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{customerError}</div> : null}
+                  {!isLoadingCustomers && !customerError && customers.length === 0 ? <CrmEmptyState title="No customers yet." description="Saved customers will appear here after they are created." /> : null}
+                  {customers.map((customer) => {
+                    const customerAppointments = appointments.filter((appointment) => appointment.customerId === customer.id);
+                    const sortedAppointments = customerAppointments.slice().sort((a, b) => b.startsAt.localeCompare(a.startsAt));
+                    const lastVisit = sortedAppointments.length > 0 ? sortedAppointments[0].startsAt : null;
+                    const customerInvoiceList = invoices.filter((inv) => inv.customerId === customer.id);
+                    const totalSpendCents = customerInvoiceList.reduce((sum, inv) => sum + inv.totalCents, 0);
+                    const isSelected = selectedCustomerId === customer.id;
+                    return (
+                      <article
+                        key={customer.id}
+                        role="button"
+                        tabIndex={0}
+                        aria-pressed={isSelected}
+                        onClick={() => setSelectedCustomerId(isSelected ? null : customer.id)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            setSelectedCustomerId(isSelected ? null : customer.id);
+                          }
+                        }}
+                        className={`cursor-pointer rounded-xl border p-4 transition duration-200 hover:-translate-y-0.5 hover:border-[rgba(212,175,55,0.3)] hover:bg-[#1a1812] ${isSelected ? "border-[rgba(212,175,55,0.42)] bg-[rgba(212,175,55,0.07)] shadow-[0_12px_32px_rgba(0,0,0,0.18)]" : "border-[rgba(212,175,55,0.1)] bg-[#17150f]"}`}
+                      >
+                        {editingCustomerId === customer.id ? (
+                          <div className="space-y-3" onClick={(event) => event.stopPropagation()}>
+                            <input value={editingCustomerName} onChange={(event) => setEditingCustomerName(event.target.value)} placeholder="Customer name" aria-label="Customer name" className="premium-input" />
+                            <input value={editingCustomerPhone} onChange={(event) => setEditingCustomerPhone(event.target.value)} placeholder="Phone" aria-label="Phone" className="premium-input" />
+                            <div className="flex flex-wrap gap-2">
+                              <button onClick={() => updateCustomer(customer.id)} className="premium-btn-primary px-3 py-2 text-sm">Save</button>
+                              <button onClick={() => setEditingCustomerId(null)} className="premium-btn-secondary px-3 py-2 text-sm">Cancel</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <div className="font-medium text-[#f5f1e6]">{customer.name}</div>
+                                <CrmBadge tone={customer.isActive ? "success" : "neutral"}>{customer.isActive ? "Active" : "Inactive"}</CrmBadge>
+                              </div>
+                              <div className="mt-1 text-sm text-[#a39a86]">{customer.phone || "No phone on file"}</div>
+                              <div className="mt-2 flex flex-wrap gap-2 text-xs text-[#807866]">
+                                <span>Visits: {customerAppointments.length}</span>
+                                <span>{lastVisit ? `Last: ${new Date(lastVisit).toLocaleDateString()}` : "No visits yet"}</span>
+                                {totalSpendCents > 0 ? <span>Spent: Rs. {(totalSpendCents / 100).toLocaleString()}</span> : null}
+                              </div>
+                            </div>
+                            <button onClick={(event) => { event.stopPropagation(); setEditingCustomerId(customer.id); setEditingCustomerName(customer.name); setEditingCustomerPhone(customer.phone || ""); }} className="premium-btn-secondary px-3 py-2 text-sm">Edit</button>
+                          </div>
+                        )}
+                      </article>
+                    );
+                  })}
+                </div>
+              </CrmPanel>
+
+              <CrmPanel title={selectedCustomerId !== null ? "Customer profile" : "Add customer"} eyebrow={selectedCustomerId !== null ? "Context" : "Create"} description={selectedCustomerId !== null ? "Loaded visit and invoice history for the selected customer." : "Create a customer record using the existing approved customer API."}>
+                {selectedCustomerId !== null ? (() => {
+                  const selectedCustomer = customers.find((c) => c.id === selectedCustomerId);
+                  if (!selectedCustomer) return null;
+                  const custAppts = appointments.filter((a) => a.customerId === selectedCustomerId).slice().sort((a, b) => b.startsAt.localeCompare(a.startsAt));
+                  const custInvoices = invoices.filter((inv) => inv.customerId === selectedCustomerId);
+                  const custTotalSpend = custInvoices.reduce((sum, inv) => sum + inv.totalCents, 0);
                   return (
-                  <div key={customer.id} className={`rounded-xl border p-3 cursor-pointer transition-colors ${selectedCustomerId === customer.id ? "border-[rgba(212,175,55,0.4)] bg-[rgba(212,175,55,0.05)]" : "border-[rgba(212,175,55,0.1)] bg-[#17150f]"}`} onClick={() => setSelectedCustomerId(selectedCustomerId === customer.id ? null : customer.id)}>
-                    {editingCustomerId === customer.id ? (
-                      <div className="space-y-2">
-                        <input
-                          value={editingCustomerName}
-                          onChange={(event) => setEditingCustomerName(event.target.value)}
-                          placeholder="Customer name"
-                          className="premium-input"
-                        />
-                        <input
-                          value={editingCustomerPhone}
-                          onChange={(event) => setEditingCustomerPhone(event.target.value)}
-                          placeholder="Phone"
-                          className="premium-input"
-                        />
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => updateCustomer(customer.id)}
-                            className="premium-btn-primary px-3 py-2 text-sm"
-                          >
-                            Save
-                          </button>
-                          <button
-                            onClick={() => setEditingCustomerId(null)}
-                            className="rounded-xl bg-[#f0dfe6] px-3 py-2 text-sm font-semibold text-[#d4af37]"
-                          >
-                            Cancel
-                          </button>
+                    <div>
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <h4 className="text-xl font-semibold text-[#f5f1e6]">{selectedCustomer.name}</h4>
+                          <div className="mt-2 space-y-1 text-sm text-[#a39a86]">
+                            {selectedCustomer.phone ? <div>Phone: {selectedCustomer.phone}</div> : null}
+                            {selectedCustomer.email ? <div>Email: {selectedCustomer.email}</div> : null}
+                            {selectedCustomer.notes ? <div>Notes: {selectedCustomer.notes}</div> : null}
+                            <div>Visits: {custAppts.length}{custTotalSpend > 0 ? ` - Total spend: Rs. ${(custTotalSpend / 100).toLocaleString()}` : ""}</div>
+                          </div>
+                        </div>
+                        <button onClick={() => setSelectedCustomerId(null)} className="premium-btn-secondary px-3 py-2 text-xs">Close</button>
+                      </div>
+                      <div className="mt-5 grid gap-4 lg:grid-cols-2 xl:grid-cols-1">
+                        <div>
+                          <h4 className="text-sm font-semibold uppercase tracking-[0.14em] text-[#d4af37]">Visit History</h4>
+                          <div className="mt-2 max-h-64 space-y-2 overflow-y-auto pr-1">
+                            {custAppts.length === 0 ? <CrmEmptyState title="No visits yet." /> : null}
+                            {custAppts.map((appt) => {
+                              const svc = services.find((s) => s.id === appt.serviceId);
+                              const stf = staff.find((s) => s.id === appt.staffId);
+                              return (
+                                <div key={appt.id} className="rounded-lg border border-[rgba(212,175,55,0.08)] bg-[#17150f] p-3 text-xs">
+                                  <div className="flex justify-between gap-3 text-[#f5f1e6]"><span>{svc?.name ?? "Service"}</span><span className="text-[#a39a86]">{new Date(appt.startsAt).toLocaleDateString()}</span></div>
+                                  <div className="mt-1 text-[#a39a86]">{stf ? `Staff: ${stf.displayName}` : "Staff unassigned"} - {appt.status}</div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-semibold uppercase tracking-[0.14em] text-[#d4af37]">Invoices</h4>
+                          <div className="mt-2 max-h-44 space-y-2 overflow-y-auto pr-1">
+                            {custInvoices.length === 0 ? <CrmEmptyState title="No invoices yet." /> : null}
+                            {custInvoices.map((inv) => (<div key={inv.id} className="flex justify-between gap-3 rounded-lg border border-[rgba(212,175,55,0.08)] bg-[#17150f] p-3 text-xs"><span>{new Date(inv.issuedAt).toLocaleDateString()}</span><span className="font-semibold text-[#d4af37]">Rs. {(inv.totalCents / 100).toLocaleString()}</span></div>))}
+                          </div>
                         </div>
                       </div>
-                    ) : (
-                      <>
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="font-medium">{customer.name}</div>
-                            <div className="text-sm text-[#a39a86]">{customer.phone}</div>
-                            <div className="text-xs text-[#a39a86]">
-                              {customerAppointments.length > 0 ? (
-                                <>
-                                  Visits: {customerAppointments.length} · Last: {new Date(lastVisit!).toLocaleDateString()}
-                                </>
-                              ) : (
-                                <span className="text-[#a39a86]">No visits yet</span>
-                              )}
-                              {totalSpendCents > 0 ? <span> · Spent: ₹{(totalSpendCents / 100).toLocaleString()}</span> : null}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className="rounded-full bg-[#f5edf1] px-2.5 py-1 text-xs">Active</span>
-                            <button
-                              onClick={() => {
-                                setEditingCustomerId(customer.id);
-                                setEditingCustomerName(customer.name);
-                                setEditingCustomerPhone(customer.phone || "");
-                              }}
-                              className="rounded-xl bg-[#f0dfe6] px-3 py-1.5 text-sm font-semibold text-[#d4af37]"
-                            >
-                              Edit
-                            </button>
-                          </div>
-                        </div>
-                      </>
-                    )}
-                  </div>
+                    </div>
                   );
-                })}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
-              {selectedCustomerId !== null ? (() => {
-                const selectedCustomer = customers.find((c) => c.id === selectedCustomerId);
-                if (!selectedCustomer) return null;
-                const custAppts = appointments.filter((a) => a.customerId === selectedCustomerId).slice().sort((a, b) => b.startsAt.localeCompare(a.startsAt));
-                const custInvoices = invoices.filter((inv) => inv.customerId === selectedCustomerId);
-                const custTotalSpend = custInvoices.reduce((sum, inv) => sum + inv.totalCents, 0);
-                return (
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <h2 className="text-xl font-semibold">{selectedCustomer.name}</h2>
-                      <button onClick={() => setSelectedCustomerId(null)} className="text-xs text-[#a39a86] hover:text-white">Close</button>
-                    </div>
-                    <div className="mt-2 space-y-1 text-sm text-[#a39a86]">
-                      {selectedCustomer.phone ? <div>Phone: {selectedCustomer.phone}</div> : null}
-                      {selectedCustomer.email ? <div>Email: {selectedCustomer.email}</div> : null}
-                      {selectedCustomer.notes ? <div>Notes: {selectedCustomer.notes}</div> : null}
-                      <div>Visits: {custAppts.length}{custTotalSpend > 0 ? ` · Total spend: ₹${(custTotalSpend / 100).toLocaleString()}` : ""}</div>
-                    </div>
-                    <h3 className="mt-4 text-sm font-semibold text-[#d4af37]">Visit History</h3>
-                    <div className="mt-2 space-y-2 max-h-60 overflow-y-auto">
-                      {custAppts.length === 0 ? <div className="text-xs text-[#a39a86]">No visits yet.</div> : null}
-                      {custAppts.map((appt) => {
-                        const svc = services.find((s) => s.id === appt.serviceId);
-                        const stf = staff.find((s) => s.id === appt.staffId);
-                        return (
-                          <div key={appt.id} className="rounded-lg border border-[rgba(212,175,55,0.08)] bg-[#17150f] p-2 text-xs">
-                            <div className="flex justify-between">
-                              <span>{svc?.name ?? "Service"}</span>
-                              <span className="text-[#a39a86]">{new Date(appt.startsAt).toLocaleDateString()}</span>
-                            </div>
-                            <div className="text-[#a39a86]">
-                              {stf ? `Staff: ${stf.displayName}` : ""} · {appt.status}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <h3 className="mt-4 text-sm font-semibold text-[#d4af37]">Invoices</h3>
-                    <div className="mt-2 space-y-2 max-h-40 overflow-y-auto">
-                      {custInvoices.length === 0 ? <div className="text-xs text-[#a39a86]">No invoices yet.</div> : null}
-                      {custInvoices.map((inv) => (
-                        <div key={inv.id} className="rounded-lg border border-[rgba(212,175,55,0.08)] bg-[#17150f] p-2 text-xs flex justify-between">
-                          <span>{new Date(inv.issuedAt).toLocaleDateString()}</span>
-                          <span>₹{(inv.totalCents / 100).toLocaleString()}</span>
-                        </div>
-                      ))}
-                    </div>
+                })() : (
+                  <div className="space-y-3">
+                    <input value={customerName} onChange={(event) => setCustomerName(event.target.value)} placeholder="Customer name" aria-label="Customer name" className="premium-input" />
+                    <input value={customerPhone} onChange={(event) => setCustomerPhone(event.target.value)} placeholder="Phone" aria-label="Phone" className="premium-input" />
+                    <button onClick={addCustomer} className="premium-btn-primary w-full py-2.5 text-sm">Save customer</button>
                   </div>
-                );
-              })() : (
-                <div>
-                  <h2 className="text-xl font-semibold">Add customer</h2>
-                  <div className="mt-4 space-y-3">
-                    <input
-                      value={customerName}
-                      onChange={(event) => setCustomerName(event.target.value)}
-                      placeholder="Customer name"
-                      className="premium-input"
-                    />
-                    <input
-                      value={customerPhone}
-                      onChange={(event) => setCustomerPhone(event.target.value)}
-                      placeholder="Phone"
-                      className="premium-input"
-                    />
-                    <button
-                      onClick={addCustomer}
-                      className="premium-btn-primary w-full py-2.5 text-sm"
-                    >
-                      Save customer
-                    </button>
-                  </div>
-                </div>
-              )}
+                )}
+              </CrmPanel>
             </div>
-          </section>
+          </CrmWorkspace>
         ) : null}
 
         {activeTab === "Leads" ? (
-          <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
-              <h2 className="text-xl font-semibold">Lead pipeline</h2>
-              <div className="mt-4 space-y-3">
-                {isLoadingLeads ? <div className="text-sm text-[#a39a86]">Loading leads...</div> : null}
-                {!isLoadingLeads && leadError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{leadError}</div> : null}
-                {!isLoadingLeads && !leadError && leads.length === 0 ? <div className="text-sm text-[#a39a86]">No leads yet.</div> : null}
-                {leads.map((lead) => (
-                  <div key={lead.id} className="flex items-center justify-between rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
-                    <div>
-                      <div className="font-medium">{lead.name}</div>
-                      <div className="text-sm text-[#a39a86]">{lead.email ?? "No email"} · {lead.phone ?? "No phone"}</div>
-                      {lead.source ? <div className="text-xs text-[#6b6455]">Source: {lead.source}</div> : null}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`rounded-full px-2 py-0.5 text-xs ${lead.status === "CONVERTED" ? "bg-[rgba(76,175,80,0.15)] text-[#4caf50]" : "bg-[rgba(212,175,55,0.12)] text-[#d4af37]"}`}>
-                        {lead.status}
-                      </span>
-                      {lead.status === "ACTIVE" ? (
-                        <button onClick={() => void convertLead(lead.id)} className="rounded-lg border border-[rgba(212,175,55,0.3)] bg-[rgba(212,175,55,0.08)] px-2 py-1 text-xs text-[#d1af3c] hover:bg-[rgba(212,175,55,0.15)]">
-                          Convert
-                        </button>
-                      ) : null}
-                      {lead.status === "CONVERTED" && lead.convertedToCustomerId ? (
-                        <span className="text-xs text-[#6b6455]">→ Customer</span>
-                      ) : null}
-                    </div>
-                  </div>
-                ))}
-              </div>
+          <CrmWorkspace eyebrow="Acquisition" title="Leads" description="A focused lead intake and conversion surface using the existing lead endpoints and loaded preview records." stats={[{ label: "Loaded", value: leads.length }, { label: "Active", value: leads.filter((lead) => lead.status === "ACTIVE").length, tone: "warning" }, { label: "Converted", value: leads.filter((lead) => lead.status === "CONVERTED").length, tone: "success" }]}>
+            <div className="grid gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
+              <CrmPanel title="Lead pipeline" eyebrow="Queue" description="Track loaded leads and convert active records through the approved conversion endpoint.">
+                <div className="space-y-3">
+                  {isLoadingLeads ? <div className="text-sm text-[#a39a86]">Loading leads...</div> : null}
+                  {!isLoadingLeads && leadError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{leadError}</div> : null}
+                  {!isLoadingLeads && !leadError && leads.length === 0 ? <CrmEmptyState title="No leads yet." description="New lead records will appear in this queue." /> : null}
+                  {leads.map((lead) => (<article key={lead.id} className="rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-4 transition duration-200 hover:-translate-y-0.5 hover:border-[rgba(212,175,55,0.3)] hover:bg-[#1a1812]"><div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"><div className="min-w-0"><div className="font-medium text-[#f5f1e6]">{lead.name}</div><div className="mt-1 text-sm text-[#a39a86]">{lead.email ?? "No email"} - {lead.phone ?? "No phone"}</div>{lead.source ? <div className="mt-2 text-xs text-[#807866]">Source: {lead.source}</div> : null}</div><div className="flex flex-wrap items-center gap-2"><CrmBadge tone={lead.status === "CONVERTED" ? "success" : "warning"}>{lead.status}</CrmBadge>{lead.status === "ACTIVE" ? (<button onClick={() => void convertLead(lead.id)} className="premium-btn-secondary px-3 py-2 text-xs">Convert</button>) : null}{lead.status === "CONVERTED" && lead.convertedToCustomerId ? <span className="text-xs text-[#807866]">Converted to customer</span> : null}</div></div></article>))}
+                </div>
+              </CrmPanel>
+              <CrmPanel title="Add lead" eyebrow="Capture" description="Minimal intake fields only; no extra CRM workflow is introduced here.">
+                <div className="space-y-3">
+                  <input placeholder="Name" aria-label="Lead name" value={leadName} onChange={(e) => setLeadName(e.target.value)} className="premium-input w-full" />
+                  <input placeholder="Email (optional)" aria-label="Lead email" value={leadEmail} onChange={(e) => setLeadEmail(e.target.value)} className="premium-input w-full" />
+                  <input placeholder="Phone (optional)" aria-label="Lead phone" value={leadPhone} onChange={(e) => setLeadPhone(e.target.value)} className="premium-input w-full" />
+                  <input placeholder="Source (optional)" aria-label="Lead source" value={leadSource} onChange={(e) => setLeadSource(e.target.value)} className="premium-input w-full" />
+                  <button onClick={() => void addLead()} className="premium-btn-primary w-full py-2">Add lead</button>
+                </div>
+              </CrmPanel>
             </div>
-            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
-              <h2 className="text-xl font-semibold">Add lead</h2>
-              <div className="mt-4 space-y-3">
-                <input placeholder="Name" value={leadName} onChange={(e) => setLeadName(e.target.value)} className="premium-input w-full" />
-                <input placeholder="Email (optional)" value={leadEmail} onChange={(e) => setLeadEmail(e.target.value)} className="premium-input w-full" />
-                <input placeholder="Phone (optional)" value={leadPhone} onChange={(e) => setLeadPhone(e.target.value)} className="premium-input w-full" />
-                <input placeholder="Source (optional)" value={leadSource} onChange={(e) => setLeadSource(e.target.value)} className="premium-input w-full" />
-                <button onClick={() => void addLead()} className="premium-btn-primary w-full py-2">Add lead</button>
-              </div>
-            </div>
-          </section>
-        ) : null}
-
-        {activeTab === "Pipeline" ? (
-          <section className="mt-6 space-y-6">
+          </CrmWorkspace>
+        ) : null}        {activeTab === "Pipeline" ? (
+          <CrmWorkspace eyebrow="Revenue motion" title="Pipeline" description="Pipeline, stage, and opportunity controls remain backed by the existing CRM endpoints and preview data only." stats={[{ label: "Pipelines", value: pipelines.length }, { label: "Stages", value: stages.length }, { label: "Open", value: opportunities.filter((opp) => opp.status === "OPEN").length, tone: "warning" }]}>
             {opportunityError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{opportunityError}</div> : null}
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
-                <h3 className="text-lg font-semibold">Pipelines</h3>
-                <div className="mt-3 space-y-2">
-                  {pipelines.length === 0 ? <div className="text-sm text-[#a39a86]">No pipelines yet.</div> : null}
-                  {pipelines.map((p) => (
-                    <button key={p.id} onClick={() => void loadStagesForPipeline(p.id)} className={`block w-full rounded-lg border p-2 text-left text-sm transition-colors ${selectedPipelineId === p.id ? "border-[rgba(212,175,55,0.4)] bg-[rgba(212,175,55,0.08)]" : "border-[rgba(212,175,55,0.1)] bg-[#17150f] hover:bg-[rgba(212,175,55,0.05)]"}`}>
-                      {p.name}
-                    </button>
-                  ))}
+            <div className="grid gap-5 xl:grid-cols-3">
+              <CrmPanel title="Pipelines" eyebrow="Structure" description="Select a pipeline before managing its stages.">
+                <div className="space-y-2">
+                  {pipelines.length === 0 ? <CrmEmptyState title="No pipelines yet." /> : null}
+                  {pipelines.map((p) => (<button key={p.id} onClick={() => void loadStagesForPipeline(p.id)} className={`block w-full rounded-lg border p-3 text-left text-sm transition-colors ${selectedPipelineId === p.id ? "border-[rgba(212,175,55,0.42)] bg-[rgba(212,175,55,0.09)] text-[#f5f1e6]" : "border-[rgba(212,175,55,0.1)] bg-[#17150f] text-[#d8d0bd] hover:bg-[rgba(212,175,55,0.05)]"}`}>{p.name}</button>))}
                 </div>
-                <div className="mt-3 flex gap-2">
-                  <input placeholder="Pipeline name" value={pipelineName} onChange={(e) => setPipelineName(e.target.value)} className="premium-input flex-1" />
-                  <button onClick={() => void addPipeline()} className="premium-btn-primary px-3 py-1 text-sm">Add</button>
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row"><input placeholder="Pipeline name" aria-label="Pipeline name" value={pipelineName} onChange={(e) => setPipelineName(e.target.value)} className="premium-input flex-1" /><button onClick={() => void addPipeline()} className="premium-btn-primary px-4 py-2 text-sm">Add</button></div>
+              </CrmPanel>
+              <CrmPanel title="Stages" eyebrow="Flow" description="Stage ordering follows the existing position value.">
+                <div className="space-y-2">
+                  {!selectedPipelineId ? <CrmEmptyState title="Select a pipeline first." /> : null}
+                  {selectedPipelineId && stages.length === 0 ? <CrmEmptyState title="No stages yet." /> : null}
+                  {stages.slice().sort((a, b) => a.position - b.position).map((s) => (<div key={s.id} className="rounded-lg border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3 text-sm"><span className="mr-2 text-xs text-[#807866]">#{s.position}</span>{s.name}</div>))}
                 </div>
-              </div>
-              <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
-                <h3 className="text-lg font-semibold">Stages</h3>
-                <div className="mt-3 space-y-2">
-                  {!selectedPipelineId ? <div className="text-sm text-[#a39a86]">Select a pipeline first.</div> : null}
-                  {selectedPipelineId && stages.length === 0 ? <div className="text-sm text-[#a39a86]">No stages yet.</div> : null}
-                  {stages.sort((a, b) => a.position - b.position).map((s) => (
-                    <div key={s.id} className="rounded-lg border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-2 text-sm">
-                      <span className="text-[#6b6455]">#{s.position}</span> {s.name}
-                    </div>
-                  ))}
-                </div>
-                {selectedPipelineId ? (
-                  <div className="mt-3 flex gap-2">
-                    <input placeholder="Stage name" value={stageName} onChange={(e) => setStageName(e.target.value)} className="premium-input flex-1" />
-                    <button onClick={() => void addStage()} className="premium-btn-primary px-3 py-1 text-sm">Add</button>
-                  </div>
-                ) : null}
-              </div>
-              <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
-                <h3 className="text-lg font-semibold">New opportunity</h3>
-                <div className="mt-3 space-y-2">
-                  <input placeholder="Opportunity name" value={oppName} onChange={(e) => setOppName(e.target.value)} className="premium-input w-full" />
-                  <input placeholder="Value (₹)" type="number" value={oppValue} onChange={(e) => setOppValue(e.target.value)} className="premium-input w-full" />
-                  <select value={oppStageId} onChange={(e) => setOppStageId(e.target.value)} className="premium-input w-full">
-                    <option value="">Select stage</option>
-                    {stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
-                  <button onClick={() => void addOpportunity()} className="premium-btn-primary w-full py-2 text-sm">Create opportunity</button>
-                </div>
-              </div>
+                {selectedPipelineId ? (<div className="mt-4 flex flex-col gap-2 sm:flex-row"><input placeholder="Stage name" aria-label="Stage name" value={stageName} onChange={(e) => setStageName(e.target.value)} className="premium-input flex-1" /><button onClick={() => void addStage()} className="premium-btn-primary px-4 py-2 text-sm">Add</button></div>) : null}
+              </CrmPanel>
+              <CrmPanel title="New opportunity" eyebrow="Create" description="Creates an opportunity in the currently selected pipeline stage.">
+                <div className="space-y-3"><input placeholder="Opportunity name" aria-label="Opportunity name" value={oppName} onChange={(e) => setOppName(e.target.value)} className="premium-input w-full" /><input placeholder="Value (Rs.)" aria-label="Opportunity value" type="number" value={oppValue} onChange={(e) => setOppValue(e.target.value)} className="premium-input w-full" /><select value={oppStageId} onChange={(e) => setOppStageId(e.target.value)} className="premium-input w-full" aria-label="Opportunity stage"><option value="">Select stage</option>{stages.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select><button onClick={() => void addOpportunity()} className="premium-btn-primary w-full py-2 text-sm">Create opportunity</button></div>
+              </CrmPanel>
             </div>
-            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
-              <h3 className="text-lg font-semibold">Opportunities</h3>
-              <div className="mt-4 space-y-3">
-                {opportunities.length === 0 ? <div className="text-sm text-[#a39a86]">No opportunities yet.</div> : null}
-                {opportunities.map((opp) => (
-                  <div key={opp.id} className="flex items-center justify-between rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
-                    <div>
-                      <div className="font-medium">{opp.name}</div>
-                      <div className="text-sm text-[#a39a86]">{opp.pipeline?.name ?? "Unknown pipeline"} · Stage: {opp.stage?.name ?? "Unknown"}</div>
-                      {opp.valueCents > 0 ? <div className="text-xs text-[#d4af37]">₹{(opp.valueCents / 100).toLocaleString()}</div> : null}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`rounded-full px-2 py-0.5 text-xs ${opp.status === "WON" ? "bg-[rgba(76,175,80,0.15)] text-[#4caf50]" : opp.status === "LOST" ? "bg-[rgba(209,85,74,0.15)] text-[#d1554a]" : "bg-[rgba(212,175,55,0.12)] text-[#d4af37]"}`}>
-                        {opp.status}
-                      </span>
-                      {selectedPipelineId && stages.length > 1 && opp.status === "OPEN" ? (
-                        <select value={opp.stageId} onChange={(e) => void moveOpportunity(opp.id, e.target.value)} className="premium-input py-1 text-xs">
-                          {stages.sort((a, b) => a.position - b.position).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                        </select>
-                      ) : null}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
+            <CrmPanel title="Opportunities" eyebrow="Board" description="Loaded opportunities with status and stage controls.">
+              <div className="space-y-3">{opportunities.length === 0 ? <CrmEmptyState title="No opportunities yet." /> : null}{opportunities.map((opp) => (<article key={opp.id} className="rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-4 transition duration-200 hover:border-[rgba(212,175,55,0.28)] hover:bg-[#1a1812]"><div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"><div><div className="font-medium text-[#f5f1e6]">{opp.name}</div><div className="mt-1 text-sm text-[#a39a86]">{opp.pipeline?.name ?? "Unknown pipeline"} - Stage: {opp.stage?.name ?? "Unknown"}</div>{opp.valueCents > 0 ? <div className="mt-2 text-xs font-semibold text-[#d4af37]">Rs. {(opp.valueCents / 100).toLocaleString()}</div> : null}</div><div className="flex flex-wrap items-center gap-2"><CrmBadge tone={opp.status === "WON" ? "success" : opp.status === "LOST" ? "danger" : "warning"}>{opp.status}</CrmBadge>{selectedPipelineId && stages.length > 1 && opp.status === "OPEN" ? (<select value={opp.stageId} onChange={(e) => void moveOpportunity(opp.id, e.target.value)} className="premium-input min-w-[160px] py-2 text-xs" aria-label={`Move ${opp.name}`}>{stages.slice().sort((a, b) => a.position - b.position).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select>) : null}</div></div></article>))}</div>
+            </CrmPanel>
+          </CrmWorkspace>
         ) : null}
-
         {activeTab === "Follow-ups" ? (
-          <section className="mt-6 space-y-6">
+          <CrmWorkspace eyebrow="Retention" title="Follow-ups" description="Follow-up creation and completion stay within the existing CRM workflow and loaded task records." stats={[{ label: "Loaded", value: followups.length }, { label: "Pending", value: followups.filter((f) => f.status === "PENDING").length, tone: "warning" }, { label: "Completed", value: followups.filter((f) => f.status === "COMPLETED").length, tone: "success" }]}>
             {followupError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{followupError}</div> : null}
-            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
-              <h3 className="text-lg font-semibold">New follow-up</h3>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <input placeholder="Follow-up title" value={followupTitle} onChange={(e) => setFollowupTitle(e.target.value)} className="premium-input flex-1 min-w-[200px]" />
-                <input type="datetime-local" value={followupDueAt} onChange={(e) => setFollowupDueAt(e.target.value)} className="premium-input" />
-                <button onClick={() => void addFollowup()} className="premium-btn-primary px-3 py-1 text-sm">Add</button>
-              </div>
-            </div>
-            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
-              <h3 className="text-lg font-semibold">Follow-ups</h3>
-              <div className="mt-4 space-y-3">
-                {followups.length === 0 ? <div className="text-sm text-[#a39a86]">No follow-ups yet.</div> : null}
-                {followups.map((f) => (
-                  <div key={f.id} className="flex items-center justify-between rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
-                    <div>
-                      <div className="font-medium">{f.title}</div>
-                      <div className="text-sm text-[#a39a86]">Due: {new Date(f.dueAt).toLocaleString()}</div>
-                      {f.notes ? <div className="text-xs text-[#a39a86] mt-1">{f.notes}</div> : null}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`rounded-full px-2 py-0.5 text-xs ${f.status === "COMPLETED" ? "bg-[rgba(76,175,80,0.15)] text-[#4caf50]" : f.status === "CANCELLED" ? "bg-[rgba(209,85,74,0.15)] text-[#d1554a]" : "bg-[rgba(212,175,55,0.12)] text-[#d4af37]"}`}>
-                        {f.status}
-                      </span>
-                      {f.status === "PENDING" ? (
-                        <button onClick={() => void completeFollowup(f.id)} className="rounded-lg border border-[rgba(76,175,80,0.3)] bg-[rgba(76,175,80,0.08)] px-2 py-0.5 text-xs text-[#4caf50] transition-colors hover:bg-[rgba(76,175,80,0.15)]">Complete</button>
-                      ) : null}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
+            <div className="grid gap-5 xl:grid-cols-[minmax(320px,0.75fr)_minmax(0,1.25fr)]"><CrmPanel title="New follow-up" eyebrow="Schedule" description="Creates a dated follow-up through the existing endpoint."><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1"><input placeholder="Follow-up title" aria-label="Follow-up title" value={followupTitle} onChange={(e) => setFollowupTitle(e.target.value)} className="premium-input" /><input type="datetime-local" aria-label="Follow-up due date" value={followupDueAt} onChange={(e) => setFollowupDueAt(e.target.value)} className="premium-input" /><button onClick={() => void addFollowup()} className="premium-btn-primary py-2 text-sm sm:col-span-2 xl:col-span-1">Add</button></div></CrmPanel><CrmPanel title="Follow-ups" eyebrow="Queue" description="Complete pending follow-ups without changing their underlying model."><div className="space-y-3">{followups.length === 0 ? <CrmEmptyState title="No follow-ups yet." /> : null}{followups.map((f) => (<article key={f.id} className="rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-4 transition duration-200 hover:border-[rgba(212,175,55,0.28)] hover:bg-[#1a1812]"><div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"><div><div className="font-medium text-[#f5f1e6]">{f.title}</div><div className="mt-1 text-sm text-[#a39a86]">Due: {new Date(f.dueAt).toLocaleString()}</div>{f.notes ? <div className="mt-2 text-xs text-[#a39a86]">{f.notes}</div> : null}</div><div className="flex flex-wrap items-center gap-2"><CrmBadge tone={f.status === "COMPLETED" ? "success" : f.status === "CANCELLED" ? "danger" : "warning"}>{f.status}</CrmBadge>{f.status === "PENDING" ? <button onClick={() => void completeFollowup(f.id)} className="premium-btn-secondary px-3 py-2 text-xs">Complete</button> : null}</div></div></article>))}</div></CrmPanel></div>
+          </CrmWorkspace>
         ) : null}
-
         {activeTab === "Communications" ? (
-          <section className="mt-6 space-y-6">
+          <CrmWorkspace eyebrow="Client contact" title="Communications" description="Log and review communication records with clear channel and direction states, using the existing API contract." stats={[{ label: "Loaded", value: communications.length }, { label: "Inbound", value: communications.filter((c) => c.direction === "inbound").length, tone: "success" }, { label: "Outbound", value: communications.filter((c) => c.direction === "outbound").length, tone: "warning" }]}>
             {commError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{commError}</div> : null}
-            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
-              <h3 className="text-lg font-semibold">Log communication</h3>
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                <select value={commChannel} onChange={(e) => setCommChannel(e.target.value)} className="premium-input">
-                  <option value="email">Email</option>
-                  <option value="whatsapp">WhatsApp</option>
-                  <option value="sms">SMS</option>
-                  <option value="phone">Phone</option>
-                  <option value="in_person">In person</option>
-                  <option value="other">Other</option>
-                </select>
-                <select value={commDirection} onChange={(e) => setCommDirection(e.target.value)} className="premium-input">
-                  <option value="outbound">Outbound</option>
-                  <option value="inbound">Inbound</option>
-                </select>
-                <input placeholder="Contact name (optional)" value={commContactName} onChange={(e) => setCommContactName(e.target.value)} className="premium-input" />
-                <input placeholder="Subject (optional)" value={commSubject} onChange={(e) => setCommSubject(e.target.value)} className="premium-input" />
-                <textarea placeholder="Message body" value={commBody} onChange={(e) => setCommBody(e.target.value)} className="premium-input sm:col-span-2" rows={3} />
-                <button onClick={() => void addCommunication()} className="premium-btn-primary px-3 py-1 text-sm sm:col-span-2">Log communication</button>
-              </div>
-            </div>
-            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
-              <h3 className="text-lg font-semibold">Communication history</h3>
-              <div className="mt-4 space-y-3">
-                {communications.length === 0 ? <div className="text-sm text-[#a39a86]">No communications yet.</div> : null}
-                {communications.map((c) => (
-                  <div key={c.id} className="rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className={`rounded-full px-2 py-0.5 text-xs ${c.direction === "inbound" ? "bg-[rgba(76,175,80,0.15)] text-[#4caf50]" : "bg-[rgba(212,175,55,0.12)] text-[#d4af37]"}`}>
-                          {c.direction}
-                        </span>
-                        <span className="rounded-full px-2 py-0.5 text-xs bg-[rgba(100,100,100,0.2)] text-[#a39a86]">{c.channel}</span>
-                        {c.contactName ? <span className="text-sm text-[#a39a86]">{c.contactName}</span> : null}
-                      </div>
-                      <div className="text-xs text-[#6b6455]">{new Date(c.communicatedAt).toLocaleString()}</div>
-                    </div>
-                    {c.subject ? <div className="mt-1 font-medium text-sm">{c.subject}</div> : null}
-                    <div className="mt-1 text-sm text-[#a39a86]">{c.body}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
+            <div className="grid gap-5 xl:grid-cols-[minmax(320px,0.8fr)_minmax(0,1.2fr)]"><CrmPanel title="Log communication" eyebrow="Record" description="Adds a communication entry without sending messages or implying delivery integration."><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2"><select value={commChannel} onChange={(e) => setCommChannel(e.target.value)} className="premium-input" aria-label="Communication channel"><option value="email">Email</option><option value="whatsapp">WhatsApp</option><option value="sms">SMS</option><option value="phone">Phone</option><option value="in_person">In person</option><option value="other">Other</option></select><select value={commDirection} onChange={(e) => setCommDirection(e.target.value)} className="premium-input" aria-label="Communication direction"><option value="outbound">Outbound</option><option value="inbound">Inbound</option></select><input placeholder="Contact name (optional)" aria-label="Contact name" value={commContactName} onChange={(e) => setCommContactName(e.target.value)} className="premium-input" /><input placeholder="Subject (optional)" aria-label="Communication subject" value={commSubject} onChange={(e) => setCommSubject(e.target.value)} className="premium-input" /><textarea placeholder="Message body" aria-label="Message body" value={commBody} onChange={(e) => setCommBody(e.target.value)} className="premium-input sm:col-span-2 xl:col-span-1 2xl:col-span-2" rows={4} /><button onClick={() => void addCommunication()} className="premium-btn-primary px-3 py-2 text-sm sm:col-span-2 xl:col-span-1 2xl:col-span-2">Log communication</button></div></CrmPanel><CrmPanel title="Communication history" eyebrow="Timeline" description="Most recent loaded interactions are shown with channel and direction metadata."><div className="space-y-3">{communications.length === 0 ? <CrmEmptyState title="No communications yet." /> : null}{communications.map((c) => (<article key={c.id} className="rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-4 transition duration-200 hover:border-[rgba(212,175,55,0.28)] hover:bg-[#1a1812]"><div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"><div className="flex flex-wrap items-center gap-2"><CrmBadge tone={c.direction === "inbound" ? "success" : "warning"}>{c.direction}</CrmBadge><CrmBadge>{c.channel}</CrmBadge>{c.contactName ? <span className="text-sm text-[#a39a86]">{c.contactName}</span> : null}</div><div className="text-xs text-[#807866]">{new Date(c.communicatedAt).toLocaleString()}</div></div>{c.subject ? <div className="mt-3 font-medium text-sm text-[#f5f1e6]">{c.subject}</div> : null}<div className="mt-2 text-sm leading-6 text-[#a39a86]">{c.body}</div></article>))}</div></CrmPanel></div>
+          </CrmWorkspace>
         ) : null}
-
         {activeTab === "Tags & Notes" ? (
-          <section className="mt-6 space-y-6">
+          <CrmWorkspace eyebrow="Customer memory" title="Tags & Notes" description="Lightweight CRM memory surfaces for loaded tags, notes, and attachments. No new document storage behavior is introduced." stats={[{ label: "Tags", value: tags.length }, { label: "Notes", value: crmNotes.length }, { label: "Attachments", value: attachments.length }]}>
             {tagError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{tagError}</div> : null}
-            <div className="grid gap-4 sm:grid-cols-3">
-              <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
-                <h3 className="text-lg font-semibold">Tags</h3>
-                <div className="mt-3 space-y-2">
-                  {tags.length === 0 ? <div className="text-sm text-[#a39a86]">No tags yet.</div> : null}
-                  {tags.map((t) => (
-                    <div key={t.id} className="rounded-lg border border-[rgba(212,175,55,0.1)] bg-[#17150f] px-3 py-1.5 text-sm">{t.name}</div>
-                  ))}
-                </div>
-                <div className="mt-3 flex gap-2">
-                  <input placeholder="Tag name" value={tagName} onChange={(e) => setTagName(e.target.value)} className="premium-input flex-1" />
-                  <button onClick={() => void addTag()} className="premium-btn-primary px-3 py-1 text-sm">Add</button>
-                </div>
-              </div>
-              <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
-                <h3 className="text-lg font-semibold">Notes</h3>
-                <div className="mt-3 space-y-2">
-                  {crmNotes.length === 0 ? <div className="text-sm text-[#a39a86]">No notes yet.</div> : null}
-                  {crmNotes.slice(0, 10).map((n) => (
-                    <div key={n.id} className="rounded-lg border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-2 text-sm">
-                      <div>{n.body}</div>
-                      <div className="text-xs text-[#6b6455] mt-1">{new Date(n.createdAt).toLocaleString()}</div>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-3">
-                  <textarea placeholder="Add a note..." value={noteBody} onChange={(e) => setNoteBody(e.target.value)} className="premium-input w-full" rows={2} />
-                  <button onClick={() => void addCrmNote()} className="premium-btn-primary mt-2 w-full py-1 text-sm">Add note</button>
-                </div>
-              </div>
-              <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
-                <h3 className="text-lg font-semibold">Attachments</h3>
-                <div className="mt-3 space-y-2">
-                  {attachments.length === 0 ? <div className="text-sm text-[#a39a86]">No attachments yet.</div> : null}
-                  {attachments.slice(0, 10).map((a) => (
-                    <div key={a.id} className="rounded-lg border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-2 text-sm">
-                      <a href={a.url} target="_blank" rel="noopener noreferrer" className="text-[#d4af37] hover:underline">{a.name}</a>
-                      {a.mimeType ? <span className="ml-2 text-xs text-[#6b6455]">{a.mimeType}</span> : null}
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-3 space-y-2">
-                  <input placeholder="File name" value={attName} onChange={(e) => setAttName(e.target.value)} className="premium-input w-full" />
-                  <input placeholder="File URL" value={attUrl} onChange={(e) => setAttUrl(e.target.value)} className="premium-input w-full" />
-                  <button onClick={() => void addAttachment()} className="premium-btn-primary w-full py-1 text-sm">Add attachment</button>
-                </div>
-              </div>
-            </div>
-          </section>
-        ) : null}
-
-        {activeTab === "Services" ? (
+            <div className="grid gap-5 xl:grid-cols-3"><CrmPanel title="Tags" eyebrow="Segments" description="Create and review lightweight labels."><div className="space-y-2">{tags.length === 0 ? <CrmEmptyState title="No tags yet." /> : null}<div className="flex flex-wrap gap-2">{tags.map((t) => <CrmBadge key={t.id}>{t.name}</CrmBadge>)}</div></div><div className="mt-4 flex flex-col gap-2 sm:flex-row xl:flex-col 2xl:flex-row"><input placeholder="Tag name" aria-label="Tag name" value={tagName} onChange={(e) => setTagName(e.target.value)} className="premium-input flex-1" /><button onClick={() => void addTag()} className="premium-btn-primary px-4 py-2 text-sm">Add</button></div></CrmPanel><CrmPanel title="Notes" eyebrow="Internal" description="Keep short operational notes in the existing CRM notes surface."><div className="space-y-2">{crmNotes.length === 0 ? <CrmEmptyState title="No notes yet." /> : null}{crmNotes.slice(0, 10).map((n) => (<article key={n.id} className="rounded-lg border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3 text-sm"><div className="leading-6 text-[#f5f1e6]">{n.body}</div><div className="mt-2 text-xs text-[#807866]">{new Date(n.createdAt).toLocaleString()}</div></article>))}</div><div className="mt-4 space-y-2"><textarea placeholder="Add a note..." aria-label="Add a note" value={noteBody} onChange={(e) => setNoteBody(e.target.value)} className="premium-input w-full" rows={3} /><button onClick={() => void addCrmNote()} className="premium-btn-primary w-full py-2 text-sm">Add note</button></div></CrmPanel><CrmPanel title="Attachments" eyebrow="References" description="Save named links through the existing attachment endpoint."><div className="space-y-2">{attachments.length === 0 ? <CrmEmptyState title="No attachments yet." /> : null}{attachments.slice(0, 10).map((a) => (<article key={a.id} className="rounded-lg border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3 text-sm"><a href={a.url} target="_blank" rel="noopener noreferrer" className="font-medium text-[#d4af37] hover:underline">{a.name}</a>{a.mimeType ? <span className="ml-2 text-xs text-[#807866]">{a.mimeType}</span> : null}</article>))}</div><div className="mt-4 space-y-2"><input placeholder="File name" aria-label="File name" value={attName} onChange={(e) => setAttName(e.target.value)} className="premium-input w-full" /><input placeholder="File URL" aria-label="File URL" value={attUrl} onChange={(e) => setAttUrl(e.target.value)} className="premium-input w-full" /><button onClick={() => void addAttachment()} className="premium-btn-primary w-full py-2 text-sm">Add attachment</button></div></CrmPanel></div>
+          </CrmWorkspace>
+        ) : null}        {activeTab === "Services" ? (
           <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
             <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
               <h2 className="text-xl font-semibold">Service menu</h2>
@@ -7666,7 +7439,7 @@ export default function Home() {
                         <div key={item.id} className="flex items-center justify-between rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
                           <div className="flex-1">
                             <div className="font-medium">{item.description}</div>
-                            <div className="text-sm text-[#a39a86]">₹{item.unitPriceCents / 100} × {item.quantity}</div>
+                            <div className="text-sm text-[#a39a86]">₹{item.unitPriceCents / 100} ?? {item.quantity}</div>
                           </div>
                           <div className="flex items-center gap-3">
                             <div className="text-sm font-medium">₹{item.unitPriceCents * item.quantity / 100}</div>
@@ -7862,7 +7635,7 @@ export default function Home() {
                         <div className="flex items-center justify-between">
                           <div>
                             <div className="font-medium">{branch.name}</div>
-                            <div className="text-sm text-[#a39a86]">{branch.slug} · BU {branch.businessUnitId}</div>
+                            <div className="text-sm text-[#a39a86]">{branch.slug} ?? BU {branch.businessUnitId}</div>
                           </div>
                           <div className="flex items-center gap-2">
                             <span className={`rounded-full px-2.5 py-1 text-xs ${branch.isActive ? "premium-badge-success" : "premium-badge-danger"}`}>{branch.isActive ? "Active" : "Inactive"}</span>
@@ -9177,7 +8950,7 @@ export default function Home() {
                       <div className="flex items-center justify-between">
                         <div>
                           <div className="text-sm font-medium">{gw.provider}{gw.label ? ` — ${gw.label}` : ""}</div>
-                          <div className="text-xs text-[#a39a86]">{gw.isActive ? "Active" : "Inactive"} · Created {new Date(gw.createdAt).toLocaleDateString()}</div>
+                          <div className="text-xs text-[#a39a86]">{gw.isActive ? "Active" : "Inactive"} ?? Created {new Date(gw.createdAt).toLocaleDateString()}</div>
                         </div>
                         <div className="flex gap-2">
                           <button
@@ -9259,7 +9032,7 @@ export default function Home() {
                             {asset.name}
                             {update ? <span className="ml-2 rounded-full bg-[rgba(212,175,55,0.2)] px-2 py-0.5 text-xs text-[#d4af37]">Update: v{update.latestVersion}</span> : null}
                           </div>
-                          <div className="text-xs text-[#a39a86]">{asset.type}{asset.category ? ` · ${asset.category}` : ""}{asset.authorName ? ` · by ${asset.authorName}` : ""}</div>
+                          <div className="text-xs text-[#a39a86]">{asset.type}{asset.category ? ` ?? ${asset.category}` : ""}{asset.authorName ? ` ?? by ${asset.authorName}` : ""}</div>
                           {asset.description ? <div className="mt-1 text-xs text-[#a39a86]">{asset.description}</div> : null}
                           {update ? <div className="mt-1 text-xs text-[#d4af37]">Installed: v{update.installedVersion} → Latest: v{update.latestVersion}</div> : null}
                         </div>
