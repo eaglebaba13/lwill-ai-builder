@@ -5,6 +5,7 @@ import { AppHeader } from "@/components/app-header";
 import { AppSidebar, type SidebarIconKey, type SidebarSection } from "@/components/app-sidebar";
 import { KpiCard as SharedKpiCard } from "@/components/kpi-card";
 import { CrmBadge, CrmEmptyState, CrmPanel, CrmWorkspace } from "@/components/xnail/crm-workspace";
+import { OperationsBadge, OperationsEmptyState, OperationsPanel, OperationsWorkspace } from "@/components/xnail/operations-workspace";
 import {
   invalidatePendingRefresh,
   loginWithNativeAuthentication,
@@ -5622,279 +5623,204 @@ export default function Home() {
             <div className="grid gap-5 xl:grid-cols-3"><CrmPanel title="Tags" eyebrow="Segments" description="Create and review lightweight labels."><div className="space-y-2">{tags.length === 0 ? <CrmEmptyState title="No tags yet." /> : null}<div className="flex flex-wrap gap-2">{tags.map((t) => <CrmBadge key={t.id}>{t.name}</CrmBadge>)}</div></div><div className="mt-4 flex flex-col gap-2 sm:flex-row xl:flex-col 2xl:flex-row"><input placeholder="Tag name" aria-label="Tag name" value={tagName} onChange={(e) => setTagName(e.target.value)} className="premium-input flex-1" /><button onClick={() => void addTag()} className="premium-btn-primary px-4 py-2 text-sm">Add</button></div></CrmPanel><CrmPanel title="Notes" eyebrow="Internal" description="Keep short operational notes in the existing CRM notes surface."><div className="space-y-2">{crmNotes.length === 0 ? <CrmEmptyState title="No notes yet." /> : null}{crmNotes.slice(0, 10).map((n) => (<article key={n.id} className="rounded-lg border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3 text-sm"><div className="leading-6 text-[#f5f1e6]">{n.body}</div><div className="mt-2 text-xs text-[#807866]">{new Date(n.createdAt).toLocaleString()}</div></article>))}</div><div className="mt-4 space-y-2"><textarea placeholder="Add a note..." aria-label="Add a note" value={noteBody} onChange={(e) => setNoteBody(e.target.value)} className="premium-input w-full" rows={3} /><button onClick={() => void addCrmNote()} className="premium-btn-primary w-full py-2 text-sm">Add note</button></div></CrmPanel><CrmPanel title="Attachments" eyebrow="References" description="Save named links through the existing attachment endpoint."><div className="space-y-2">{attachments.length === 0 ? <CrmEmptyState title="No attachments yet." /> : null}{attachments.slice(0, 10).map((a) => (<article key={a.id} className="rounded-lg border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3 text-sm"><a href={a.url} target="_blank" rel="noopener noreferrer" className="font-medium text-[#d4af37] hover:underline">{a.name}</a>{a.mimeType ? <span className="ml-2 text-xs text-[#807866]">{a.mimeType}</span> : null}</article>))}</div><div className="mt-4 space-y-2"><input placeholder="File name" aria-label="File name" value={attName} onChange={(e) => setAttName(e.target.value)} className="premium-input w-full" /><input placeholder="File URL" aria-label="File URL" value={attUrl} onChange={(e) => setAttUrl(e.target.value)} className="premium-input w-full" /><button onClick={() => void addAttachment()} className="premium-btn-primary w-full py-2 text-sm">Add attachment</button></div></CrmPanel></div>
           </CrmWorkspace>
         ) : null}        {activeTab === "Services" ? (
-          <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
-              <h2 className="text-xl font-semibold">Service menu</h2>
-              <div className="mt-4 space-y-3">
-                {isLoadingServices ? <div className="text-sm text-[#a39a86]">Loading services...</div> : null}
-                {!isLoadingServices && serviceError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{serviceError}</div> : null}
-                {!isLoadingServices && !serviceError && services.length === 0 ? <div className="text-sm text-[#a39a86]">No services yet.</div> : null}
-                {services.map((service) => (
-                  <div key={service.id} className="rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
-                    {editingServiceId === service.id ? (
-                      <div className="space-y-2">
-                        <input
-                          value={editingServiceName}
-                          onChange={(event) => setEditingServiceName(event.target.value)}
-                          placeholder="Service name"
-                          className="premium-input"
-                        />
-                        <input
-                          value={editingServicePrice}
-                          onChange={(event) => setEditingServicePrice(event.target.value)}
-                          placeholder="Price"
-                          className="premium-input"
-                        />
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => updateService(service.id)}
-                            className="premium-btn-primary px-3 py-2 text-sm"
-                          >
-                            Save
-                          </button>
-                          <button
-                            onClick={() => setEditingServiceId(null)}
-                            className="rounded-xl bg-[#f0dfe6] px-3 py-2 text-sm font-semibold text-[#d4af37]"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="font-medium">{service.name}</div>
-                          <div className="text-sm text-[#a39a86]">{service.durationMinutes} min</div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="font-semibold text-[#a39a86]">₹{service.priceCents / 100}</div>
-                          <button
-                            onClick={() => {
-                              setEditingServiceId(service.id);
-                              setEditingServiceName(service.name);
-                              setEditingServicePrice(String(service.priceCents));
-                            }}
-                            className="rounded-xl bg-[#f0dfe6] px-3 py-1.5 text-sm font-semibold text-[#d4af37]"
-                          >
-                            Edit
-                          </button>
-                        </div>
-                      </div>
-                    )}
+          <OperationsWorkspace
+            eyebrow="Operations catalog"
+            title="Services"
+            description="Manage the service menu used by appointments and billing. Prices are displayed in rupees while the existing API continues to store paise."
+            stats={[
+              { label: "Loaded", value: services.length },
+              { label: "Active", value: services.filter((service) => service.isActive).length, tone: "success" },
+              { label: "Inactive", value: services.filter((service) => !service.isActive).length },
+            ]}
+          >
+            {serviceError ? <div role="alert" className="rounded-lg border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#e47a70]">{serviceError}</div> : null}
+            <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.55fr)]">
+              <OperationsPanel eyebrow="Catalog" title="Service menu" description="Compact service records with their current duration, price, and availability.">
+                {isLoadingServices ? (
+                  <div className="space-y-2" aria-live="polite">
+                    <div className="text-sm text-[#a39a86]">Loading services...</div>
+                    {[0, 1, 2].map((item) => <div key={item} className="h-16 animate-pulse rounded-lg bg-[#17150f]" />)}
                   </div>
-                ))}
-              </div>
+                ) : !serviceError && services.length === 0 ? (
+                  <OperationsEmptyState title="No services yet." description="Create the first service using the form alongside the catalog." />
+                ) : (
+                  <div className="divide-y divide-[rgba(212,175,55,0.1)]">
+                    {services.map((service) => (
+                      <article key={service.id} className="py-3 first:pt-0 last:pb-0">
+                        {editingServiceId === service.id ? (
+                          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_160px_auto] sm:items-end">
+                            <label className="text-xs font-medium text-[#a39a86]">Service name<input aria-label="Edit service name" value={editingServiceName} onChange={(event) => setEditingServiceName(event.target.value)} placeholder="Service name" className="premium-input mt-1 w-full" /></label>
+                            <label className="text-xs font-medium text-[#a39a86]">Price in paise<input aria-label="Edit service price in paise" inputMode="numeric" value={editingServicePrice} onChange={(event) => setEditingServicePrice(event.target.value)} placeholder="Price" className="premium-input mt-1 w-full" /></label>
+                            <div className="flex gap-2">
+                              <button onClick={() => updateService(service.id)} className="premium-btn-primary min-h-11 px-3 text-sm">Save</button>
+                              <button onClick={() => setEditingServiceId(null)} className="premium-btn-secondary min-h-11 px-3 text-sm">Cancel</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h4 className="font-medium text-[#f5f1e6]">{service.name}</h4>
+                                <OperationsBadge tone={service.isActive ? "success" : "neutral"}>{service.isActive ? "Active" : "Inactive"}</OperationsBadge>
+                              </div>
+                              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-[#a39a86]">
+                                <span>{service.durationMinutes} min</span>
+                                {service.description ? <span className="truncate">{service.description}</span> : null}
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between gap-4 sm:justify-end">
+                              <div className="font-semibold tabular-nums text-[#f5f1e6]">₹{(service.priceCents / 100).toLocaleString("en-IN")}</div>
+                              <button onClick={() => { setEditingServiceId(service.id); setEditingServiceName(service.name); setEditingServicePrice(String(service.priceCents)); }} className="premium-btn-secondary min-h-10 px-3 text-sm">Edit</button>
+                            </div>
+                          </div>
+                        )}
+                      </article>
+                    ))}
+                  </div>
+                )}
+              </OperationsPanel>
+              <OperationsPanel eyebrow="Create" title="Add service" description="New services use the established 45-minute default and existing paise-based price contract.">
+                <div className="space-y-4">
+                  <label className="block text-xs font-medium text-[#a39a86]">Service name<input aria-label="Service name" value={serviceName} onChange={(event) => setServiceName(event.target.value)} placeholder="Service name" className="premium-input mt-1 w-full" /></label>
+                  <label className="block text-xs font-medium text-[#a39a86]">Price in paise<input aria-label="Service price in paise" inputMode="numeric" value={servicePrice} onChange={(event) => setServicePrice(event.target.value)} placeholder="Price" className="premium-input mt-1 w-full" /></label>
+                  <button onClick={addService} className="premium-btn-primary min-h-11 w-full px-4 text-sm">Save service</button>
+                </div>
+              </OperationsPanel>
             </div>
-
-            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
-              <h2 className="text-xl font-semibold">Add service</h2>
-              <div className="mt-4 space-y-3">
-                <input
-                  value={serviceName}
-                  onChange={(event) => setServiceName(event.target.value)}
-                  placeholder="Service name"
-                  className="premium-input"
-                />
-                <input
-                  value={servicePrice}
-                  onChange={(event) => setServicePrice(event.target.value)}
-                  placeholder="Price"
-                  className="premium-input"
-                />
-                <button
-                  onClick={addService}
-                  className="premium-btn-primary w-full py-2.5 text-sm"
-                >
-                  Save service
-                </button>
-              </div>
-            </div>
-          </section>
+          </OperationsWorkspace>
         ) : null}
 
         {activeTab === "Packages" ? (
-          <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
-              <h2 className="text-xl font-semibold">Packages</h2>
-              <div className="mt-4 space-y-3">
-                {isLoadingPackages ? <div className="text-sm text-[#a39a86]">Loading packages...</div> : null}
-                {!isLoadingPackages && packageError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{packageError}</div> : null}
-                {!isLoadingPackages && !packageError && packages.length === 0 ? <div className="text-sm text-[#a39a86]">No packages yet.</div> : null}
-                {packages.map((pkg) => (
-                  <div key={pkg.id} className="rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
-                    {editingPackageId === pkg.id ? (
-                      <div className="space-y-2">
-                        <input
-                          value={editingPackageName}
-                          onChange={(event) => setEditingPackageName(event.target.value)}
-                          placeholder="Package name"
-                          className="premium-input"
-                        />
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => updatePackage(pkg.id)}
-                            className="premium-btn-primary px-3 py-2 text-sm"
-                          >
-                            Save
-                          </button>
-                          <button
-                            onClick={() => setEditingPackageId(null)}
-                            className="rounded-xl bg-[#f0dfe6] px-3 py-2 text-sm font-semibold text-[#d4af37]"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="font-medium">{pkg.name}</div>
-                          <div className="text-sm text-[#a39a86]">{pkg.serviceIds.length} service(s)</div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="font-semibold text-[#a39a86]">{pkg.priceCents === null ? "—" : `₹${pkg.priceCents / 100}`}</div>
-                          <button
-                            onClick={() => {
-                              setEditingPackageId(pkg.id);
-                              setEditingPackageName(pkg.name);
-                            }}
-                            className="rounded-xl bg-[#f0dfe6] px-3 py-1.5 text-sm font-semibold text-[#d4af37]"
-                          >
-                            Edit
-                          </button>
-                        </div>
-                      </div>
-                    )}
+          <OperationsWorkspace
+            eyebrow="Service bundles"
+            title="Packages"
+            description="Review package composition, price, validity, and availability without changing the current package rules."
+            stats={[
+              { label: "Loaded", value: packages.length },
+              { label: "Active", value: packages.filter((pkg) => pkg.isActive).length, tone: "success" },
+              { label: "Services linked", value: packages.reduce((total, pkg) => total + pkg.serviceIds.length, 0) },
+            ]}
+          >
+            {packageError ? <div role="alert" className="rounded-lg border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#e47a70]">{packageError}</div> : null}
+            <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(300px,0.55fr)]">
+              <OperationsPanel eyebrow="Catalog" title="Package register" description="Administrative package records, not customer-facing offers.">
+                {isLoadingPackages ? (
+                  <div className="space-y-2" aria-live="polite"><div className="text-sm text-[#a39a86]">Loading packages...</div>{[0, 1, 2].map((item) => <div key={item} className="h-20 animate-pulse rounded-lg bg-[#17150f]" />)}</div>
+                ) : !packageError && packages.length === 0 ? (
+                  <OperationsEmptyState title="No packages yet." description="Create a package record using the form alongside the register." />
+                ) : (
+                  <div className="space-y-3">
+                    {packages.map((pkg) => (
+                      <article key={pkg.id} className="rounded-lg border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-4 transition-colors hover:border-[rgba(212,175,55,0.25)]">
+                        {editingPackageId === pkg.id ? (
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                            <label className="flex-1 text-xs font-medium text-[#a39a86]">Package name<input aria-label="Edit package name" value={editingPackageName} onChange={(event) => setEditingPackageName(event.target.value)} placeholder="Package name" className="premium-input mt-1 w-full" /></label>
+                            <div className="flex gap-2">
+                              <button onClick={() => updatePackage(pkg.id)} className="premium-btn-primary min-h-11 px-3 text-sm">Save</button>
+                              <button onClick={() => setEditingPackageId(null)} className="premium-btn-secondary min-h-11 px-3 text-sm">Cancel</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h4 className="font-medium text-[#f5f1e6]">{pkg.name}</h4>
+                                <OperationsBadge tone={pkg.isActive ? "success" : "neutral"}>{pkg.isActive ? "Active" : "Inactive"}</OperationsBadge>
+                              </div>
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                {pkg.serviceIds.length === 0 ? <span className="text-sm text-[#807866]">No linked services</span> : pkg.serviceIds.map((serviceId) => <OperationsBadge key={serviceId}>{serviceMap.get(serviceId) ?? "Linked service"}</OperationsBadge>)}
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-3">
+                              <div className="text-right text-sm text-[#a39a86]">
+                                <div className="font-semibold tabular-nums text-[#f5f1e6]">{pkg.priceCents === null ? "Price not set" : `₹${(pkg.priceCents / 100).toLocaleString("en-IN")}`}</div>
+                                <div>{pkg.durationDays === null ? "No validity set" : `${pkg.durationDays} days`}</div><div>{pkg.serviceIds.length} service(s)</div>
+                              </div>
+                              <button onClick={() => { setEditingPackageId(pkg.id); setEditingPackageName(pkg.name); }} className="premium-btn-secondary min-h-10 px-3 text-sm">Edit</button>
+                            </div>
+                          </div>
+                        )}
+                      </article>
+                    ))}
                   </div>
-                ))}
-              </div>
+                )}
+              </OperationsPanel>
+              <OperationsPanel eyebrow="Create" title="Add package" description="Creates the same empty package shell supported by the current API.">
+                <div className="space-y-4">
+                  <label className="block text-xs font-medium text-[#a39a86]">Package name<input aria-label="Package name" value={packageName} onChange={(event) => setPackageName(event.target.value)} placeholder="Package name" className="premium-input mt-1 w-full" /></label>
+                  <button onClick={addPackage} className="premium-btn-primary min-h-11 w-full px-4 text-sm">Save package</button>
+                </div>
+              </OperationsPanel>
             </div>
-
-            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
-              <h2 className="text-xl font-semibold">Add package</h2>
-              <div className="mt-4 space-y-3">
-                <input
-                  value={packageName}
-                  onChange={(event) => setPackageName(event.target.value)}
-                  placeholder="Package name"
-                  className="premium-input"
-                />
-                <button
-                  onClick={addPackage}
-                  className="premium-btn-primary w-full py-2.5 text-sm"
-                >
-                  Save package
-                </button>
-              </div>
-            </div>
-          </section>
+          </OperationsWorkspace>
         ) : null}
 
         {activeTab === "Memberships" ? (
-          <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
-              <h2 className="text-xl font-semibold">Memberships</h2>
-              <div className="mt-4 space-y-3">
-                {isLoadingMemberships ? <div className="text-sm text-[#a39a86]">Loading memberships...</div> : null}
-                {!isLoadingMemberships && membershipError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{membershipError}</div> : null}
-                {!isLoadingMemberships && !membershipError && memberships.length === 0 ? <div className="text-sm text-[#a39a86]">No memberships yet.</div> : null}
-                {memberships.map((membership) => (
-                  <div key={membership.id} className="rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
-                    {editingMembershipId === membership.id ? (
-                      <div className="space-y-2">
-                        <input
-                          value={editingMembershipStatus}
-                          onChange={(event) => setEditingMembershipStatus(event.target.value)}
-                          placeholder="Status"
-                          className="premium-input"
-                        />
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => updateMembership(membership.id)}
-                            className="premium-btn-primary px-3 py-2 text-sm"
-                          >
-                            Save
-                          </button>
-                          <button
-                            onClick={() => setEditingMembershipId(null)}
-                            className="rounded-xl bg-[#f0dfe6] px-3 py-2 text-sm font-semibold text-[#d4af37]"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <div className="font-medium">{customerMap.get(membership.customerId) ?? `Customer ${membership.customerId}`}</div>
-                          <div className="text-sm text-[#a39a86]">{packageMap.get(membership.packageId) ?? `Package ${membership.packageId}`}</div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="text-right text-sm text-[#a39a86]">
-                            <div>{membership.startedAt}</div>
-                            <div>{membership.endsAt ?? "—"}</div>
+          <OperationsWorkspace
+            eyebrow="Customer programs"
+            title="Memberships"
+            description="Manage customer package memberships using the existing dates, package relationships, and backend status values."
+            stats={[
+              { label: "Loaded", value: memberships.length },
+              { label: "With end date", value: memberships.filter((membership) => membership.endsAt).length },
+              { label: "Without status", value: memberships.filter((membership) => !membership.status).length, tone: "warning" },
+            ]}
+          >
+            {membershipError ? <div role="alert" className="rounded-lg border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#e47a70]">{membershipError}</div> : null}
+            <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.55fr)]">
+              <OperationsPanel eyebrow="Register" title="Membership records" description="Customer, package, lifecycle dates, and the persisted status for each loaded membership.">
+                {isLoadingMemberships ? (
+                  <div className="space-y-2" aria-live="polite"><div className="text-sm text-[#a39a86]">Loading memberships...</div>{[0, 1, 2].map((item) => <div key={item} className="h-20 animate-pulse rounded-lg bg-[#17150f]" />)}</div>
+                ) : !membershipError && memberships.length === 0 ? (
+                  <OperationsEmptyState title="No memberships yet." description="Create a customer membership using the form alongside the register." />
+                ) : (
+                  <div className="space-y-3">
+                    {memberships.map((membership) => (
+                      <article key={membership.id} className="rounded-lg border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-4">
+                        {editingMembershipId === membership.id ? (
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                            <label className="flex-1 text-xs font-medium text-[#a39a86]">Membership status<input aria-label="Edit membership status" value={editingMembershipStatus} onChange={(event) => setEditingMembershipStatus(event.target.value)} placeholder="Status (optional)" className="premium-input mt-1 w-full" /></label>
+                            <div className="flex gap-2">
+                              <button onClick={() => updateMembership(membership.id)} className="premium-btn-primary min-h-11 px-3 text-sm">Save</button>
+                              <button onClick={() => setEditingMembershipId(null)} className="premium-btn-secondary min-h-11 px-3 text-sm">Cancel</button>
+                            </div>
                           </div>
-                          <button
-                            onClick={() => {
-                              setEditingMembershipId(membership.id);
-                              setEditingMembershipStatus(membership.status || "");
-                            }}
-                            className="rounded-xl bg-[#f0dfe6] px-3 py-1.5 text-sm font-semibold text-[#d4af37]"
-                          >
-                            Edit
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                        ) : (
+                          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h4 className="font-medium text-[#f5f1e6]">{customerMap.get(membership.customerId) ?? `Customer ${membership.customerId}`}</h4>
+                                <OperationsBadge tone={membership.status?.toLowerCase() === "active" ? "success" : membership.status?.toLowerCase() === "expired" ? "danger" : "neutral"}>{membership.status ?? "Status not set"}</OperationsBadge>
+                              </div>
+                              <div className="mt-1 text-sm text-[#a39a86]">{packageMap.get(membership.packageId) ?? `Package ${membership.packageId}`}</div>
+                            </div>
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                              <dl className="grid grid-cols-2 gap-x-5 text-sm">
+                                <div><dt className="text-xs uppercase tracking-[0.1em] text-[#807866]">Started</dt><dd className="mt-1 tabular-nums text-[#d8d0bd]">{new Date(membership.startedAt).toLocaleDateString("en-IN")}</dd></div>
+                                <div><dt className="text-xs uppercase tracking-[0.1em] text-[#807866]">Ends</dt><dd className="mt-1 tabular-nums text-[#d8d0bd]">{membership.endsAt ? new Date(membership.endsAt).toLocaleDateString("en-IN") : "Open"}</dd></div>
+                              </dl>
+                              <button onClick={() => { setEditingMembershipId(membership.id); setEditingMembershipStatus(membership.status ?? ""); }} className="premium-btn-secondary min-h-10 px-3 text-sm">Edit</button>
+                            </div>
+                          </div>
+                        )}
+                      </article>
+                    ))}
                   </div>
-                ))}
-              </div>
+                )}
+              </OperationsPanel>
+              <OperationsPanel eyebrow="Create" title="Add membership" description="Associate an existing customer and package. Optional end date and status remain unchanged API fields.">
+                <div className="space-y-4">
+                  <label className="block text-xs font-medium text-[#a39a86]">Customer<select aria-label="Membership customer" value={membershipCustomerId} onChange={(event) => setMembershipCustomerId(event.target.value)} className="premium-input mt-1 w-full"><option value="">Select customer</option>{customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}</select></label>
+                  <label className="block text-xs font-medium text-[#a39a86]">Package<select aria-label="Membership package" value={membershipPackageId} onChange={(event) => setMembershipPackageId(event.target.value)} className="premium-input mt-1 w-full"><option value="">Select package</option>{packages.map((pkg) => <option key={pkg.id} value={pkg.id}>{pkg.name}</option>)}</select></label>
+                  <label className="block text-xs font-medium text-[#a39a86]">Start date<input aria-label="Membership start date" value={membershipStartedAt} onChange={(event) => setMembershipStartedAt(event.target.value)} placeholder="Start date (ISO)" className="premium-input mt-1 w-full" /></label>
+                  <label className="block text-xs font-medium text-[#a39a86]">End date, optional<input aria-label="Membership end date" value={membershipEndsAt} onChange={(event) => setMembershipEndsAt(event.target.value)} placeholder="End date (optional, ISO)" className="premium-input mt-1 w-full" /></label>
+                  <label className="block text-xs font-medium text-[#a39a86]">Status, optional<input aria-label="Membership status" value={membershipStatus} onChange={(event) => setMembershipStatus(event.target.value)} placeholder="Status (optional)" className="premium-input mt-1 w-full" /></label>
+                  <button onClick={addMembership} className="premium-btn-primary min-h-11 w-full px-4 text-sm">Save membership</button>
+                </div>
+              </OperationsPanel>
             </div>
-
-            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
-              <h2 className="text-xl font-semibold">Add membership</h2>
-              <div className="mt-4 space-y-3">
-                <input
-                  value={membershipCustomerId}
-                  onChange={(event) => setMembershipCustomerId(event.target.value)}
-                  placeholder="Customer ID"
-                  className="premium-input"
-                />
-                <input
-                  value={membershipPackageId}
-                  onChange={(event) => setMembershipPackageId(event.target.value)}
-                  placeholder="Package ID"
-                  className="premium-input"
-                />
-                <input
-                  value={membershipStartedAt}
-                  onChange={(event) => setMembershipStartedAt(event.target.value)}
-                  placeholder="Started at (ISO date)"
-                  className="premium-input"
-                />
-                <input
-                  value={membershipEndsAt}
-                  onChange={(event) => setMembershipEndsAt(event.target.value)}
-                  placeholder="Ends at (optional)"
-                  className="premium-input"
-                />
-                <input
-                  value={membershipStatus}
-                  onChange={(event) => setMembershipStatus(event.target.value)}
-                  placeholder="Status (optional)"
-                  className="premium-input"
-                />
-                <button
-                  onClick={addMembership}
-                  className="premium-btn-primary w-full py-2.5 text-sm"
-                >
-                  Save membership
-                </button>
-              </div>
-            </div>
-          </section>
+          </OperationsWorkspace>
         ) : null}
-
         {activeTab === "Staff" ? (
           <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
             <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
@@ -6119,134 +6045,72 @@ export default function Home() {
         ) : null}
 
         {activeTab === "Appointments" ? (
-          <section className="mt-6 grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
-            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
-              <h2 className="text-xl font-semibold">Appointments</h2>
-              {!appointmentError ? null : (
-                <div className="mt-2 rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">
-                  {appointmentError}
-                </div>
-              )}
-              {isLoadingAppointments ? <div className="text-sm text-[#a39a86]">Loading appointments...</div> : null}
-              {!isLoadingAppointments && !appointmentError && appointments.length === 0 ? (
-                <div className="text-sm text-[#a39a86]">No appointments yet.</div>
-              ) : null}
-               <div className="mt-4 space-y-3">
-                {appointments.map((appointment, index) => (
-                  <div key={`${appointment.customerId}-${index}`} className="rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
-                    {editingAppointmentIndex !== index ? (
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <div className="font-medium">{customerMap.get(appointment.customerId) ?? `Customer ${appointment.customerId}`}</div>
-                          <div className="text-sm text-[#a39a86]">{serviceMap.get(appointment.serviceId) ?? `Service ${appointment.serviceId}`}</div>
-                          <div className="text-sm text-[#a39a86]">{staffMap.get(appointment.staffId) ?? `Staff ${appointment.staffId}`}</div>
-                          <div className="text-sm text-[#a39a86]">{appointment.startsAt}</div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => advanceAppointment(index)}
-                            className="premium-btn-secondary px-3 py-1.5 text-xs"
-                          >
-                            {appointment.status}
-                          </button>
-                          <button
-                            onClick={() => {
-                              setEditingAppointmentIndex(index);
-                              setEditingAppointmentStartsAt(appointment.startsAt);
-                            }}
-                            className="premium-btn-secondary px-3 py-1.5 text-xs"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => deleteAppointment(appointment.id)}
-                            className="premium-btn-secondary px-3 py-1.5 text-xs"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <input
-                          value={editingAppointmentStartsAt}
-                          onChange={(event) => setEditingAppointmentStartsAt(event.target.value)}
-                          placeholder="Start time (ISO)"
-                          className="premium-input"
-                        />
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={async () => {
-                              if (editingAppointmentIndex === null) return;
-                              await updateAppointment(editingAppointmentIndex, editingAppointmentStartsAt);
-                              setEditingAppointmentIndex(null);
-                            }}
-                            className="premium-btn-primary px-3 py-1.5 text-xs"
-                          >
-                            Save
-                          </button>
-                          <button
-                            onClick={() => setEditingAppointmentIndex(null)}
-                            className="premium-btn-secondary px-3 py-1.5 text-xs"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    )}
+          <OperationsWorkspace
+            eyebrow="Daily operations"
+            title="Appointments"
+            description="Review the loaded schedule, advance established appointment states, and create bookings through the current workflow."
+            stats={[
+              { label: "Loaded", value: appointments.length },
+              { label: "Today", value: appointments.filter((appointment) => appointment.startsAt.startsWith(new Date().toISOString().split("T")[0])).length, tone: "success" },
+              { label: "Completed", value: appointments.filter((appointment) => appointment.status === "Completed").length },
+            ]}
+          >
+            {appointmentError ? <div role="alert" className="rounded-lg border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#e47a70]">{appointmentError}</div> : null}
+            <div className="grid gap-5 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.5fr)]">
+              <OperationsPanel eyebrow="Schedule" title="Appointment register" description="Loaded bookings are shown in start-time order supplied by the existing endpoint.">
+                {isLoadingAppointments ? (
+                  <div className="space-y-2" aria-live="polite"><div className="text-sm text-[#a39a86]">Loading appointments...</div>{[0, 1, 2].map((item) => <div key={item} className="h-24 animate-pulse rounded-lg bg-[#17150f]" />)}</div>
+                ) : !appointmentError && appointments.length === 0 ? (
+                  <OperationsEmptyState title="No appointments yet." description="Book an appointment using the form alongside the schedule." />
+                ) : (
+                  <div className="space-y-3">
+                    {appointments.map((appointment, index) => (
+                      <article key={appointment.id || `${appointment.customerId}-${index}`} className="rounded-lg border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-4 transition-colors hover:border-[rgba(212,175,55,0.25)]">
+                        {editingAppointmentIndex === index ? (
+                          <div className="space-y-3">
+                            <label className="block text-xs font-medium text-[#a39a86]">Start time (ISO)<input aria-label="Appointment start time" value={editingAppointmentStartsAt} onChange={(event) => setEditingAppointmentStartsAt(event.target.value)} placeholder="Start time (ISO)" className="premium-input mt-1 w-full" /></label>
+                            <div className="flex gap-2">
+                              <button onClick={async () => { if (editingAppointmentIndex === null) return; await updateAppointment(editingAppointmentIndex, editingAppointmentStartsAt); setEditingAppointmentIndex(null); }} className="premium-btn-primary min-h-11 px-3 text-sm">Save</button>
+                              <button onClick={() => setEditingAppointmentIndex(null)} className="premium-btn-secondary min-h-11 px-3 text-sm">Cancel</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h4 className="font-medium text-[#f5f1e6]">{customerMap.get(appointment.customerId) ?? `Customer ${appointment.customerId}`}</h4>
+                                <OperationsBadge tone={appointment.status === "Completed" ? "success" : appointment.status === "In Service" ? "warning" : "neutral"}>Current: {appointment.status}</OperationsBadge>
+                              </div>
+                              <div className="mt-2 grid gap-1 text-sm text-[#a39a86] sm:grid-cols-2">
+                                <span>{serviceMap.get(appointment.serviceId) ?? `Service ${appointment.serviceId}`}</span>
+                                <span>{appointment.staffId ? staffMap.get(appointment.staffId) ?? `Staff ${appointment.staffId}` : "Staff not assigned"}</span>
+                                <span className="tabular-nums"><span className="block text-[#d8d0bd]">{appointment.startsAt}</span><span className="block text-xs text-[#807866]">{new Date(appointment.startsAt).toLocaleString("en-IN")}</span></span>
+                                <span className="tabular-nums">Ends {new Date(appointment.endsAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</span>
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <button onClick={() => advanceAppointment(index)} className="premium-btn-secondary min-h-10 px-3 text-xs" aria-label={`Advance ${customerMap.get(appointment.customerId) ?? "appointment"} status from ${appointment.status}`}>{appointment.status}</button>
+                              <button onClick={() => { setEditingAppointmentIndex(index); setEditingAppointmentStartsAt(appointment.startsAt); }} className="premium-btn-secondary min-h-10 px-3 text-xs">Edit</button>
+                              <button onClick={() => deleteAppointment(appointment.id)} className="min-h-10 rounded-lg border border-[rgba(209,85,74,0.3)] px-3 text-xs font-semibold text-[#e47a70] transition-colors hover:bg-[rgba(209,85,74,0.1)]">Delete</button>
+                            </div>
+                          </div>
+                        )}
+                      </article>
+                    ))}
                   </div>
-                ))}
-              </div>
+                )}
+              </OperationsPanel>
+              <OperationsPanel eyebrow="Create" title="Book appointment" description="Creates an immediate booking using the selected service duration and current timestamp, matching existing behavior.">
+                <div className="space-y-4">
+                  <label className="block text-xs font-medium text-[#a39a86]">Customer<select aria-label="Appointment customer" value={appointmentCustomer} onChange={(event) => setAppointmentCustomer(event.target.value)} className="premium-input mt-1 w-full">{customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}</select></label>
+                  <label className="block text-xs font-medium text-[#a39a86]">Service<select aria-label="Appointment service" value={appointmentService} onChange={(event) => setAppointmentService(event.target.value)} className="premium-input mt-1 w-full">{services.map((service) => <option key={service.id} value={service.id}>{service.name}</option>)}</select></label>
+                  <label className="block text-xs font-medium text-[#a39a86]">Assigned staff<select aria-label="Appointment staff" value={appointmentStaff} onChange={(event) => setAppointmentStaff(event.target.value)} className="premium-input mt-1 w-full"><option value="">Select staff</option>{staff.map((member) => <option key={member.id} value={member.id}>{member.displayName}</option>)}</select></label>
+                  <button onClick={addAppointment} className="premium-btn-primary min-h-11 w-full px-4 text-sm">Save appointment</button>
+                </div>
+              </OperationsPanel>
             </div>
-
-            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
-              <h2 className="text-xl font-semibold">Book appointment</h2>
-              <div className="mt-4 space-y-3">
-                <select
-                  value={appointmentCustomer}
-                  onChange={(event) => setAppointmentCustomer(event.target.value)}
-                  className="premium-input"
-                >
-                  {customers.map((customer) => (
-                    <option key={customer.id} value={customer.id}>
-                      {customer.name}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={appointmentService}
-                  onChange={(event) => setAppointmentService(event.target.value)}
-                  className="premium-input"
-                >
-                  {services.map((service) => (
-                    <option key={service.id} value={service.id}>
-                      {service.name}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={appointmentStaff}
-                  onChange={(event) => setAppointmentStaff(event.target.value)}
-                  className="premium-input"
-                >
-                  <option value="">Select staff</option>
-                  {staff.map((member) => (
-                    <option key={member.id} value={member.id}>
-                      {member.displayName}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  onClick={addAppointment}
-                  className="premium-btn-primary w-full py-2.5 text-sm"
-                >
-                  Save appointment
-                </button>
-              </div>
-            </div>
-          </section>
+          </OperationsWorkspace>
         ) : null}
-
         {activeTab === "Inventory" ? (
           <>
           <section className="mt-6 space-y-6">
