@@ -864,7 +864,7 @@ export default function Home() {
   }, [authenticated]);
 
   useEffect(() => {
-    if (authenticated !== true) {
+    if (authenticated !== true || activeTab !== "Leads") {
       return;
     }
 
@@ -885,40 +885,40 @@ export default function Home() {
         if (mounted) setLeads([]);
       });
     return () => { mounted = false; };
-  }, [authenticated]);
+  }, [authenticated, activeTab]);
 
   useEffect(() => {
-    if (authenticated !== true) return;
+    if (authenticated !== true || activeTab !== "Pipeline") return;
     let mounted = true;
     void Promise.all([
       fetch("/api/pipelines", { credentials: "same-origin" }).then(async (r) => { if (!mounted || !r.ok) return []; const b = await r.json() as { pipelines?: PipelineRecord[] }; return Array.isArray(b.pipelines) ? b.pipelines : []; }),
       fetch("/api/opportunities", { credentials: "same-origin" }).then(async (r) => { if (!mounted || !r.ok) return []; const b = await r.json() as { opportunities?: OpportunityRecord[] }; return Array.isArray(b.opportunities) ? b.opportunities : []; }),
     ]).then(([p, o]) => { if (mounted) { setPipelines(p); setOpportunities(o); } }).catch(() => {});
     return () => { mounted = false; };
-  }, [authenticated]);
+  }, [authenticated, activeTab]);
 
   useEffect(() => {
-    if (authenticated !== true) return;
+    if (authenticated !== true || activeTab !== "Follow-ups") return;
     let mounted = true;
     void fetch("/api/followups", { credentials: "same-origin" })
       .then(async (r) => { if (!mounted || !r.ok) return []; const b = await r.json() as { followups?: FollowupRecord[] }; return Array.isArray(b.followups) ? b.followups : []; })
       .then((f) => { if (mounted) setFollowups(f); })
       .catch(() => {});
     return () => { mounted = false; };
-  }, [authenticated]);
+  }, [authenticated, activeTab]);
 
   useEffect(() => {
-    if (authenticated !== true) return;
+    if (authenticated !== true || activeTab !== "Communications") return;
     let mounted = true;
     void fetch("/api/communications", { credentials: "same-origin" })
       .then(async (r) => { if (!mounted || !r.ok) return []; const b = await r.json() as { communications?: CommunicationRecord[] }; return Array.isArray(b.communications) ? b.communications : []; })
       .then((c) => { if (mounted) setCommunications(c); })
       .catch(() => {});
     return () => { mounted = false; };
-  }, [authenticated]);
+  }, [authenticated, activeTab]);
 
   useEffect(() => {
-    if (authenticated !== true) return;
+    if (authenticated !== true || activeTab !== "Tags & Notes") return;
     let mounted = true;
     void Promise.all([
       fetch("/api/tags", { credentials: "same-origin" }).then(async (r) => { if (!mounted || !r.ok) return []; const b = await r.json() as { tags?: TagRecord[] }; return Array.isArray(b.tags) ? b.tags : []; }),
@@ -926,7 +926,7 @@ export default function Home() {
       fetch("/api/attachments", { credentials: "same-origin" }).then(async (r) => { if (!mounted || !r.ok) return []; const b = await r.json() as { attachments?: AttachmentRecord[] }; return Array.isArray(b.attachments) ? b.attachments : []; }),
     ]).then(([t, n, a]) => { if (mounted) { setTags(t); setCrmNotes(n); setAttachments(a); } }).catch(() => {});
     return () => { mounted = false; };
-  }, [authenticated]);
+  }, [authenticated, activeTab]);
 
   useEffect(() => {
     if (authenticated !== true || activeTab !== "Settings" || (!permissionCodes.includes("setting.read") && !permissionCodes.includes("setting.write"))) {
@@ -2329,6 +2329,8 @@ export default function Home() {
       if (mounted) {
         setIsLoadingReport(true);
         setReportError(null);
+        setCrmReportsLoading(true);
+        setCrmReportsError(null);
       }
     }, 0);
     void fetch("/api/reports", { credentials: "same-origin" })
@@ -2567,8 +2569,6 @@ export default function Home() {
         }
       });
 
-    setCrmReportsLoading(true);
-    setCrmReportsError(null);
     void Promise.all([
       fetch("/api/reports/crm/lead-source", { credentials: "same-origin" }).then(async (r) => { if (!mounted || !r.ok) return []; return (await r.json() as LeadSourceRow[]); }),
       fetch("/api/reports/crm/sales-funnel", { credentials: "same-origin" }).then(async (r) => { if (!mounted || !r.ok) return []; return (await r.json() as FunnelRow[]); }),
@@ -8287,7 +8287,7 @@ export default function Home() {
             {/* Settlement List */}
             {isLoadingSettlements ? <div className="text-sm text-[#a39a86]">Loading settlements...</div> : null}
             {!isLoadingSettlements && settlementsError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-4 text-sm text-[#d1554a]">{settlementsError}</div> : null}
-            {!isLoadingSettlements && !settlementsError && settlements.length === 0 ? <div className="text-sm text-[#a39a86]">No settlements generated yet. Use "Generate Settlement" to create one.</div> : null}
+            {!isLoadingSettlements && !settlementsError && settlements.length === 0 ? <div className="text-sm text-[#a39a86]">No settlements generated yet. Use &quot;Generate Settlement&quot; to create one.</div> : null}
 
             {/* Settlement Detail View */}
             {selectedSettlement ? (

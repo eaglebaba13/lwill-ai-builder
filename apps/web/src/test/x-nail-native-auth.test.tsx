@@ -639,6 +639,7 @@ describe("X Nail native authentication integration", () => {
       .mockResolvedValueOnce(Response.json({ settings: [] }))
       .mockResolvedValueOnce(Response.json({ users: [] }))
       .mockResolvedValueOnce(Response.json({ roles: [] }))
+      .mockResolvedValueOnce(Response.json({ territories: [] }))
       .mockResolvedValueOnce(Response.json({ appointments: [] }));
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
