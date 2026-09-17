@@ -7,6 +7,7 @@ import { KpiCard as SharedKpiCard } from "@/components/kpi-card";
 import { CrmBadge, CrmEmptyState, CrmPanel, CrmWorkspace } from "@/components/xnail/crm-workspace";
 import { OperationsBadge, OperationsEmptyState, OperationsPanel, OperationsWorkspace } from "@/components/xnail/operations-workspace";
 import { BillingDownloadActions, BillingEmptyState, BillingPanel, BillingStatusBadge, BillingTotals, BillingWorkspace, formatMoney } from "@/components/xnail/billing-workspace";
+import { InventoryWorkspace } from "@/components/xnail/inventory-workspace";
 import {
   invalidatePendingRefresh,
   loginWithNativeAuthentication,
@@ -374,7 +375,7 @@ export default function Home() {
   const [paymentNotes, setPaymentNotes] = useState("");
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [isRecordingPayment, setIsRecordingPayment] = useState(false);
-  const [products, setProducts] = useState<Array<{ id: string; name: string; sku: string; priceCents: number; isActive: boolean }>>([]);
+  const [products, setProducts] = useState<Array<{ id: string; categoryId: string; name: string; sku: string; unit: string; priceCents: number; isActive: boolean }>>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   const [productError, setProductError] = useState<string | null>(null);
   const [productName, setProductName] = useState("");
@@ -1345,8 +1346,10 @@ export default function Home() {
         const body = await result.json() as {
           products?: Array<{
             id: string;
+            categoryId: string;
             name: string;
             sku: string;
+            unit: string;
             priceCents: number;
             isActive: boolean;
           }>;
@@ -4114,7 +4117,7 @@ export default function Home() {
       setProductError("Product could not be saved.");
       return;
     }
-    const body = await result.json() as { product: { id: string; name: string; sku: string; priceCents: number; isActive: boolean } };
+    const body = await result.json() as { product: { id: string; categoryId: string; name: string; sku: string; unit: string; priceCents: number; isActive: boolean } };
     setProducts((current) => [body.product, ...current]);
     setProductName("");
     setProductSku("");
@@ -4291,7 +4294,7 @@ export default function Home() {
       setProductError("Product could not be updated.");
       return;
     }
-    const body = await result.json() as { product: { id: string; name: string; sku: string; priceCents: number; isActive: boolean } };
+    const body = await result.json() as { product: { id: string; categoryId: string; name: string; sku: string; unit: string; priceCents: number; isActive: boolean } };
     setProducts((current) => current.map((item) => (item.id === body.product.id ? body.product : item)));
   };
 
@@ -6113,8 +6116,14 @@ export default function Home() {
           </OperationsWorkspace>
         ) : null}
         {activeTab === "Inventory" ? (
-          <>
-          <section className="mt-6 space-y-6">
+          <InventoryWorkspace
+            productCount={products.length}
+            stockUnitCount={stockItems.reduce((sum, item) => sum + item.quantity, 0)}
+            lowStockCount={lowStockItems.length}
+            purchaseCount={purchaseReceipts.length}
+            isLoading={isLoadingProducts || isLoadingStockItems || isLoadingLowStockItems || isLoadingPurchaseReceipts}
+            onProductsImported={setProducts}
+          >          <section className="mt-6 space-y-6">
             <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
               <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
                 <h2 className="text-xl font-semibold">Categories</h2>
@@ -7113,11 +7122,10 @@ export default function Home() {
             </div>
           </div>
         </section>
-        </>
+        </InventoryWorkspace>
         ) : null}
 
-        {activeTab === "Billing" ? (
-          <BillingWorkspace
+        {activeTab === "Billing" ? (          <BillingWorkspace
             eyebrow="Point of sale"
             title="Billing / POS"
             description="Create invoices, review loaded financial records, and record payments through the existing tenant-scoped billing workflow."

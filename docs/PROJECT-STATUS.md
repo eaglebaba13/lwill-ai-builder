@@ -4066,4 +4066,15 @@ The remaining gaps are properly classified as NOT SPECIFIED — APPROVAL REQUIRE
 
 5 of 8 functional requirements are IMPLEMENTED — PRODUCTION VERIFIED. 3 are NOT SPECIFIED — APPROVAL REQUIRED. Plugin SDK has 1 implemented (manifest), 1 NOT SPECIFIED (compatibility), and 5 NOT IMPLEMENTED (future architectural work requiring plugin execution engine).
 
+## X Nail Inventory & Purchasing Modernization — 2026-09-17
 
+### Status: IMPLEMENTED — LOCALLY VERIFIED
+
+- Added the premium responsive Inventory workspace shell while preserving the existing product, category, stock, warehouse, supplier, reorder, receipt, transfer, and adjustment handlers.
+- Added genuine server-generated Inventory and Purchase register XLSX/PDF exports using the existing ExcelJS and PDFKit dependencies.
+- Added versioned Inventory product XLSX template, authoritative server preview, row-level validation, and explicit-confirmation atomic create-only import through the existing product service.
+- Added shared low-level download and spreadsheet formula-safety helpers; Billing uses the shared helpers without changes to its domain queries or financial behavior.
+- Added focused transfer tests covering authorization, genuine file signatures, response headers, formula safety, malformed/versioned templates, columns, row validation, duplicates, limits, permissions, and all-or-nothing import.
+- No dependency, Prisma schema, migration, environment-variable, authentication, RBAC, tenant hierarchy, stock arithmetic, purchase stock-in, invoice stock-out, or Staff Commission changes were introduced.
+- ADR 010 remains unresolved: the X Nail tenant-specific interface is still scheduled for migration to its tenant repository.
+- Verification: focused Inventory/Billing/native-auth suite 13 files / 149 tests passed; full single-worker suite 75 files / 912 tests passed; production build passed; lint passed with 0 errors and 17 pre-existing warnings. The unrestricted worker suite passed 75/912 earlier in the phase, but two final retries encountered Windows fork-worker startup timeouts without assertion failures.

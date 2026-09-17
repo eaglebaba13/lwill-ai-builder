@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
 import PDFDocument from "pdfkit";
+import { safeSpreadsheetText } from "./data-transfer";
 
 export type BillingExportInvoice = {
   readonly id: string;
@@ -22,13 +23,6 @@ export type BillingExportPayment = {
   readonly paidAt: string;
   readonly notes: string | null;
 };
-
-const FORMULA_TRIGGER = /^[=+\-@]/;
-
-function safeSpreadsheetText(value: string | null): string {
-  if (!value) return "";
-  return FORMULA_TRIGGER.test(value) ? `'${value}` : value;
-}
 
 function rupees(cents: number): number {
   return cents / 100;

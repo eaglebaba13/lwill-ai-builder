@@ -5,6 +5,7 @@ import {
   createPaymentWorkbook,
   type BillingExportInvoice,
 } from "./billing-export";
+import { downloadResponse, PDF_CONTENT_TYPE, XLSX_CONTENT_TYPE } from "./data-transfer";
 
 export type BillingExportAuthorization =
   | { readonly outcome: "unauthenticated" }
@@ -49,18 +50,5 @@ export async function handleBillingExport(
   const label = dataset === "invoices" ? "Invoices" : "Payments";
   const filename = `X-Nail-${label}-${dateStamp(generatedAt)}.${format}`;
 
-  const responseBody = new ArrayBuffer(body.byteLength);
-  new Uint8Array(responseBody).set(body);
-
-  return new Response(responseBody, {
-    status: 200,
-    headers: {
-      "content-type": isExcel
-        ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        : "application/pdf",
-      "content-disposition": `attachment; filename="${filename}"`,
-      "cache-control": "private, no-store",
-      "x-content-type-options": "nosniff",
-    },
-  });
+  return downloadResponse(body, isExcel ? XLSX_CONTENT_TYPE : PDF_CONTENT_TYPE, filename);
 }
