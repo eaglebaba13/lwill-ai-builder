@@ -14,7 +14,9 @@
     "@lwill/authorization": "workspace:*",
     "@lwill/authorization-prisma": "workspace:*",
     "@lwill/authorization-service": "workspace:*",
+    "exceljs": "^4.4.0",
     "next": "16.3.0",
+    "pdfkit": "^0.20.2",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "server-only": "^0.0.1"
@@ -25,6 +27,7 @@
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.3",
     "@types/node": "^20",
+    "@types/pdfkit": "^0.17.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

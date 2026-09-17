@@ -6,6 +6,7 @@ import { AppSidebar, type SidebarIconKey, type SidebarSection } from "@/componen
 import { KpiCard as SharedKpiCard } from "@/components/kpi-card";
 import { CrmBadge, CrmEmptyState, CrmPanel, CrmWorkspace } from "@/components/xnail/crm-workspace";
 import { OperationsBadge, OperationsEmptyState, OperationsPanel, OperationsWorkspace } from "@/components/xnail/operations-workspace";
+import { BillingDownloadActions, BillingEmptyState, BillingPanel, BillingStatusBadge, BillingTotals, BillingWorkspace, formatMoney } from "@/components/xnail/billing-workspace";
 import {
   invalidatePendingRefresh,
   loginWithNativeAuthentication,
@@ -7116,284 +7117,144 @@ export default function Home() {
         ) : null}
 
         {activeTab === "Billing" ? (
-          <section className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
-              <h2 className="text-xl font-semibold">Invoices</h2>
-              <div className="mt-4 space-y-3">
-                {isLoadingInvoices ? <div className="text-sm text-[#a39a86]">Loading invoices...</div> : null}
-                {!isLoadingInvoices && invoiceError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{invoiceError}</div> : null}
-                {!isLoadingInvoices && !invoiceError && invoices.length === 0 ? <div className="text-sm text-[#a39a86]">No invoices yet.</div> : null}
-                  {invoices.map((invoice) => (
-                    <div key={invoice.id} className="flex flex-col gap-2 rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
-                      {editingInvoiceId !== invoice.id ? (
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="font-medium">{customerMap.get(invoice.customerId) ?? `Customer ${invoice.customerId}`}</div>
-                            <div className="text-sm text-[#a39a86]">{invoice.issuedAt}</div>
-                            {invoice.branchId ? (() => {
-                              const branch = branches.find((b) => b.id === invoice.branchId);
-                              const outlet = outlets.find((o) => o.branchId === invoice.branchId);
-                              return (
-                                <div className="text-xs text-[#a39a86]">
-                                  <span className="text-[#d4af37]">Outlet:</span> {branch?.name ?? "Unknown"}{outlet?.partnerName ? ` — ${outlet.partnerName}` : " — Company Owned"}
+          <BillingWorkspace
+            eyebrow="Point of sale"
+            title="Billing / POS"
+            description="Create invoices, review loaded financial records, and record payments through the existing tenant-scoped billing workflow."
+            stats={[
+              { label: "Loaded invoices", value: invoices.length },
+              { label: "Loaded total", value: formatMoney(invoices.reduce((sum, invoice) => sum + invoice.totalCents, 0)) },
+              { label: "Current cart", value: formatMoney(cartSubtotalCents), tone: cartItems.length > 0 ? "warning" : "neutral" },
+            ]}
+          >
+            <BillingDownloadActions>
+              <a href="/api/exports/billing/invoices/xlsx" download className="premium-btn-secondary inline-flex min-h-10 items-center px-3 text-sm">Invoice Excel</a>
+              <a href="/api/exports/billing/invoices/pdf" download className="premium-btn-secondary inline-flex min-h-10 items-center px-3 text-sm">Invoice PDF</a>
+              <a href="/api/exports/billing/payments/xlsx" download className="premium-btn-secondary inline-flex min-h-10 items-center px-3 text-sm">Payment Excel</a>
+              <a href="/api/exports/billing/payments/pdf" download className="premium-btn-secondary inline-flex min-h-10 items-center px-3 text-sm">Payment PDF</a>
+            </BillingDownloadActions>
+
+            {invoiceError ? <div role="alert" className="rounded-lg border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#e47a70]">{invoiceError}</div> : null}
+
+            <div className="grid gap-5 2xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)]">
+              <BillingPanel eyebrow="Register" title="Invoices" description="Financial records in the current authorized tenant scope. Payment totals shown here reflect data loaded into this session.">
+                {isLoadingInvoices ? (
+                  <div className="space-y-2" aria-live="polite">
+                    <div className="text-sm text-[#a39a86]">Loading invoices...</div>
+                    {[0, 1, 2].map((item) => <div key={item} className="h-28 animate-pulse rounded-lg bg-[#17150f]" />)}
+                  </div>
+                ) : !invoiceError && invoices.length === 0 ? (
+                  <BillingEmptyState title="No invoices yet." description="Use POS checkout to create the first invoice in this authorized scope." />
+                ) : (
+                  <div className="space-y-3">
+                    {invoices.map((invoice) => {
+                      const paidCents = invoice.paidCents;
+                      const branch = invoice.branchId ? branches.find((item) => item.id === invoice.branchId) : undefined;
+                      const outlet = invoice.branchId ? outlets.find((item) => item.branchId === invoice.branchId) : undefined;
+                      return (
+                        <article key={invoice.id} className="rounded-lg border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-4 transition-colors hover:border-[rgba(212,175,55,0.25)]">
+                          {editingInvoiceId === invoice.id ? (
+                            <div className="space-y-4">
+                              <div className="grid gap-3 sm:grid-cols-2">
+                                <label className="text-xs font-medium text-[#a39a86]">Discount in paise<input aria-label="Invoice discount in paise" inputMode="numeric" value={editingInvoiceDiscountCents} onChange={(event) => setEditingInvoiceDiscountCents(event.target.value)} placeholder="Discount (cents)" className="premium-input mt-1 w-full" /></label>
+                                <label className="text-xs font-medium text-[#a39a86]">Notes<input aria-label="Invoice notes" value={editingInvoiceNotes} onChange={(event) => setEditingInvoiceNotes(event.target.value)} placeholder="Notes" className="premium-input mt-1 w-full" /></label>
+                              </div>
+                              <div className="flex gap-2">
+                                <button onClick={async () => { await updateInvoice(invoice.id, Number(editingInvoiceDiscountCents), editingInvoiceNotes); setEditingInvoiceId(null); }} className="premium-btn-primary min-h-11 px-4 text-sm">Save</button>
+                                <button onClick={() => setEditingInvoiceId(null)} className="premium-btn-secondary min-h-11 px-4 text-sm">Cancel</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(230px,0.55fr)_auto] lg:items-center">
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <h4 className="font-medium text-[#f5f1e6]">{customerMap.get(invoice.customerId) ?? `Customer ${invoice.customerId}`}</h4>
+                                  <BillingStatusBadge paidCents={paidCents} totalCents={invoice.totalCents} />
                                 </div>
-                              );
-                            })() : (
-                              <div className="text-xs text-[#a39a86]"><span className="text-[#d4af37]">Outlet:</span> Not attributed</div>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <div className="text-right text-sm text-[#a39a86]">
-                              <div>Total ₹{invoice.totalCents / 100}</div>
-                              {invoice.paidCents !== undefined && invoice.paidCents > 0 ? (
-                                <div className="text-[#3fae6a]">Paid ₹{(invoice.paidCents / 100).toFixed(2)}</div>
-                              ) : null}
-                              <div>{invoice.notes ?? "—"}</div>
+                                <div className="mt-1 break-all text-xs text-[#807866]">Invoice {invoice.id}</div>
+                                <div className="mt-2 text-sm tabular-nums text-[#a39a86]">{invoice.issuedAt}</div>
+                                <div className="mt-1 text-xs text-[#a39a86]"><span className="text-[#d4af37]">Outlet:</span> {invoice.branchId ? `${branch?.name ?? "Unknown"} - ${outlet?.partnerName ?? "Company Owned"}` : "Not attributed"}</div>
+                                {invoice.notes ? <p className="mt-2 text-sm leading-6 text-[#a39a86]">{invoice.notes}</p> : null}
+                              </div>
+                              <BillingTotals subtotalCents={invoice.subtotalCents} discountCents={invoice.discountCents} gstCents={invoice.gstCents} totalCents={invoice.totalCents} paidCents={paidCents} />
+                              <div className="flex flex-wrap gap-2 lg:flex-col">
+                                <button onClick={() => { setEditingInvoiceId(invoice.id); setEditingInvoiceDiscountCents(String(invoice.discountCents)); setEditingInvoiceNotes(invoice.notes ?? ""); }} className="premium-btn-secondary min-h-10 px-3 text-xs">Edit</button>
+                                <button onClick={() => { setPayingInvoiceId(invoice.id); setPaymentAmount(""); setPaymentNotes(""); setPaymentError(null); }} className="min-h-10 rounded-lg border border-[rgba(63,174,106,0.3)] bg-[rgba(63,174,106,0.08)] px-3 text-xs font-medium text-[#70d391] transition-colors hover:bg-[rgba(63,174,106,0.15)]">Record payment</button>
+                              </div>
                             </div>
-                            <div className="flex flex-col gap-1">
-                              <button
-                                onClick={() => {
-                                  setEditingInvoiceId(invoice.id);
-                                  setEditingInvoiceDiscountCents(String(invoice.discountCents));
-                                  setEditingInvoiceNotes(invoice.notes ?? "");
-                                }}
-                                className="premium-btn-secondary px-3 py-1.5 text-xs"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setPayingInvoiceId(invoice.id);
-                                  setPaymentAmount("");
-                                  setPaymentNotes("");
-                                  setPaymentError(null);
-                                }}
-                                className="rounded-lg border border-[rgba(63,174,106,0.3)] bg-[rgba(63,174,106,0.08)] px-3 py-1.5 text-xs font-medium text-[#3fae6a] hover:bg-[rgba(63,174,106,0.15)]"
-                              >
-                                Pay
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
+                          )}
+                        </article>
+                      );
+                    })}
+                  </div>
+                )}
+              </BillingPanel>
+
+              <div className="space-y-5">
+                <BillingPanel eyebrow="Checkout" title="POS checkout" description="Build an invoice from existing products, services, or packages. Server-side totals and stock effects remain authoritative.">
+                  <div className="space-y-4">
+                    <fieldset className="space-y-3">
+                      <legend className="text-xs font-semibold uppercase tracking-[0.14em] text-[#d4af37]">Customer and outlet</legend>
+                      <label className="block text-xs font-medium text-[#a39a86]">Customer<select aria-label="Invoice customer" value={invoiceCustomerId} onChange={(event) => setInvoiceCustomerId(event.target.value)} className="premium-input mt-1 w-full"><option value="">Select customer</option>{customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}</select></label>
+                      <label className="block text-xs font-medium text-[#a39a86]">Billing outlet<select aria-label="Billing outlet" value={invoiceBranchId} onChange={(event) => setInvoiceBranchId(event.target.value)} className="premium-input mt-1 w-full"><option value="">Select billing outlet</option>{branches.filter((branch) => branch.isActive).map((branch) => { const outlet = outlets.find((item) => item.branchId === branch.id); return <option key={branch.id} value={branch.id}>{branch.name}{outlet?.partnerName ? ` - ${outlet.partnerName}` : " - Company Owned"}</option>; })}</select></label>
+                      {invoiceBranchId ? (() => { const selectedOutlet = outlets.find((item) => item.branchId === invoiceBranchId); return <div className="rounded-lg border border-[rgba(212,175,55,0.1)] bg-[#0d0c0a] px-3 py-2 text-xs text-[#a39a86]"><span className="text-[#d4af37]">{selectedOutlet ? "Franchise partner:" : "Type:"}</span> {selectedOutlet ? `${selectedOutlet.partnerName} (${selectedOutlet.outletType ?? "FOCO"})` : "Company Owned"}</div>; })() : null}
+                    </fieldset>
+
+                    <fieldset className="space-y-3 border-t border-[rgba(212,175,55,0.1)] pt-4">
+                      <legend className="text-xs font-semibold uppercase tracking-[0.14em] text-[#d4af37]">Add item</legend>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <label className="text-xs font-medium text-[#a39a86]">Item type<select aria-label="Cart item type" value={cartItemType} onChange={(event) => { setCartItemType(event.target.value as "product" | "service" | "package"); setCartItemId(""); }} className="premium-input mt-1 w-full"><option value="product">Product</option><option value="service">Service</option><option value="package">Package</option></select></label>
+                        <label className="text-xs font-medium text-[#a39a86]">Item<select aria-label="Cart item" value={cartItemId} onChange={(event) => setCartItemId(event.target.value)} className="premium-input mt-1 w-full"><option value="">Select item</option>{cartItemType === "product" && products.filter((product) => product.isActive).map((product) => <option key={product.id} value={product.id}>{product.name} ({formatMoney(product.priceCents)})</option>)}{cartItemType === "service" && services.filter((service) => service.isActive).map((service) => <option key={service.id} value={service.id}>{service.name} ({formatMoney(service.priceCents)})</option>)}{cartItemType === "package" && packages.filter((pkg) => pkg.isActive).map((pkg) => <option key={pkg.id} value={pkg.id}>{pkg.name} ({formatMoney(pkg.priceCents ?? 0)})</option>)}</select></label>
+                      </div>
+                      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-3">
+                        <label className="text-xs font-medium text-[#a39a86]">Quantity<input aria-label="Cart item quantity" value={cartItemQuantity} onChange={(event) => setCartItemQuantity(event.target.value)} placeholder="Qty" type="number" min="1" className="premium-input mt-1 w-full" /></label>
+                        <button onClick={addToCart} className="premium-btn-secondary mt-5 min-h-11 px-4 text-sm">Add item</button>
+                      </div>
+                    </fieldset>
+
+                    <div className="border-t border-[rgba(212,175,55,0.1)] pt-4">
+                      <div className="mb-3 flex items-center justify-between"><h4 className="text-sm font-semibold text-[#f5f1e6]">Line items</h4><span className="text-xs tabular-nums text-[#807866]">{cartItems.length} item(s)</span></div>
+                      {cartItems.length === 0 ? <BillingEmptyState title="Cart is empty." description="Select an item and quantity to begin checkout." /> : (
                         <div className="space-y-2">
-                          <input
-                            value={editingInvoiceDiscountCents}
-                            onChange={(event) => setEditingInvoiceDiscountCents(event.target.value)}
-                            placeholder="Discount (cents)"
-                            className="premium-input"
-                          />
-                          <input
-                            value={editingInvoiceNotes}
-                            onChange={(event) => setEditingInvoiceNotes(event.target.value)}
-                            placeholder="Notes"
-                            className="premium-input"
-                          />
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={async () => {
-                                if (!invoice.id) return;
-                                await updateInvoice(invoice.id, Number(editingInvoiceDiscountCents), editingInvoiceNotes);
-                                setEditingInvoiceId(null);
-                              }}
-                              className="premium-btn-primary px-3 py-1.5 text-xs"
-                            >
-                              Save
-                            </button>
-                            <button
-                              onClick={() => setEditingInvoiceId(null)}
-                              className="premium-btn-secondary px-3 py-1.5 text-xs"
-                            >
-                              Cancel
-                            </button>
+                          <div className="max-h-56 space-y-2 overflow-y-auto pr-1">
+                            {cartItems.map((item) => <div key={item.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 rounded-lg border border-[rgba(212,175,55,0.1)] bg-[#0d0c0a] p-3"><div className="min-w-0"><div className="truncate text-sm font-medium text-[#f5f1e6]">{item.description}</div><div className="mt-1 text-xs text-[#a39a86]">{formatMoney(item.unitPriceCents)} × {item.quantity}</div></div><div className="text-right"><div className="text-sm font-semibold tabular-nums text-[#f5f1e6]">{formatMoney(item.unitPriceCents * item.quantity)}</div><button onClick={() => removeFromCart(item.id)} className="mt-1 text-xs font-medium text-[#e47a70] hover:underline">Remove</button></div></div>)}
                           </div>
+                          <div className="rounded-lg border border-[rgba(212,175,55,0.18)] bg-[#0d0c0a] p-3"><BillingTotals subtotalCents={cartSubtotalCents} totalCents={cartSubtotalCents} /></div>
                         </div>
                       )}
                     </div>
-                  ))}
-              </div>
-            </div>
 
-            <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
-              <h2 className="text-xl font-semibold">POS checkout</h2>
-              <div className="mt-4 space-y-3">
-                <select
-                  value={invoiceCustomerId}
-                  onChange={(event) => setInvoiceCustomerId(event.target.value)}
-                  className="premium-input"
-                >
-                  <option value="">Select customer</option>
-                  {customers.map((customer) => (
-                    <option key={customer.id} value={customer.id}>{customer.name}</option>
-                  ))}
-                </select>
-                <select
-                  value={invoiceBranchId}
-                  onChange={(event) => setInvoiceBranchId(event.target.value)}
-                  className="premium-input"
-                >
-                  <option value="">Select billing outlet</option>
-                  {branches.filter((b) => b.isActive).map((branch) => {
-                    const outlet = outlets.find((o) => o.branchId === branch.id);
-                    const partnerName = outlet?.partnerName;
-                    return (
-                      <option key={branch.id} value={branch.id}>
-                        {branch.name}{partnerName ? ` — ${partnerName}` : " — Company Owned"}
-                      </option>
-                    );
-                  })}
-                </select>
-                {invoiceBranchId ? (() => {
-                  const selectedOutlet = outlets.find((o) => o.branchId === invoiceBranchId);
-                  return selectedOutlet ? (
-                    <div className="rounded-lg border border-[rgba(212,175,55,0.1)] bg-[#17150f] px-3 py-2 text-xs text-[#a39a86]">
-                      <span className="text-[#d4af37]">Franchise Partner:</span> {selectedOutlet.partnerName} ({selectedOutlet.outletType ?? "FOCO"})
-                    </div>
-                  ) : (
-                    <div className="rounded-lg border border-[rgba(212,175,55,0.1)] bg-[#17150f] px-3 py-2 text-xs text-[#a39a86]">
-                      <span className="text-[#d4af37]">Type:</span> Company Owned
-                    </div>
+                    <label className="block text-xs font-medium text-[#a39a86]">Invoice notes<input aria-label="Checkout invoice notes" value={invoiceNotes} onChange={(event) => setInvoiceNotes(event.target.value)} placeholder="Notes (optional)" className="premium-input mt-1 w-full" /></label>
+                    {checkoutError ? <div role="alert" className="rounded-lg border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#e47a70]">{checkoutError}</div> : null}
+                    <button onClick={checkout} disabled={isCheckingOut || cartItems.length === 0 || !invoiceCustomerId} className="premium-btn-primary min-h-11 w-full px-4 text-sm disabled:cursor-not-allowed disabled:opacity-50">{isCheckingOut ? "Processing..." : "Checkout"}</button>
+                  </div>
+                </BillingPanel>
+
+                {payingInvoiceId ? (() => {
+                  const invoice = invoices.find((item) => item.id === payingInvoiceId);
+                  return (
+                    <BillingPanel eyebrow="Payment" title="Record payment" description="Payments use the existing rupee input and server-side cents validation.">
+                      {paymentError ? <div role="alert" className="mb-3 rounded-lg border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#e47a70]">{paymentError}</div> : null}
+                      <div className="mb-4 rounded-lg border border-[rgba(63,174,106,0.18)] bg-[rgba(63,174,106,0.06)] p-3">
+                        <div className="text-xs uppercase tracking-[0.12em] text-[#807866]">Invoice total</div>
+                        <div className="mt-1 text-xl font-semibold tabular-nums text-[#f5f1e6]">{invoice ? formatMoney(invoice.totalCents) : payingInvoiceId}</div>
+                      </div>
+                      <div className="space-y-3">
+                        <label className="block text-xs font-medium text-[#a39a86]">Amount in rupees<input aria-label="Payment amount in rupees" value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} placeholder="Amount (e.g. 1500.00)" type="number" min="0.01" step="0.01" className="premium-input mt-1 w-full" /></label>
+                        <label className="block text-xs font-medium text-[#a39a86]">Payment method<select aria-label="Payment method" value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)} className="premium-input mt-1 w-full"><option value="offline">Offline</option><option value="online">Online</option></select></label>
+                        <label className="block text-xs font-medium text-[#a39a86]">Payment notes<input aria-label="Payment notes" value={paymentNotes} onChange={(event) => setPaymentNotes(event.target.value)} placeholder="Notes (optional)" className="premium-input mt-1 w-full" /></label>
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                          <button onClick={recordPayment} disabled={isRecordingPayment} className="premium-btn-primary min-h-11 flex-1 px-4 text-sm disabled:opacity-50">{isRecordingPayment ? "Recording..." : "Record Payment"}</button>
+                          <button onClick={() => { setPayingInvoiceId(null); setPaymentError(null); }} className="premium-btn-secondary min-h-11 px-4 text-sm">Cancel</button>
+                        </div>
+                      </div>
+                    </BillingPanel>
                   );
                 })() : null}
-                <select
-                  value={cartItemType}
-                  onChange={(event) => { setCartItemType(event.target.value as "product" | "service" | "package"); setCartItemId(""); }}
-                  className="premium-input"
-                >
-                  <option value="product">Product</option>
-                  <option value="service">Service</option>
-                  <option value="package">Package</option>
-                </select>
-                <select
-                  value={cartItemId}
-                  onChange={(event) => setCartItemId(event.target.value)}
-                  className="premium-input"
-                >
-                  <option value="">Select item</option>
-                  {cartItemType === "product" && products.filter((product) => product.isActive).map((product) => (
-                    <option key={product.id} value={product.id}>{product.name} (₹{product.priceCents / 100})</option>
-                  ))}
-                  {cartItemType === "service" && services.filter((service) => service.isActive).map((service) => (
-                    <option key={service.id} value={service.id}>{service.name} (₹{service.priceCents / 100})</option>
-                  ))}
-                  {cartItemType === "package" && packages.filter((pkg) => pkg.isActive).map((pkg) => (
-                    <option key={pkg.id} value={pkg.id}>{pkg.name} (₹{(pkg.priceCents ?? 0) / 100})</option>
-                  ))}
-                </select>
-                <div className="grid grid-cols-2 gap-3">
-                  <input
-                    value={cartItemQuantity}
-                    onChange={(event) => setCartItemQuantity(event.target.value)}
-                    placeholder="Qty"
-                    type="number"
-                    min="1"
-                    className="premium-input"
-                  />
-                  <button
-                    onClick={addToCart}
-                    className="premium-btn-primary w-full py-2.5 text-sm"
-                  >
-                    Add to cart
-                  </button>
-                </div>
-                {cartItems.length > 0 ? (
-                  <div className="mt-4 space-y-2">
-                    <div className="max-h-48 overflow-y-auto space-y-2">
-                      {cartItems.map((item) => (
-                        <div key={item.id} className="flex items-center justify-between rounded-xl border border-[rgba(212,175,55,0.1)] bg-[#17150f] p-3">
-                          <div className="flex-1">
-                            <div className="font-medium">{item.description}</div>
-                            <div className="text-sm text-[#a39a86]">₹{item.unitPriceCents / 100} ?? {item.quantity}</div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <div className="text-sm font-medium">₹{item.unitPriceCents * item.quantity / 100}</div>
-                            <button
-                              onClick={() => removeFromCart(item.id)}
-                              className="text-sm text-[#8f3f3f]"
-                            >
-                              Remove
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="flex items-center justify-between rounded-xl bg-[#fff6f6] p-3 text-sm">
-                      <span className="font-medium">Subtotal</span>
-                      <span className="font-semibold">₹{cartSubtotalCents / 100}</span>
-                    </div>
-                  </div>
-                ) : null}
-                <input
-                  value={invoiceNotes}
-                  onChange={(event) => setInvoiceNotes(event.target.value)}
-                  placeholder="Notes (optional)"
-                  className="premium-input"
-                />
-                {checkoutError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{checkoutError}</div> : null}
-                <button
-                  onClick={checkout}
-                  disabled={isCheckingOut || cartItems.length === 0 || !invoiceCustomerId}
-                  className="premium-btn-primary w-full py-2.5 text-sm disabled:opacity-60"
-                >
-                  {isCheckingOut ? "Processing..." : "Checkout"}
-                </button>
               </div>
             </div>
-
-            {payingInvoiceId ? (
-              <div className="rounded-2xl border border-[rgba(63,174,106,0.2)] bg-[#12110f] p-5">
-                <h2 className="text-xl font-semibold">Record Payment</h2>
-                <div className="mt-4 space-y-3">
-                  {paymentError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a]">{paymentError}</div> : null}
-                  <div className="text-sm text-[#a39a86]">
-                    Invoice: {invoices.find((inv) => inv.id === payingInvoiceId)?.totalCents !== undefined
-                      ? `₹${invoices.find((inv) => inv.id === payingInvoiceId)!.totalCents / 100}`
-                      : payingInvoiceId}
-                  </div>
-                  <input
-                    value={paymentAmount}
-                    onChange={(event) => setPaymentAmount(event.target.value)}
-                    placeholder="Amount (e.g. 1500.00)"
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    className="premium-input"
-                  />
-                  <select
-                    value={paymentMethod}
-                    onChange={(event) => setPaymentMethod(event.target.value)}
-                    className="premium-input"
-                  >
-                    <option value="offline">Offline</option>
-                    <option value="online">Online</option>
-                  </select>
-                  <input
-                    value={paymentNotes}
-                    onChange={(event) => setPaymentNotes(event.target.value)}
-                    placeholder="Notes (optional)"
-                    className="premium-input"
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      onClick={recordPayment}
-                      disabled={isRecordingPayment}
-                      className="premium-btn-primary w-full py-2.5 text-sm disabled:opacity-60"
-                    >
-                      {isRecordingPayment ? "Recording..." : "Record Payment"}
-                    </button>
-                    <button
-                      onClick={() => { setPayingInvoiceId(null); setPaymentError(null); }}
-                      className="rounded-xl bg-[#f0dfe6] px-4 py-2.5 text-sm font-semibold text-[#d4af37]"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-          </section>
+          </BillingWorkspace>
         ) : null}
-
         {activeTab === "Branches" ? (
           <section className="mt-6 grid gap-6 lg:grid-cols-2">
             <div className="rounded-2xl border border-[rgba(212,175,55,0.15)] bg-[#12110f] p-5">
