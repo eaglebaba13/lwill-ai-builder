@@ -7,6 +7,18 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum FranchiseAssignmentStatus {
+  DRAFT
+  ACTIVE
+  SUSPENDED
+  ENDED
+}
+
+enum FranchiseCoverageMode {
+  WHOLE_STATE
+  PINCODE_SET
+}
+
 model Tenant {
   id                String             @id @default(uuid()) @db.Uuid
   name              String
@@ -26,6 +38,12 @@ model Tenant {
   franchiseSettlements FranchiseSettlement[]
   franchiseSettlementLines FranchiseSettlementLine[]
   franchisePayments    FranchisePayment[]
+  stateFranchises StateFranchise[]
+  stateFranchisePincodes StateFranchisePincode[]
+  cityFranchises CityFranchise[]
+  cityFranchiseAreas CityFranchiseArea[]
+  cityFranchisePincodes CityFranchisePincode[]
+  franchiseOutletAssignments FranchiseOutletAssignment[]
   tenantDomains     TenantDomain[]
   tenantSettings    TenantSetting[]
   tenantMemberships TenantMembership[]
@@ -218,6 +236,185 @@ model Territory {
   @@index([tenantId, isActive])
 }
 
+model GeoCountry {
+  code   String     @id @db.Char(2)
+  name   String
+  states GeoState[]
+}
+
+model GeoState {
+  id              String           @id @default(uuid()) @db.Uuid
+  countryCode     String           @db.Char(2)
+  code            String
+  name            String
+  country         GeoCountry       @relation(fields: [countryCode], references: [code], onDelete: Restrict)
+  cities          GeoCity[]
+  pincodes        GeoPincode[]
+  stateFranchises StateFranchise[]
+
+  @@unique([countryCode, code])
+}
+
+model GeoCity {
+  id             String          @id @default(uuid()) @db.Uuid
+  stateId        String          @db.Uuid
+  code           String
+  name           String
+  state          GeoState        @relation(fields: [stateId], references: [id], onDelete: Restrict)
+  pincodes       GeoPincode[]
+  cityFranchises CityFranchise[]
+
+  @@unique([stateId, id])
+  @@unique([stateId, code])
+  @@index([stateId, name])
+}
+
+model GeoPincode {
+  id                     String                  @id @default(uuid()) @db.Uuid
+  stateId                String                  @db.Uuid
+  cityId                 String                  @db.Uuid
+  value                  String                  @db.Char(6)
+  state                  GeoState                @relation(fields: [stateId], references: [id], onDelete: Restrict)
+  city                   GeoCity                 @relation(fields: [stateId, cityId], references: [stateId, id], onDelete: Restrict)
+  stateFranchisePincodes StateFranchisePincode[]
+  cityFranchisePincodes  CityFranchisePincode[]
+
+  @@unique([value])
+  @@index([cityId, value])
+}
+
+model StateFranchise {
+  id                        String                    @id @default(uuid()) @db.Uuid
+  tenantId                  String                    @db.Uuid
+  partnerId                 String                    @db.Uuid
+  stateId                   String                    @db.Uuid
+  code                      String
+  displayName               String
+  coverageMode              FranchiseCoverageMode
+  effectiveFrom             DateTime
+  effectiveTo               DateTime?
+  status                    FranchiseAssignmentStatus @default(DRAFT)
+  conflictApprovedAt        DateTime?
+  conflictApprovedBy        String?
+  conflictApprovalReference String?
+  createdAt                 DateTime                  @default(now())
+  updatedAt                 DateTime                  @updatedAt
+
+  tenant   Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  partner  FranchisePartner        @relation(fields: [tenantId, partnerId], references: [tenantId, id], onDelete: Restrict)
+  state    GeoState                @relation(fields: [stateId], references: [id], onDelete: Restrict)
+  cities   CityFranchise[]
+  pincodes StateFranchisePincode[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, code])
+  @@index([tenantId, stateId, status])
+  @@index([tenantId, partnerId, status])
+  @@index([tenantId, effectiveFrom, effectiveTo])
+}
+
+model StateFranchisePincode {
+  id               String         @id @default(uuid()) @db.Uuid
+  tenantId         String         @db.Uuid
+  stateFranchiseId String         @db.Uuid
+  pincodeId        String         @db.Uuid
+  effectiveFrom    DateTime
+  effectiveTo      DateTime?
+  stateFranchise   StateFranchise @relation(fields: [tenantId, stateFranchiseId], references: [tenantId, id], onDelete: Restrict)
+  pincode          GeoPincode     @relation(fields: [pincodeId], references: [id], onDelete: Restrict)
+  tenant           Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, stateFranchiseId, pincodeId, effectiveFrom])
+  @@index([tenantId, pincodeId, effectiveFrom, effectiveTo])
+}
+
+model CityFranchise {
+  id                        String                    @id @default(uuid()) @db.Uuid
+  tenantId                  String                    @db.Uuid
+  stateFranchiseId          String                    @db.Uuid
+  partnerId                 String                    @db.Uuid
+  cityId                    String                    @db.Uuid
+  areaCode                  String
+  displayName               String
+  effectiveFrom             DateTime
+  effectiveTo               DateTime?
+  status                    FranchiseAssignmentStatus @default(DRAFT)
+  conflictApprovedAt        DateTime?
+  conflictApprovedBy        String?
+  conflictApprovalReference String?
+  createdAt                 DateTime                  @default(now())
+  updatedAt                 DateTime                  @updatedAt
+
+  tenant                  Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  stateFranchise          StateFranchise              @relation(fields: [tenantId, stateFranchiseId], references: [tenantId, id], onDelete: Restrict)
+  partner                 FranchisePartner            @relation(fields: [tenantId, partnerId], references: [tenantId, id], onDelete: Restrict)
+  city                    GeoCity                     @relation(fields: [cityId], references: [id], onDelete: Restrict)
+  areas                   CityFranchiseArea[]
+  pincodes                CityFranchisePincode[]
+  outletAssignments       FranchiseOutletAssignment[]
+  franchiseOutletProfiles FranchiseOutletProfile[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, stateFranchiseId, cityId, areaCode, effectiveFrom])
+  @@index([tenantId, cityId, status])
+  @@index([tenantId, stateFranchiseId, status])
+  @@index([tenantId, partnerId, status])
+  @@index([tenantId, effectiveFrom, effectiveTo])
+}
+
+model CityFranchiseArea {
+  id                    String                 @id @default(uuid()) @db.Uuid
+  tenantId              String                 @db.Uuid
+  cityFranchiseId       String                 @db.Uuid
+  name                  String
+  normalizedName        String
+  cityFranchise         CityFranchise          @relation(fields: [tenantId, cityFranchiseId], references: [tenantId, id], onDelete: Restrict)
+  tenant                Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  cityFranchisePincodes CityFranchisePincode[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, cityFranchiseId, normalizedName])
+}
+
+model CityFranchisePincode {
+  id              String             @id @default(uuid()) @db.Uuid
+  tenantId        String             @db.Uuid
+  cityFranchiseId String             @db.Uuid
+  areaId          String?            @db.Uuid
+  pincodeId       String             @db.Uuid
+  effectiveFrom   DateTime
+  effectiveTo     DateTime?
+  cityFranchise   CityFranchise      @relation(fields: [tenantId, cityFranchiseId], references: [tenantId, id], onDelete: Restrict)
+  area            CityFranchiseArea? @relation(fields: [tenantId, areaId], references: [tenantId, id], onDelete: Restrict)
+  pincode         GeoPincode         @relation(fields: [pincodeId], references: [id], onDelete: Restrict)
+  tenant          Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, cityFranchiseId, pincodeId, effectiveFrom])
+  @@index([tenantId, pincodeId, effectiveFrom, effectiveTo])
+}
+
+model FranchiseOutletAssignment {
+  id                String                    @id @default(uuid()) @db.Uuid
+  tenantId          String                    @db.Uuid
+  outletProfileId   String                    @db.Uuid
+  cityFranchiseId   String                    @db.Uuid
+  effectiveFrom     DateTime
+  effectiveTo       DateTime?
+  status            FranchiseAssignmentStatus @default(DRAFT)
+  transferReference String?
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+
+  outletProfile FranchiseOutletProfile @relation(fields: [tenantId, outletProfileId], references: [tenantId, id], onDelete: Restrict)
+  cityFranchise CityFranchise          @relation(fields: [tenantId, cityFranchiseId], references: [tenantId, id], onDelete: Restrict)
+  tenant        Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, outletProfileId, effectiveFrom])
+  @@index([tenantId, outletProfileId, effectiveFrom, effectiveTo])
+  @@index([tenantId, cityFranchiseId, status])
+}
+
 model FranchisePartner {
   id             String   @id @default(uuid()) @db.Uuid
   tenantId       String   @db.Uuid
@@ -237,6 +434,8 @@ model FranchisePartner {
   outletProfiles FranchiseOutletProfile[]
   agreements    FranchiseAgreement[]
   settlements   FranchiseSettlement[]
+  stateFranchises StateFranchise[]
+  cityFranchises CityFranchise[]
 
   @@unique([tenantId, id])
   @@unique([tenantId, userId])
@@ -249,6 +448,8 @@ model FranchiseOutletProfile {
   partnerId      String   @db.Uuid
   branchId       String   @db.Uuid
   territoryId    String?  @db.Uuid
+  currentCityFranchiseId String? @db.Uuid
+  assignmentStatus FranchiseAssignmentStatus @default(DRAFT)
   outletType     String?  @default("STANDALONE")
   investmentCents Int?
   isActive       Boolean  @default(true)
@@ -259,11 +460,16 @@ model FranchiseOutletProfile {
   partner       FranchisePartner     @relation(fields: [partnerId], references: [id], onDelete: Restrict)
   branch        Branch               @relation(fields: [tenantId, branchId], references: [tenantId, id], onDelete: Restrict)
   territory     Territory?           @relation(fields: [tenantId, territoryId], references: [tenantId, id], onDelete: Restrict)
+  currentCityFranchise CityFranchise? @relation(fields: [tenantId, currentCityFranchiseId], references: [tenantId, id], onDelete: Restrict)
+  hierarchyAssignments FranchiseOutletAssignment[]
 
+  @@unique([tenantId, id])
   @@unique([tenantId, branchId])
   @@unique([tenantId, partnerId, branchId])
   @@index([tenantId, partnerId])
   @@index([tenantId, territoryId])
+  @@index([tenantId, currentCityFranchiseId])
+  @@index([tenantId, assignmentStatus])
 }
 
 model FranchiseAgreement {
