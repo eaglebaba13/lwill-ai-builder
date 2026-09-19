@@ -64,9 +64,10 @@ function createFixture() {
       count: vi.fn(async () => state.agreements.size),
     },
     franchiseOutletProfile: {
-      create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({ id: "outlet-1", ...data })),
-      findUnique: vi.fn(async () => ({ id: "outlet-1", name: "Outlet 1" })),
+      create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({ id: "outlet-1", ...data, createdAt: new Date(), updatedAt: new Date(), isActive: true })),
+      findUnique: vi.fn(async ({ where }: { where: { id: string } }) => ({ id: where.id, tenantId: "tenant-1", partnerId: "partner-1", branchId: "branch-1", territoryId: null, outletType: "STANDALONE", ownershipMode: null, investmentCents: null, isActive: true, createdAt: new Date(), updatedAt: new Date() })),
       findMany: vi.fn(async () => []),
+      update: vi.fn(async ({ where, data }: { where: { id: string }; data: Record<string, unknown> }) => ({ id: where.id, tenantId: "tenant-1", partnerId: "partner-1", branchId: "branch-1", territoryId: null, outletType: "STANDALONE", ownershipMode: null, investmentCents: null, isActive: true, createdAt: new Date(), updatedAt: new Date(), ...data })),
       count: vi.fn(async () => 0),
     },
     franchiseAgreementOutlet: {
@@ -246,5 +247,139 @@ describe("franchise service — commercial terms foundation", () => {
 
     expect(agreement.termsSnapshot).toEqual(snapshot);
     expect(agreement.minimumGuaranteeCents).toBe(1500000);
+  });
+});
+
+describe("franchise service — outlet ownership", () => {
+  it("creates COMPANY_OWNED outlet with null partnerId", async () => {
+    const { prisma } = createFixture();
+    const service = createFranchiseService(prisma as never);
+    const outlet = await service.createOutlet({
+      tenantId: "tenant-1",
+      branchId: "branch-1",
+      ownershipMode: "COMPANY_OWNED",
+    });
+    expect(outlet.partnerId).toBeNull();
+    expect(outlet.ownershipMode).toBe("COMPANY_OWNED");
+    expect(prisma.franchiseOutletProfile.create).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ partnerId: null, ownershipMode: "COMPANY_OWNED" }),
+    }));
+  });
+
+  it("creates UNDER_FRANCHISE_PARTNER outlet with valid partnerId", async () => {
+    const { prisma } = createFixture();
+    (prisma.franchisePartner.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ id: "partner-1", tenantId: "tenant-1", isActive: true });
+    const service = createFranchiseService(prisma as never);
+    const outlet = await service.createOutlet({
+      tenantId: "tenant-1",
+      partnerId: "partner-1",
+      branchId: "branch-1",
+      ownershipMode: "UNDER_FRANCHISE_PARTNER",
+    });
+    expect(outlet.partnerId).toBe("partner-1");
+    expect(outlet.ownershipMode).toBe("UNDER_FRANCHISE_PARTNER");
+  });
+
+  it("rejects COMPANY_OWNED with non-null partnerId", async () => {
+    const { prisma } = createFixture();
+    const service = createFranchiseService(prisma as never);
+    await expect(service.createOutlet({
+      tenantId: "tenant-1",
+      partnerId: "partner-1",
+      branchId: "branch-1",
+      ownershipMode: "COMPANY_OWNED",
+    })).rejects.toThrow("COMPANY_OWNED outlets must not have an Outlet Franchise Partner.");
+  });
+
+  it("rejects UNDER_FRANCHISE_PARTNER without partnerId", async () => {
+    const { prisma } = createFixture();
+    const service = createFranchiseService(prisma as never);
+    await expect(service.createOutlet({
+      tenantId: "tenant-1",
+      branchId: "branch-1",
+      ownershipMode: "UNDER_FRANCHISE_PARTNER",
+    })).rejects.toThrow("UNDER_FRANCHISE_PARTNER outlets require an Outlet Franchise Partner.");
+  });
+
+  it("rejects UNDER_FRANCHISE_PARTNER with non-existent partner", async () => {
+    const { prisma } = createFixture();
+    (prisma.franchisePartner.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null);
+    const service = createFranchiseService(prisma as never);
+    await expect(service.createOutlet({
+      tenantId: "tenant-1",
+      partnerId: "nonexistent",
+      branchId: "branch-1",
+      ownershipMode: "UNDER_FRANCHISE_PARTNER",
+    })).rejects.toThrow("Outlet Franchise Partner must exist, belong to the same tenant, and be active.");
+  });
+
+  it("rejects UNDER_FRANCHISE_PARTNER with cross-tenant partner", async () => {
+    const { prisma } = createFixture();
+    (prisma.franchisePartner.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ id: "partner-2", tenantId: "other-tenant", isActive: true });
+    const service = createFranchiseService(prisma as never);
+    await expect(service.createOutlet({
+      tenantId: "tenant-1",
+      partnerId: "partner-2",
+      branchId: "branch-1",
+      ownershipMode: "UNDER_FRANCHISE_PARTNER",
+    })).rejects.toThrow("Outlet Franchise Partner must exist, belong to the same tenant, and be active.");
+  });
+
+  it("rejects UNDER_FRANCHISE_PARTNER with inactive partner", async () => {
+    const { prisma } = createFixture();
+    (prisma.franchisePartner.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ id: "partner-1", tenantId: "tenant-1", isActive: false });
+    const service = createFranchiseService(prisma as never);
+    await expect(service.createOutlet({
+      tenantId: "tenant-1",
+      partnerId: "partner-1",
+      branchId: "branch-1",
+      ownershipMode: "UNDER_FRANCHISE_PARTNER",
+    })).rejects.toThrow("Outlet Franchise Partner must exist, belong to the same tenant, and be active.");
+  });
+
+  it("updateOutletOwnership updates COMPANY_OWNED and clears partnerId", async () => {
+    const { prisma } = createFixture();
+    const service = createFranchiseService(prisma as never);
+    const result = await service.updateOutletOwnership("tenant-1", "outlet-1", { ownershipMode: "COMPANY_OWNED", partnerId: null });
+    expect(result).not.toBeNull();
+    expect(prisma.franchiseOutletProfile.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "outlet-1" },
+      data: expect.objectContaining({ ownershipMode: "COMPANY_OWNED", partnerId: null }),
+    }));
+  });
+
+  it("updateOutletOwnership rejects COMPANY_OWNED with partnerId", async () => {
+    const { prisma } = createFixture();
+    const service = createFranchiseService(prisma as never);
+    await expect(service.updateOutletOwnership("tenant-1", "outlet-1", { ownershipMode: "COMPANY_OWNED", partnerId: "partner-1" }))
+      .rejects.toThrow("COMPANY_OWNED outlets must not have an Outlet Franchise Partner.");
+  });
+
+  it("updateOutletOwnership rejects cross-tenant outlet", async () => {
+    const { prisma } = createFixture();
+    (prisma.franchiseOutletProfile.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ id: "outlet-1", tenantId: "other-tenant" });
+    const service = createFranchiseService(prisma as never);
+    const result = await service.updateOutletOwnership("tenant-1", "outlet-1", { ownershipMode: "COMPANY_OWNED", partnerId: null });
+    expect(result).toBeNull();
+  });
+
+  it("updateOutletOwnership returns null for non-existent outlet", async () => {
+    const { prisma } = createFixture();
+    (prisma.franchiseOutletProfile.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null);
+    const service = createFranchiseService(prisma as never);
+    const result = await service.updateOutletOwnership("tenant-1", "nonexistent", { ownershipMode: "COMPANY_OWNED", partnerId: null });
+    expect(result).toBeNull();
+  });
+
+  it("creates outlet without ownershipMode (legacy compatible)", async () => {
+    const { prisma } = createFixture();
+    const service = createFranchiseService(prisma as never);
+    const outlet = await service.createOutlet({
+      tenantId: "tenant-1",
+      partnerId: "partner-1",
+      branchId: "branch-1",
+    });
+    expect(outlet.partnerId).toBe("partner-1");
+    expect(outlet.ownershipMode).toBeNull();
   });
 });

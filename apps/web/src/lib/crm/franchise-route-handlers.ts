@@ -20,6 +20,7 @@ export interface FranchiseRouteServices {
   readonly listOutlets: (tenantId: string) => Promise<unknown>;
   readonly getOutlet: (tenantId: string, outletId: string) => Promise<unknown>;
   readonly createOutlet: (tenantId: string, data: Record<string, unknown>) => Promise<unknown>;
+  readonly updateOutletOwnership: (tenantId: string, outletId: string, data: Record<string, unknown>) => Promise<unknown | null>;
   readonly getDashboard: (tenantId: string) => Promise<unknown>;
 }
 
@@ -279,11 +280,22 @@ export async function handleCreateOutlet(
   if (body.tenantId !== undefined && body.tenantId !== authResult.tenantId) {
     return response(400, { error: "tenantId mismatch" });
   }
-  if (!isNonEmptyString(body.partnerId)) {
-    return response(400, { error: "partnerId is required" });
-  }
   if (!isNonEmptyString(body.branchId)) {
     return response(400, { error: "branchId is required" });
+  }
+  const ownershipMode = body.ownershipMode as string | undefined;
+  if (ownershipMode === "COMPANY_OWNED") {
+    if (body.partnerId != null) {
+      return response(400, { error: "COMPANY_OWNED outlets must not have partnerId" });
+    }
+  } else if (ownershipMode === "UNDER_FRANCHISE_PARTNER") {
+    if (!isNonEmptyString(body.partnerId)) {
+      return response(400, { error: "UNDER_FRANCHISE_PARTNER outlets require partnerId" });
+    }
+  } else {
+    if (!isNonEmptyString(body.partnerId)) {
+      return response(400, { error: "partnerId is required when ownershipMode is not set" });
+    }
   }
   const outlet = await services.createOutlet(authResult.tenantId, body);
   return response(201, { outlet });
@@ -300,4 +312,47 @@ export async function handleGetFranchiseDashboard(
   }
   const dashboard = await services.getDashboard(authResult.tenantId);
   return response(200, { dashboard });
+}
+
+export async function handleUpdateOutletOwnership(
+  request: Request,
+  services: FranchiseRouteServices,
+  outletId: string,
+): Promise<Response> {
+  const authorization = await services.authorize("franchise.write");
+  const authResult = authorizationOutcome(authorization);
+  if (!authResult.ok) {
+    return authResult.response;
+  }
+  const body = (await request.json()) as Record<string, unknown>;
+  if (body.tenantId !== undefined && body.tenantId !== authResult.tenantId) {
+    return response(400, { error: "tenantId mismatch" });
+  }
+  const ownershipMode = body.ownershipMode as string | undefined;
+  if (ownershipMode !== "COMPANY_OWNED" && ownershipMode !== "UNDER_FRANCHISE_PARTNER") {
+    return response(400, { error: "ownershipMode must be COMPANY_OWNED or UNDER_FRANCHISE_PARTNER" });
+  }
+  const allowedKeys = new Set(["ownershipMode", "partnerId"]);
+  if (Object.keys(body).some((key) => !allowedKeys.has(key))) {
+    return response(400, { error: "Only ownershipMode and partnerId are allowed" });
+  }
+  if (ownershipMode === "COMPANY_OWNED") {
+    if (body.partnerId != null) {
+      return response(400, { error: "COMPANY_OWNED outlets must not have partnerId" });
+    }
+  } else {
+    if (!isNonEmptyString(body.partnerId)) {
+      return response(400, { error: "UNDER_FRANCHISE_PARTNER outlets require partnerId" });
+    }
+  }
+  let outlet: unknown | null;
+  try {
+    outlet = await services.updateOutletOwnership(authResult.tenantId, outletId, { ownershipMode, partnerId: body.partnerId ?? null });
+  } catch (error) {
+    return response(400, { error: error instanceof Error ? error.message : "Invalid outlet ownership update" });
+  }
+  if (outlet === null) {
+    return response(404);
+  }
+  return response(200, { outlet });
 }

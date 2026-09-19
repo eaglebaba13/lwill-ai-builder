@@ -95,7 +95,7 @@ function project(value: unknown): unknown {
     "id", "partnerId", "stateId", "stateFranchiseId", "cityId", "code",
     "displayName", "coverageMode", "areaCode", "effectiveFrom", "effectiveTo",
     "status", "outletProfileId", "cityFranchiseId", "transferReference",
-    "currentCityFranchiseId", "assignmentStatus",
+    "currentCityFranchiseId", "assignmentStatus", "ownershipMode", "outletType",
   ];
   return Object.fromEntries(keys.filter((key) => key in record).map((key) => [key, record[key]]));
 }

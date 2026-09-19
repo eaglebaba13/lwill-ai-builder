@@ -46,6 +46,8 @@ const ALL_TABS = [
   "Partners",
   "Agreements",
   "Outlets",
+  "Franchise Settlement",
+  "Hierarchy",
 ] as const;
 
 const ADMIN_TABS = ALL_TABS;
@@ -83,6 +85,8 @@ const FRANCHISE_TABS = [
   "Partners",
   "Agreements",
   "Outlets",
+  "Franchise Settlement",
+  "Hierarchy",
   "Overview",
   "Branches",
   "Reports",
@@ -202,6 +206,8 @@ export function deriveTabsFromPermissions(permissionCodes: readonly string[]): r
     tabs.push("Partners");
     tabs.push("Agreements");
     tabs.push("Outlets");
+    tabs.push("Franchise Settlement");
+    tabs.push("Hierarchy");
   }
   return tabs;
 }

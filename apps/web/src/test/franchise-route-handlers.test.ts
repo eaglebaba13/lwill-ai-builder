@@ -9,6 +9,7 @@ import {
   handleListOutlets,
   handleGetOutlet,
   handleGetFranchiseDashboard,
+  handleUpdateOutletOwnership,
   type FranchiseAuthorization,
   type FranchiseRouteServices,
 } from "../lib/crm/franchise-route-handlers";
@@ -33,6 +34,7 @@ function createServices(authorization: FranchiseAuthorization): FranchiseRouteSe
     listOutlets: vi.fn().mockResolvedValue([]),
     getOutlet: vi.fn().mockResolvedValue({ id: "o1" }),
     createOutlet: vi.fn().mockResolvedValue({ id: "o1" }),
+    updateOutletOwnership: vi.fn().mockResolvedValue({ id: "o1", ownershipMode: "COMPANY_OWNED", partnerId: null }),
     getDashboard: vi.fn().mockResolvedValue({ territories: [], partners: [], agreements: [], outlets: [], summary: { totalTerritories: 0, totalPartners: 0, totalAgreements: 0, totalOutlets: 0, activeOutlets: 0, inactiveOutlets: 0 } }),
   };
 }
@@ -167,5 +169,67 @@ describe("franchise route handlers: authorized access", () => {
     const result = await handleGetFranchiseDashboard(request(), services);
     expect(result.status).toBe(200);
     expect(services.getDashboard).toHaveBeenCalledWith("tenant-1");
+  });
+});
+
+
+describe("franchise route handlers: outlet ownership PATCH", () => {
+  function patchRequest(body: unknown) {
+    return new Request("https://builder.lwill.in/api/franchise/outlets/o1", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  }
+
+  it("returns 401 for unauthenticated PATCH callers", async () => {
+    const services = createServices({ outcome: "unauthenticated" });
+    const result = await handleUpdateOutletOwnership(patchRequest({ ownershipMode: "COMPANY_OWNED", partnerId: null }), services, "o1");
+    expect(result.status).toBe(401);
+    expect(services.updateOutletOwnership).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 for authenticated PATCH callers without franchise.write", async () => {
+    const services = createServices({ outcome: "forbidden" });
+    const result = await handleUpdateOutletOwnership(patchRequest({ ownershipMode: "COMPANY_OWNED", partnerId: null }), services, "o1");
+    expect(result.status).toBe(403);
+    expect(services.updateOutletOwnership).not.toHaveBeenCalled();
+  });
+
+  it("updates COMPANY_OWNED with null partnerId", async () => {
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1", userId: "user-1" });
+    const result = await handleUpdateOutletOwnership(patchRequest({ ownershipMode: "COMPANY_OWNED", partnerId: null }), services, "o1");
+    expect(result.status).toBe(200);
+    expect(services.authorize).toHaveBeenCalledWith("franchise.write");
+    expect(services.updateOutletOwnership).toHaveBeenCalledWith("tenant-1", "o1", { ownershipMode: "COMPANY_OWNED", partnerId: null });
+  });
+
+  it("rejects COMPANY_OWNED with partnerId", async () => {
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1", userId: "user-1" });
+    const result = await handleUpdateOutletOwnership(patchRequest({ ownershipMode: "COMPANY_OWNED", partnerId: "partner-1" }), services, "o1");
+    expect(result.status).toBe(400);
+    expect(services.updateOutletOwnership).not.toHaveBeenCalled();
+  });
+
+  it("rejects UNDER_FRANCHISE_PARTNER without partnerId", async () => {
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1", userId: "user-1" });
+    const result = await handleUpdateOutletOwnership(patchRequest({ ownershipMode: "UNDER_FRANCHISE_PARTNER" }), services, "o1");
+    expect(result.status).toBe(400);
+    expect(services.updateOutletOwnership).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when service rejects cross-tenant or inactive partner", async () => {
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1", userId: "user-1" });
+    vi.mocked(services.updateOutletOwnership).mockRejectedValueOnce(new Error("Outlet Franchise Partner must exist, belong to the same tenant, and be active."));
+    const result = await handleUpdateOutletOwnership(patchRequest({ ownershipMode: "UNDER_FRANCHISE_PARTNER", partnerId: "partner-2" }), services, "o1");
+    expect(result.status).toBe(400);
+    expect(services.updateOutletOwnership).toHaveBeenCalledWith("tenant-1", "o1", { ownershipMode: "UNDER_FRANCHISE_PARTNER", partnerId: "partner-2" });
+  });
+
+  it("returns 404 for nonexistent or cross-tenant outlet", async () => {
+    const services = createServices({ outcome: "authorized", tenantId: "tenant-1", userId: "user-1" });
+    vi.mocked(services.updateOutletOwnership).mockResolvedValueOnce(null);
+    const result = await handleUpdateOutletOwnership(patchRequest({ ownershipMode: "COMPANY_OWNED", partnerId: null }), services, "missing");
+    expect(result.status).toBe(404);
   });
 });

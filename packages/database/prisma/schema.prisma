@@ -19,6 +19,11 @@ enum FranchiseCoverageMode {
   PINCODE_SET
 }
 
+enum FranchiseOutletOwnershipMode {
+  COMPANY_OWNED
+  UNDER_FRANCHISE_PARTNER
+}
+
 model Tenant {
   id                String             @id @default(uuid()) @db.Uuid
   name              String
@@ -445,19 +450,20 @@ model FranchisePartner {
 model FranchiseOutletProfile {
   id             String   @id @default(uuid()) @db.Uuid
   tenantId       String   @db.Uuid
-  partnerId      String   @db.Uuid
+  partnerId      String?  @db.Uuid
   branchId       String   @db.Uuid
   territoryId    String?  @db.Uuid
   currentCityFranchiseId String? @db.Uuid
   assignmentStatus FranchiseAssignmentStatus @default(DRAFT)
   outletType     String?  @default("STANDALONE")
+  ownershipMode  FranchiseOutletOwnershipMode?
   investmentCents Int?
   isActive       Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   tenant        Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  partner       FranchisePartner     @relation(fields: [partnerId], references: [id], onDelete: Restrict)
+  partner       FranchisePartner?    @relation(fields: [partnerId], references: [id], onDelete: Restrict)
   branch        Branch               @relation(fields: [tenantId, branchId], references: [tenantId, id], onDelete: Restrict)
   territory     Territory?           @relation(fields: [tenantId, territoryId], references: [tenantId, id], onDelete: Restrict)
   currentCityFranchise CityFranchise? @relation(fields: [tenantId, currentCityFranchiseId], references: [tenantId, id], onDelete: Restrict)

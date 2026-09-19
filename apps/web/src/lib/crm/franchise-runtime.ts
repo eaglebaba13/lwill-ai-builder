@@ -54,6 +54,7 @@ export function createFranchiseRouteServices(): FranchiseRouteServices {
     listOutlets: (tenantId) => franchiseService.listOutlets({ tenantId }),
     getOutlet: (tenantId, outletId) => franchiseService.getOutlet({ tenantId, outletId }),
     createOutlet: (tenantId, data) => franchiseService.createOutlet({ tenantId, ...data } as never),
+    updateOutletOwnership: (tenantId, outletId, data) => franchiseService.updateOutletOwnership(tenantId, outletId, data),
     getDashboard: (tenantId) => franchiseService.getDashboard({ tenantId }),
   };
 }

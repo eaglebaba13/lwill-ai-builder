@@ -49,10 +49,11 @@ export interface FranchiseAgreementRecord {
 export interface FranchiseOutletProfileRecord {
   readonly id: string;
   readonly tenantId: string;
-  readonly partnerId: string;
+  readonly partnerId: string | null;
   readonly branchId: string;
   readonly territoryId: string | null;
   readonly outletType: string | null;
+  readonly ownershipMode: string | null;
   readonly investmentCents: number | null;
   readonly isActive: boolean;
   readonly createdAt: Date;
@@ -105,10 +106,11 @@ export interface FranchiseAgreementCreateInput {
 
 export interface FranchiseOutletProfileCreateInput {
   readonly tenantId: string;
-  readonly partnerId: string;
+  readonly partnerId?: string | null;
   readonly branchId: string;
   readonly territoryId?: string | null;
   readonly outletType?: string | null;
+  readonly ownershipMode?: "COMPANY_OWNED" | "UNDER_FRANCHISE_PARTNER" | null;
   readonly investmentCents?: number | null;
 }
 
@@ -144,6 +146,7 @@ export interface FranchiseService {
   listOutlets(args: { tenantId: string }): Promise<ReadonlyArray<FranchiseOutletProfileRecord & { readonly partnerName: string; readonly branchName: string; readonly territoryName: string | null }>>;
   getOutlet(args: { tenantId: string; outletId: string }): Promise<(FranchiseOutletProfileRecord & { readonly partnerName: string; readonly branchName: string; readonly territoryName: string | null }) | null>;
   createOutlet(input: FranchiseOutletProfileCreateInput): Promise<FranchiseOutletProfileRecord>;
+  updateOutletOwnership(tenantId: string, outletId: string, data: Record<string, unknown>): Promise<FranchiseOutletProfileRecord | null>;
 
   getDashboard(args: { tenantId: string }): Promise<FranchiseDashboardData>;
 }
@@ -172,6 +175,7 @@ interface FranchisePrismaClient {
     create(args: { data: Record<string, unknown> }): Promise<FranchiseOutletProfileRecord>;
     findUnique(args: { where: { id: string }; include?: Record<string, unknown> }): Promise<FranchiseOutletProfileRecord | null>;
     findMany(args: { where?: Record<string, unknown>; include?: Record<string, unknown> }): Promise<ReadonlyArray<FranchiseOutletProfileRecord & Record<string, unknown>>>;
+    update(args: { where: { id: string }; data: Record<string, unknown> }): Promise<FranchiseOutletProfileRecord>;
     count(args: { where?: Record<string, unknown> }): Promise<number>;
   };
 }
@@ -412,10 +416,11 @@ export function createFranchiseService(prisma: FranchisePrismaClient): Franchise
       return outlets.map((outlet) => ({
         id: outlet.id,
         tenantId: outlet.tenantId,
-        partnerId: outlet.partnerId,
+        partnerId: outlet.partnerId ?? null,
         branchId: outlet.branchId,
         territoryId: outlet.territoryId,
         outletType: outlet.outletType,
+        ownershipMode: (outlet as unknown as Record<string, unknown>).ownershipMode as string | null ?? null,
         investmentCents: outlet.investmentCents,
         isActive: outlet.isActive,
         createdAt: outlet.createdAt,
@@ -441,10 +446,11 @@ export function createFranchiseService(prisma: FranchisePrismaClient): Franchise
       return {
         id: outlet.id,
         tenantId: outlet.tenantId,
-        partnerId: outlet.partnerId,
+        partnerId: outlet.partnerId ?? null,
         branchId: outlet.branchId,
         territoryId: outlet.territoryId,
         outletType: outlet.outletType,
+        ownershipMode: (outlet as unknown as Record<string, unknown>).ownershipMode as string | null ?? null,
         investmentCents: outlet.investmentCents,
         isActive: outlet.isActive,
         createdAt: outlet.createdAt,
@@ -456,14 +462,51 @@ export function createFranchiseService(prisma: FranchisePrismaClient): Franchise
     },
 
     async createOutlet(input) {
+      if (input.ownershipMode === "COMPANY_OWNED") {
+        if (input.partnerId != null) {
+          throw new Error("COMPANY_OWNED outlets must not have an Outlet Franchise Partner.");
+        }
+      } else if (input.ownershipMode === "UNDER_FRANCHISE_PARTNER") {
+        if (!input.partnerId) {
+          throw new Error("UNDER_FRANCHISE_PARTNER outlets require an Outlet Franchise Partner.");
+        }
+        const partner = await prisma.franchisePartner.findUnique({ where: { id: input.partnerId } });
+        if (!partner || partner.tenantId !== input.tenantId || !partner.isActive) {
+          throw new Error("Outlet Franchise Partner must exist, belong to the same tenant, and be active.");
+        }
+      }
       return prisma.franchiseOutletProfile.create({
         data: {
           tenantId: input.tenantId,
-          partnerId: input.partnerId,
+          partnerId: input.partnerId ?? null,
           branchId: input.branchId,
           territoryId: input.territoryId ?? null,
           outletType: input.outletType ?? "STANDALONE",
+          ownershipMode: input.ownershipMode ?? null,
           investmentCents: input.investmentCents ?? null,
+        },
+      });
+    },
+
+    async updateOutletOwnership(tenantId: string, outletId: string, data: Record<string, unknown>) {
+      const existing = await prisma.franchiseOutletProfile.findUnique({ where: { id: outletId } });
+      if (!existing || existing.tenantId !== tenantId) return null;
+      const ownershipMode = data.ownershipMode as string;
+      const partnerId = data.partnerId as string | null;
+      if (ownershipMode === "COMPANY_OWNED") {
+        if (partnerId != null) throw new Error("COMPANY_OWNED outlets must not have an Outlet Franchise Partner.");
+      } else if (ownershipMode === "UNDER_FRANCHISE_PARTNER") {
+        if (!partnerId) throw new Error("UNDER_FRANCHISE_PARTNER outlets require an Outlet Franchise Partner.");
+        const partner = await prisma.franchisePartner.findUnique({ where: { id: partnerId } });
+        if (!partner || partner.tenantId !== tenantId || !partner.isActive) {
+          throw new Error("Outlet Franchise Partner must exist, belong to the same tenant, and be active.");
+        }
+      }
+      return prisma.franchiseOutletProfile.update({
+        where: { id: outletId },
+        data: {
+          ownershipMode: ownershipMode as "COMPANY_OWNED" | "UNDER_FRANCHISE_PARTNER",
+          partnerId: partnerId ?? null,
         },
       });
     },
@@ -543,10 +586,11 @@ export function createFranchiseService(prisma: FranchisePrismaClient): Franchise
       const outletResults = outlets.map((outlet) => ({
         id: outlet.id,
         tenantId: outlet.tenantId,
-        partnerId: outlet.partnerId,
+        partnerId: outlet.partnerId ?? null,
         branchId: outlet.branchId,
         territoryId: outlet.territoryId,
         outletType: outlet.outletType,
+        ownershipMode: (outlet as unknown as Record<string, unknown>).ownershipMode as string | null ?? null,
         investmentCents: outlet.investmentCents,
         isActive: outlet.isActive,
         createdAt: outlet.createdAt,

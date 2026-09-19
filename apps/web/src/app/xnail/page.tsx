@@ -8,6 +8,7 @@ import { CrmBadge, CrmEmptyState, CrmPanel, CrmWorkspace } from "@/components/xn
 import { OperationsBadge, OperationsEmptyState, OperationsPanel, OperationsWorkspace } from "@/components/xnail/operations-workspace";
 import { BillingDownloadActions, BillingEmptyState, BillingPanel, BillingStatusBadge, BillingTotals, BillingWorkspace, formatMoney } from "@/components/xnail/billing-workspace";
 import { InventoryWorkspace } from "@/components/xnail/inventory-workspace";
+import { HierarchyDashboard } from "@/components/xnail/hierarchy-dashboard";
 import {
   invalidatePendingRefresh,
   loginWithNativeAuthentication,
@@ -208,7 +209,7 @@ function KpiCard({ definition, context }: { readonly definition: RoleDashboardCo
   return <SharedKpiCard title={definition.label} value={value} subtitle={subtitle} icon={<MetricGlyph type={definition.source.type} />} tone={tone} meta="Live state" />;
 }
 
-const ALL_TABS = ["Overview", "Customers", "Leads", "Pipeline", "Follow-ups", "Communications", "Tags & Notes", "Services", "Packages", "Memberships", "Inventory", "Staff", "Attendance", "Appointments", "Billing", "Branches", "Reports", "Settings", "Notifications", "Users & Access", "Gateway Accounts", "Marketplace", "Franchise Overview", "Financials", "Territories", "Partners", "Agreements", "Outlets", "Franchise Settlement"] as const;
+const ALL_TABS = ["Overview", "Customers", "Leads", "Pipeline", "Follow-ups", "Communications", "Tags & Notes", "Services", "Packages", "Memberships", "Inventory", "Staff", "Attendance", "Appointments", "Billing", "Branches", "Reports", "Settings", "Notifications", "Users & Access", "Gateway Accounts", "Marketplace", "Franchise Overview", "Financials", "Territories", "Partners", "Agreements", "Outlets", "Franchise Settlement", "Hierarchy"] as const;
 type XNailTab = (typeof ALL_TABS)[number];
 
 type NavigationGroup = {
@@ -224,7 +225,7 @@ const SIDEBAR_NAVIGATION_GROUPS: readonly NavigationGroup[] = [
   { label: "Inventory", icon: "inventory", tabs: ["Inventory"] },
   { label: "Team", icon: "team", tabs: ["Staff", "Attendance"] },
   { label: "Business", icon: "business", tabs: ["Branches", "Reports", "Financials"] },
-  { label: "Franchise", icon: "franchise", tabs: ["Franchise Overview", "Territories", "Partners", "Agreements", "Outlets", "Franchise Settlement"] },
+  { label: "Franchise", icon: "franchise", tabs: ["Franchise Overview", "Territories", "Partners", "Agreements", "Outlets", "Franchise Settlement", "Hierarchy"] },
   { label: "Platform", icon: "platform", tabs: ["Marketplace", "Gateway Accounts"] },
   { label: "Administration", icon: "admin", tabs: ["Notifications", "Users & Access", "Settings"] },
 ] as const;
@@ -8142,6 +8143,10 @@ export default function Home() {
               </div>
             ) : null}
           </section>
+        ) : null}
+
+        {activeTab === "Hierarchy" ? (
+          <HierarchyDashboard authenticated={authenticated} />
         ) : null}
 
         {activeTab === "Overview" ? (
