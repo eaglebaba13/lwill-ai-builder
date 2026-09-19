@@ -1,540 +1,1540 @@
-# X Nail Staff Commission — Business Decision Sheet
+# X Nail Staff Compensation — Business Decision & Approval Sheet
 
-**Document ID:** LWILL-XNAIL-STAFF-COMMISSION-BDS  
-**Version:** 2.0  
+**Document ID:** LWILL-XNAIL-STAFF-COMPENSATION-BDS  
+**Version:** 4.0  
 **Status:** AWAITING BUSINESS APPROVAL  
 **Branch:** `phase-1d-native-auth`  
 **Created:** 2026-09-15  
 **Updated:** 2026-09-15
 
-**Purpose:** Present explicit commission business-rule options to the business owner for approval before engineering implementation begins.
+**Purpose:** Organize all X Nail Staff Compensation business decisions into a logical approval flow so the business owner can approve decisions in stages, starting with the minimum required for technical design.
 
 **Related Documents:**
 - `docs/LWILL-DOC-017-X-Nail-ERP-SRS-MVP-v1.0.txt` (XN-006)
-- `docs/LWILL-DOC-023-Finance-Accounting-SRS-v1.0.txt`
 - `docs/DECISIONS.md` (ADR 014)
-- `docs/FRANCHISE-COMMERCIAL-RULES-BUSINESS-APPROVAL-SHEET.md`
 - `docs/PROJECT-STATUS.md`
 
 ---
 
-## Background
+## Confirmed Business Requirements
 
-### XN-006 Requirement
+The business has explicitly confirmed these 12 requirements. They are NOT decisions — they are facts.
 
-DOC-017 defines: `XN-006 | Staff attendance and commission calculation.`
-
-**Attendance:** IMPLEMENTED — check-in/check-out, staff assignment, branch scoping.
-
-**Staff Commission:** NOT IMPLEMENTED — no formula, rate, basis, eligibility, timing, or calculation rules exist in any approved document.
-
-### Staff Commission vs Franchise-Sale Commission
-
-These are two distinct business concepts:
-
-| | Staff Commission | Franchise-Sale Commission |
-|---|---|---|
-| **Concept** | Operational staff earning from service/sale revenue | Franchise partner earning from selling new franchises |
-| **SRS** | XN-006 (DOC-017) | Agreement clause 2.2C |
-| **Rate** | NOT SPECIFIED | ₹15,000 per successful franchise sold |
-| **Governed by** | This document | Franchise commercial rules |
-| **Blocked by ADR-014?** | **NO** | YES |
-
-**These concepts must not be merged.**
+| # | Confirmed Requirement |
+|---|----------------------|
+| 1 | Staff are salary-based |
+| 2 | Salary is dynamic/configurable |
+| 3 | Salary may vary from low to high |
+| 4 | Salary may fluctuate/change |
+| 5 | Salary may differ by staff and/or assignment/period |
+| 6 | Compensation = Salary + Target + Dynamic Incentive |
+| 7 | Incentive is dynamic |
+| 8 | Assignment allows configuring: salary, employment details, target, territory, branch, incentive terms |
+| 9 | One staff → one, two, or more branches |
+| 10 | System must NOT assume one staff = one branch |
+| 11 | Staff may have territory/branch assignment |
+| 12 | All commission/incentive calculations EXCLUDING GST ✅ APPROVED |
 
 ---
 
-## P0 Decisions — Minimum Required Before Technical Design
+## Staff Compensation Model
 
-These 5 decisions MUST be approved before any commission implementation can begin.
+```
+STAFF COMPENSATION
+    │
+    ├── SALARY (fixed/dynamic per staff per period)
+    │     └── may differ by branch assignment
+    │
+    ├── TARGET (performance/business measurement)
+    │     ├── metric
+    │     ├── amount
+    │     ├── period
+    │     └── may differ by branch
+    │
+    └── DYNAMIC INCENTIVE (additional compensation)
+          ├── eligibility
+          ├── basis (EXCLUDING GST)
+          ├── formula
+          ├── target relationship
+          └── per-service/product/package/membership
+```
+
+---
+
+## Decision Dependency Map
+
+```
+STAGE 1: EMPLOYMENT (SE)
+    │
+    ├── defines salary model
+    │
+    ▼
+STAGE 2: ASSIGNMENT (SA)
+    │
+    ├── links staff to branches/territories
+    ├── may affect salary per assignment
+    │
+    ▼
+STAGE 3: TARGET (TG)
+    │
+    ├── defines performance measurement
+    ├── may differ per branch assignment
+    │
+    ▼
+STAGE 4: INCENTIVE PLAN (IN)
+    │
+    ├── defines how incentive is calculated
+    ├── depends on target
+    │
+    ▼
+STAGE 5: COMMISSION EVENT (SC)
+    │
+    ├── defines when/how commission is earned
+    ├── depends on incentive plan
+    ├── GST excluded (APPROVED)
+    │
+    ▼
+STAGE 6: APPROVAL & PAYOUT (SC)
+    │
+    ├── defines finalization and payment boundary
+    └── depends on all previous stages
+```
+
+**Specific dependencies:**
+- SA-009 (assignment-specific compensation) → affects SE-002 (salary structure)
+- SA-010 (assignment-specific target) → affects TG-005 (multi-branch aggregation)
+- TG-002 (target metric) → affects IN-002 (incentive basis)
+- IN-003 (incentive formula) → affects SC-002 (rate structure)
+- IN-004 (target achievement relationship) → affects IN-005 (incentive slabs)
+- SC-004 (staff attribution) → affects SC-014 (multiple staff)
+- SC-008 (GST) → APPROVED — all amounts excluding GST
+
+---
+
+## Minimum Decisions Required to Start Technical Design
+
+These 12 decisions block architecture and schema design. All other decisions can be deferred to a later phase if the business approves a limited release scope.
+
+| ID | Decision | Stage | Why It Blocks Design |
+|----|----------|-------|---------------------|
+| SE-002 | Salary structure | Employment | Determines whether salary is per-staff, per-assignment, or per-period |
+| SE-004 | Salary effective date | Employment | Determines whether salary history model is needed |
+| SE-005 | Salary revision/history | Employment | Determines historical reproducibility |
+| SA-001 | Assignment model | Assignment | Determines join table design for multi-branch |
+| SA-002 | Multi-branch independence | Assignment | Determines whether salary/target/incentive differ per branch |
+| SA-009 | Assignment-specific compensation | Assignment | Determines whether salary is global or per-assignment |
+| TG-001 | Target period | Target | Determines target period model |
+| TG-002 | Target metric | Target | Determines what is measured (revenue, services, etc.) |
+| TG-004 | Target ownership | Target | Determines individual vs branch vs both |
+| IN-001 | Incentive eligibility | Incentive | Determines who gets incentive |
+| IN-003 | Incentive formula | Incentive | Determines calculation architecture |
+| SC-008 | GST treatment | Commission | APPROVED — excluding GST ✅ |
+
+**11 decisions still required + 1 already approved = 12 total to start design.**
+
+---
+
+## Business Owner Approval Workflow
+
+The business owner approves decisions in 6 stages. Each stage builds on the previous.
+
+### STEP 1 — Employment Model
+
+**Purpose:** Define how staff employment and salary work.
+
+Decisions: SE-001 through SE-009
+
+### STEP 2 — Staff Assignment Model
+
+**Purpose:** Define how staff are assigned to branches and territories.
+
+Decisions: SA-001 through SA-010
+
+### STEP 3 — Target Model
+
+**Purpose:** Define what targets look like and how they are measured.
+
+Decisions: TG-001 through TG-010
+
+### STEP 4 — Incentive Model
+
+**Purpose:** Define how incentive plans work.
+
+Decisions: IN-001 through IN-020
+
+### STEP 5 — Commission Event & Adjustments
+
+**Purpose:** Define when commission is earned and how exceptions are handled.
+
+Decisions: SC-001 through SC-014
+
+### STEP 6 — Approval & Payout
+
+**Purpose:** Define finalization, adjustments, and payout boundary.
+
+Decisions: SC-015 through SC-020
+
+---
+
+## STAGE 1 — EMPLOYMENT DECISIONS
+
+---
+
+### SE-001 — Employment Status
+
+**Business Question:** What employment statuses should the system track?
+
+**Options:**
+
+- [ ] A. Active / Inactive only
+- [ ] B. Active / On Leave / Resigned / Terminated
+- [ ] C. Configurable status list
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### SE-002 — Salary Structure
+
+**Business Question:** How should salary be structured?
+
+**Options:**
+
+- [ ] A. Fixed monthly salary — one amount per staff per month
+- [ ] B. Fixed salary per assignment period — salary may change when assignment changes
+- [ ] C. Hourly rate
+- [ ] D. Daily rate
+- [ ] E. Configurable — salary amount, period, and structure fully configurable per staff
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### SE-003 — Salary Period
+
+**Business Question:** What is the salary calculation/payment period?
+
+**Options:**
+
+- [ ] A. Monthly
+- [ ] B. Bi-weekly
+- [ ] C. Weekly
+- [ ] D. Configurable per staff
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### SE-004 — Salary Effective Date
+
+**Business Question:** Does salary have an effective start date?
+
+**Options:**
+
+- [ ] A. Yes — salary applies from a specific date
+- [ ] B. No — salary is immediate
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### SE-005 — Salary Revision / History
+
+**Business Question:** When salary changes, must the system preserve salary history?
+
+**Options:**
+
+- [ ] A. Yes — full salary history — every change recorded with dates; historical calculations use the salary active at the time
+- [ ] B. Yes — current and previous only
+- [ ] C. No — only current salary; no history
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### SE-006 — Offer Letter Requirement
+
+**Business Question:** Is an offer letter required when a staff member is assigned?
+
+**Options:**
+
+- [ ] A. Yes — mandatory
+- [ ] B. No — optional
+- [ ] C. Not applicable
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### SE-007 — Offer Letter Information
+
+**Business Question:** What information should be in the employment/offer record?
+
+**Options:**
+
+- [ ] A. Basic — start date, salary, role/title, branch assignment
+- [ ] B. Standard — start date, salary, role/title, branch assignment, target, incentive terms
+- [ ] C. Complete — start date, salary, role/title, branch assignment, target, incentive terms, territory, contract details
+- [ ] D. Configurable
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### SE-008 — Offer Letter Approval
+
+**Business Question:** Does the offer letter / employment record require approval?
+
+**Options:**
+
+- [ ] A. No — final when created
+- [ ] B. Manager approval required
+- [ ] C. Tenant-admin approval required
+- [ ] D. Multi-level approval
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### SE-009 — Employment Effective Date
+
+**Business Question:** Does employment have an effective start date?
+
+**Options:**
+
+- [ ] A. Yes — joining date
+- [ ] B. Yes — joining date + end date (contract period)
+- [ ] C. Immediate
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+## STAGE 2 — STAFF ASSIGNMENT DECISIONS
+
+**CONFIRMED:** One staff → many branches.
+
+---
+
+### SA-001 — Staff-to-Branch Assignment Model
+
+**Business Question:** How should staff-to-branch assignment be represented?
+
+**Options:**
+
+- [ ] A. Explicit assignment records — each assignment is a separate record with its own dates and terms
+- [ ] B. Multiple branch selection — staff record allows selecting multiple branches (simple list)
+- [ ] C. Assignment with role/title per branch
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### SA-002 — Multiple Branch Assignment Independence
+
+**Business Question:** When staff is assigned to multiple branches, are the assignments independent?
+
+**Options:**
+
+- [ ] A. Fully independent — each branch assignment has its own salary, target, incentive, and dates
+- [ ] B. Partially independent — salary is global; target and incentive may differ per branch
+- [ ] C. Fully linked — all terms same across all branches
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### SA-003 — Primary Branch
+
+**Business Question:** Is there a designated primary branch when staff has multiple assignments?
+
+**Options:**
+
+- [ ] A. Yes — one primary branch
+- [ ] B. No — all branches equal
+- [ ] C. Configurable — optional
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### SA-004 — Territory Assignment
+
+**Business Question:** Should staff be assigned to a territory in addition to branches?
+
+**Options:**
+
+- [ ] A. Yes — staff assigned to territory; branches within territory are the scope
+- [ ] B. No — branch assignment only; territory derived from branch
+- [ ] C. Both — territory AND specific branches
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### SA-005 — Branch Assignment Effective Dates
+
+**Business Question:** Do branch assignments have effective start/end dates?
+
+**Options:**
+
+- [ ] A. Yes — start and end dates
+- [ ] B. Start date only
+- [ ] C. No dates
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### SA-006 — Territory Assignment Effective Dates
+
+**Business Question:** Do territory assignments have effective start/end dates?
+
+**Options:**
+
+- [ ] A. Yes — start and end dates
+- [ ] B. Start date only
+- [ ] C. No dates
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### SA-007 — Staff Transfer Between Branches
+
+**Business Question:** How should the system handle staff transfer?
+
+**Options:**
+
+- [ ] A. End old assignment, create new assignment
+- [ ] B. Add new assignment, keep old
+- [ ] C. Replace assignment
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### SA-008 — Simultaneous Multi-Branch Working
+
+**Business Question:** Can a staff member work at multiple branches on the same day?
+
+**Options:**
+
+- [ ] A. Yes
+- [ ] B. No — one branch per day
+- [ ] C. Configurable
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### SA-009 — Assignment-Specific Compensation
+
+**Business Question:** Can salary differ per branch assignment?
+
+**Options:**
+
+- [ ] A. Yes — each branch assignment can have a different salary
+- [ ] B. No — salary is global for the staff member
+- [ ] C. Base + allowance — one base salary plus branch-specific allowance
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### SA-010 — Assignment-Specific Target
+
+**Business Question:** Can target differ per branch assignment?
+
+**Options:**
+
+- [ ] A. Yes — each branch assignment can have a different target
+- [ ] B. No — target is global
+- [ ] C. Separate per branch, aggregated
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+## STAGE 3 — TARGET DECISIONS
+
+**CONFIRMED:** Compensation includes TARGET. Target is dynamic/configurable.
+
+---
+
+### TG-001 — Target Period
+
+**Business Question:** What is the target measurement period?
+
+**Options:**
+
+- [ ] A. Monthly
+- [ ] B. Weekly
+- [ ] C. Quarterly
+- [ ] D. Custom per staff
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### TG-002 — Target Metric
+
+**Business Question:** What does the target measure?
+
+**Options:**
+
+- [ ] A. Revenue — total revenue generated (excluding GST)
+- [ ] B. Service count — number of services performed
+- [ ] C. Appointment count — number of appointments completed
+- [ ] D. Customer count — number of unique customers served
+- [ ] E. Product sales — product revenue
+- [ ] F. Composite — combination (specify): _______________________________________________
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### TG-003 — Target Amount
+
+**Business Question:** How is the target amount determined?
+
+**Options:**
+
+- [ ] A. Fixed amount per staff
+- [ ] B. Fixed amount per role
+- [ ] C. Fixed amount per branch
+- [ ] D. Dynamic/configurable per staff per period
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### TG-004 — Target Ownership
+
+**Business Question:** Who owns the target?
+
+**Options:**
+
+- [ ] A. Individual staff — each staff member has their own target
+- [ ] B. Branch — target belongs to the branch; staff contribute collectively
+- [ ] C. Both — individual AND branch targets exist independently
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### TG-005 — Multi-Branch Target Aggregation
+
+**Business Question:** When staff works at multiple branches, how are targets aggregated?
+
+**Options:**
+
+- [ ] A. Sum of branch targets
+- [ ] B. Single global target
+- [ ] C. Separate per branch, no aggregation
+- [ ] D. Not applicable
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### TG-006 — Branch-Specific Target
+
+**Business Question:** Can a staff member have a different target at each branch?
+
+**Options:**
+
+- [ ] A. Yes
+- [ ] B. No — same at all branches
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### TG-007 — Target Revision
+
+**Business Question:** Can a target be revised after it is set?
+
+**Options:**
+
+- [ ] A. Yes — with history
+- [ ] B. Yes — without history
+- [ ] C. No — fixed once set
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### TG-008 — Target Effective Date
+
+**Business Question:** Does a target have an effective start date?
+
+**Options:**
+
+- [ ] A. Yes
+- [ ] B. No — immediate
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### TG-009 — Target Approval
+
+**Business Question:** Does a target require approval?
+
+**Options:**
+
+- [ ] A. No — active when set
+- [ ] B. Manager approval required
+- [ ] C. Tenant-admin approval required
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### TG-010 — Target Achievement Calculation
+
+**Business Question:** How is target achievement calculated?
+
+**Options:**
+
+- [ ] A. Percentage — (actual / target) × 100%
+- [ ] B. Absolute — actual − target
+- [ ] C. Both
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+## STAGE 4 — INCENTIVE PLAN DECISIONS
+
+**CONFIRMED:** Incentive is dynamic and target-based. All calculations EXCLUDING GST.
+
+---
+
+### IN-001 — Incentive Eligibility
+
+**Business Question:** Which staff are eligible for incentive?
+
+**Options:**
+
+- [ ] A. All active staff with a target
+- [ ] B. Only staff who meet a minimum target threshold
+- [ ] C. Selected staff roles only (specify): _______________________________________________
+- [ ] D. Individual eligibility flag
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### IN-002 — Incentive Basis
+
+**Business Question:** What monetary amount is the incentive calculated on?
+
+**Options:**
+
+- [ ] A. Revenue excluding GST
+- [ ] B. Revenue exceeding target
+- [ ] C. Total revenue after reaching target
+- [ ] D. Service-specific amounts
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### IN-003 — Incentive Formula
+
+**Business Question:** How is the incentive amount calculated?
+
+**Options:**
+
+- [ ] A. Fixed percentage of basis
+- [ ] B. Slab-based percentage (requires IN-005)
+- [ ] C. Fixed amount per unit
+- [ ] D. Fixed amount upon target achievement
+- [ ] E. Configurable per staff
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### IN-004 — Target Achievement Relationship
+
+**Business Question:** How does target achievement affect incentive?
+
+**Options:**
+
+- [ ] A. No incentive until target is met
+- [ ] B. Partial achievement = partial incentive
+- [ ] C. Threshold-based — no incentive below X%; full at or above X%
+- [ ] D. Always applies — target is informational only
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### IN-005 — Incentive Slabs / Tiers
+
+**Business Question:** Are there incentive slabs based on achievement levels?
+
+**Options:**
+
+- [ ] A. No slabs — one flat rate
+- [ ] B. Progressive slabs — higher achievement = higher rate
+- [ ] C. Regressive slabs
+- [ ] D. Configurable slabs
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### IN-006 — Incentive on Excess Target
+
+**Business Question:** When staff exceeds target, does incentive apply to excess only or total?
+
+**Options:**
+
+- [ ] A. Excess only
+- [ ] B. Total after reaching target
+- [ ] C. Configurable
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### IN-007 — Service Incentive
+
+**Business Question:** Does incentive apply to service revenue?
+
+**Options:**
+
+- [ ] A. Yes
+- [ ] B. No
+- [ ] C. Separate rate (specify): _______________________________________________
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### IN-008 — Product Incentive
+
+**Business Question:** Does incentive apply to product sales?
+
+**Options:**
+
+- [ ] A. Yes
+- [ ] B. No
+- [ ] C. Separate rate (specify): _______________________________________________
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### IN-009 — Package Incentive
+
+**Business Question:** Does incentive apply to package sales?
+
+**Options:**
+
+- [ ] A. Yes
+- [ ] B. No
+- [ ] C. Separate rate (specify): _______________________________________________
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### IN-010 — Membership Incentive
+
+**Business Question:** Does incentive apply to membership sales?
+
+**Options:**
+
+- [ ] A. Yes
+- [ ] B. No
+- [ ] C. Separate rate (specify): _______________________________________________
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### IN-011 — Staff-Specific Incentive Plan
+
+**Business Question:** Can each staff member have a different incentive plan?
+
+**Options:**
+
+- [ ] A. Yes
+- [ ] B. No — one plan for all
+- [ ] C. Role-based
+- [ ] D. Branch-based
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### IN-012 — Branch-Specific Incentive Plan
+
+**Business Question:** Can incentive plans differ by branch?
+
+**Options:**
+
+- [ ] A. Yes
+- [ ] B. No — global
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### IN-013 — Incentive Effective Date
+
+**Business Question:** Does an incentive plan have an effective start date?
+
+**Options:**
+
+- [ ] A. Yes
+- [ ] B. No — immediate
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### IN-014 — Incentive Revision / History
+
+**Business Question:** When incentive plan changes, must history be preserved?
+
+**Options:**
+
+- [ ] A. Yes — full history
+- [ ] B. No — only current plan
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### IN-015 — Incentive Calculation Period
+
+**Business Question:** What is the incentive calculation period?
+
+**Options:**
+
+- [ ] A. Monthly
+- [ ] B. Weekly
+- [ ] C. Per transaction
+- [ ] D. Same as target period
+- [ ] E. Configurable per staff
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### IN-016 — Incentive Earning Event
+
+**Business Question:** When does incentive become earned?
+
+**Options:**
+
+- [ ] A. Appointment completion
+- [ ] B. Invoice creation
+- [ ] C. Payment collection
+- [ ] D. End-of-period calculation
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### IN-017 — Incentive Approval / Finalization
+
+**Business Question:** Does incentive require approval?
+
+**Options:**
+
+- [ ] A. Automatically final
+- [ ] B. Manager approval
+- [ ] C. Accountant approval
+- [ ] D. Tenant-admin approval
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### IN-018 — Incentive Adjustment
+
+**Business Question:** Can incentive be manually adjusted?
+
+**Options:**
+
+- [ ] A. No
+- [ ] B. Yes — with reason
+- [ ] C. Yes — requiring approval
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### IN-019 — Incentive Refund / Reversal
+
+**Business Question:** How is incentive treated when revenue is reversed?
+
+**Options:**
+
+- [ ] A. Reverse completely
+- [ ] B. Reduce proportionally
+- [ ] C. No change after finalization
+- [ ] D. Manual adjustment
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+### IN-020 — Incentive Payout Boundary
+
+**Business Question:** Does this implementation include actual payment to staff?
+
+**Options:**
+
+- [ ] A. Calculation only — payment handled externally
+- [ ] B. Calculation + approval — payment external
+- [ ] C. Full lifecycle — calculation, approval, and payment tracking
+- [ ] Other: _______________________________________________
+
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
+
+---
+
+## STAGE 5 — COMMISSION EVENT & ADJUSTMENTS
 
 ---
 
 ### SC-001 — Commission Basis
 
-**Business Question:** What monetary amount should the commission rate be applied to?
+**Business Question:** What monetary amount is the incentive rate applied to?
 
 **Options:**
 
-- [ ] A. **Service revenue** — The listed price of each service performed. Simple and predictable. Does not depend on payment status.
-- [ ] B. **Invoice revenue** — The total invoice amount including all line items (services, products, packages). Broader than service-only.
-- [ ] C. **Collected payment** — Only amounts actually collected from customers. Most conservative — commission is only earned when the business receives money.
-- [ ] D. **Service-specific commissionable amount** — Each service has its own designated commissionable amount (may differ from price). Most flexible but requires per-service configuration.
-- [ ] Other / Specify: _______________________________________________
+- [ ] A. Service revenue
+- [ ] B. Invoice revenue
+- [ ] C. Collected payment
+- [ ] D. Service-specific commissionable amount
+- [ ] Other: _______________________________________________
 
-**Business Owner Decision:** _______________________________________________
+**Business Owner Selection:** _______________________________________________
 
-**Notes:** _______________________________________________
+**Status:** NOT SPECIFIED
 
 ---
 
 ### SC-002 — Commission Rate Structure
 
-**Business Question:** How should the commission rate be defined?
+**Business Question:** How is the incentive rate defined?
 
 **Options:**
 
-- [ ] A. **One global rate** — One configurable percentage for all eligible services. Example: 10% of all eligible service revenue.
-- [ ] B. **Per-service rate** — Different services have different commission rates. Example: Manicure 10%, Pedicure 12%, Nail Art 15%.
-- [ ] C. **Per-staff rate** — Different staff members have different commission rates based on experience/role.
-- [ ] D. **Staff + service combination** — Each staff member has different rates for different services. Most granular.
-- [ ] E. **Fixed amount** — Flat fee per service regardless of price. Example: ₹50 per manicure.
-- [ ] Other / Specify: _______________________________________________
+- [ ] A. One global rate
+- [ ] B. Per-service rate
+- [ ] C. Per-staff rate
+- [ ] D. Staff + service combination
+- [ ] E. Fixed amount per service
+- [ ] F. Defined by incentive plan (see IN-003)
+- [ ] Other: _______________________________________________
 
-**If a percentage-based option is selected, specify the rate(s):**
+**Business Owner Selection:** _______________________________________________
 
-_______________________________________________
-
-**Business Owner Decision:** _______________________________________________
-
-**Notes:** _______________________________________________
+**Status:** NOT SPECIFIED
 
 ---
 
 ### SC-003 — Staff Eligibility
 
-**Business Question:** Which staff members can earn commission?
+**Business Question:** Which staff earn incentive?
 
 **Options:**
 
-- [ ] A. **All active staff** — Every staff member marked as active is eligible. Simplest.
-- [ ] B. **Nail technicians only** — Only staff with a nail technician role/title.
-- [ ] C. **Selected staff roles** — Configurable set of roles (specify which): _______________________________________________
-- [ ] D. **Individual flag** — Each staff member has an explicit eligibility flag. Most flexible.
-- [ ] Other / Specify: _______________________________________________
+- [ ] A. All active staff
+- [ ] B. Nail technicians only
+- [ ] C. Selected staff roles (specify): _______________________________________________
+- [ ] D. Individual eligibility flag
+- [ ] E. Defined by incentive plan (see IN-001)
+- [ ] Other: _______________________________________________
 
-**Business Owner Decision:** _______________________________________________
+**Business Owner Selection:** _______________________________________________
 
-**Notes:** _______________________________________________
+**Status:** NOT SPECIFIED
 
 ---
 
 ### SC-004 — Staff Attribution
 
-**Business Question:** Which staff relationship earns the commission?
+**Business Question:** Which staff relationship earns the incentive?
 
 **Options:**
 
-- [ ] A. **Appointment staff** — The staff member assigned to the appointment (`Appointment.staffId`) earns commission. Already exists in the system.
-- [ ] B. **Explicit staff assignment at billing** — The billing user selects the commission-earning staff at invoice creation time. Requires a new field.
-- [ ] C. **Invoice-line staff attribution** — Each line item on the invoice can be attributed to a different staff member. Most granular but most complex.
-- [ ] Other / Specify: _______________________________________________
+- [ ] A. Appointment staff (Appointment.staffId)
+- [ ] B. Explicit staff assignment at billing
+- [ ] C. Invoice-line staff attribution
+- [ ] Other: _______________________________________________
 
-**Business Owner Decision:** _______________________________________________
+**Business Owner Selection:** _______________________________________________
 
-**Notes:** _______________________________________________
+**Status:** NOT SPECIFIED
 
 ---
 
 ### SC-005 — Earning Event
 
-**Business Question:** When does commission become earned?
+**Business Question:** When does incentive become earned?
 
 **Options:**
 
-- [ ] A. **Appointment completion** — Commission is earned when the appointment status changes to completed.
-- [ ] B. **Invoice creation** — Commission is earned when the invoice is created.
-- [ ] C. **Payment collection** — Commission is earned when payment is received.
-- [ ] D. **End-of-period calculation** — Commission is calculated in batch at the end of a period (daily/weekly/monthly).
-- [ ] Other / Specify: _______________________________________________
+- [ ] A. Appointment completion
+- [ ] B. Invoice creation
+- [ ] C. Payment collection
+- [ ] D. End-of-period calculation
+- [ ] E. Defined by incentive plan (see IN-016)
+- [ ] Other: _______________________________________________
 
-**Business Owner Decision:** _______________________________________________
+**Business Owner Selection:** _______________________________________________
 
-**Notes:** _______________________________________________
-
----
-
-## P1 Decisions — Required for Complete Production-Safe Commission
-
-These decisions define scope, tax treatment, and product coverage.
-
-**IMPORTANT:** Business owner must explicitly approve the intended release scope if any P1 decisions are deferred.
+**Status:** NOT SPECIFIED
 
 ---
 
 ### SC-006 — Unpaid Invoices
 
-**Business Question:** Should unpaid invoices generate commission?
+**Business Question:** Should unpaid invoices generate incentive?
 
 **Options:**
 
-- [ ] A. **Yes** — Unpaid invoices generate commission. Staff earns commission regardless of customer payment.
-- [ ] B. **No** — Only collected payments generate commission. Most financially conservative.
-- [ ] Other / Specify: _______________________________________________
+- [ ] A. Yes
+- [ ] B. No — only collected payments
+- [ ] Other: _______________________________________________
 
-**Business Owner Decision:** _______________________________________________
+**Business Owner Selection:** _______________________________________________
 
-**Notes:** _______________________________________________
+**Status:** NOT SPECIFIED
 
 ---
 
 ### SC-007 — Discount Treatment
 
-**Business Question:** Do discounts reduce the commissionable base?
+**Business Question:** Do discounts reduce the incentive base?
 
 **Options:**
 
-- [ ] A. **Before discount** — Commission calculated on the original amount before discount.
-- [ ] B. **After discount** — Commission calculated on the amount after discount is applied.
-- [ ] C. **Selected discount types only** — Discount excluded only for selected discount types (specify): _______________________________________________
-- [ ] Other / Specify: _______________________________________________
+- [ ] A. Before discount
+- [ ] B. After discount
+- [ ] C. Selected discount types only
+- [ ] Other: _______________________________________________
 
-**Business Owner Decision:** _______________________________________________
+**Business Owner Selection:** _______________________________________________
 
-**Notes:** _______________________________________________
+**Status:** NOT SPECIFIED
 
 ---
 
 ### SC-008 — GST Treatment
 
-**Business Question:** Is GST included in the commissionable revenue?
+**Business Question:** Is GST included in the incentive base?
 
 **Options:**
 
-- [ ] A. **Excluding GST** — Commission on amount excluding GST.
-- [ ] B. **Including GST** — Commission on amount including GST.
-- [ ] Other / Specify: _______________________________________________
+- [x] A. **Excluding GST** — ✅ CONFIRMED
+- [ ] B. Including GST
 
-**Business Owner Decision:** _______________________________________________
+**Business Owner Selection:** **A — Excluding GST** ✅ APPROVED
 
-**Notes:** _______________________________________________
+**Status:** **APPROVED**
 
 ---
 
-### SC-009a — Service Sales Commission
-
-**Business Question:** Does commission apply to service sales?
+### SC-009a — Service Incentive
 
 **Options:**
 
-- [ ] A. **Commission applies**
-- [ ] B. **Commission does not apply**
-- [ ] C. **Separate rate** (specify): _______________________________________________
-- [ ] Other / Specify: _______________________________________________
+- [ ] A. Applies
+- [ ] B. Does not apply
+- [ ] C. Separate rate
+- [ ] D. Defined by incentive plan (IN-007)
+- [ ] Other: _______________________________________________
 
-**Business Owner Decision:** _______________________________________________
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
 
 ---
 
-### SC-009b — Product Sales Commission
-
-**Business Question:** Does commission apply to product sales (nail polish, tools, etc.)?
+### SC-009b — Product Incentive
 
 **Options:**
 
-- [ ] A. **Commission applies**
-- [ ] B. **Commission does not apply**
-- [ ] C. **Separate rate** (specify): _______________________________________________
-- [ ] Other / Specify: _______________________________________________
+- [ ] A. Applies
+- [ ] B. Does not apply
+- [ ] C. Separate rate
+- [ ] D. Defined by incentive plan (IN-008)
+- [ ] Other: _______________________________________________
 
-**Business Owner Decision:** _______________________________________________
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
 
 ---
 
-### SC-009c — Package Sales Commission
-
-**Business Question:** Does commission apply to package sales (bundled service packages)?
+### SC-009c — Package Incentive
 
 **Options:**
 
-- [ ] A. **Commission applies**
-- [ ] B. **Commission does not apply**
-- [ ] C. **Separate rate** (specify): _______________________________________________
-- [ ] Other / Specify: _______________________________________________
+- [ ] A. Applies
+- [ ] B. Does not apply
+- [ ] C. Separate rate
+- [ ] D. Defined by incentive plan (IN-009)
+- [ ] Other: _______________________________________________
 
-**Business Owner Decision:** _______________________________________________
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
 
 ---
 
-### SC-009d — Membership Sales Commission
-
-**Business Question:** Does commission apply to membership sales (recurring membership plans)?
+### SC-009d — Membership Incentive
 
 **Options:**
 
-- [ ] A. **Commission applies**
-- [ ] B. **Commission does not apply**
-- [ ] C. **Separate rate** (specify): _______________________________________________
-- [ ] Other / Specify: _______________________________________________
+- [ ] A. Applies
+- [ ] B. Does not apply
+- [ ] C. Separate rate
+- [ ] D. Defined by incentive plan (IN-010)
+- [ ] Other: _______________________________________________
 
-**Business Owner Decision:** _______________________________________________
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
 
 ---
 
 ### SC-010 — Refund: Cancelled Appointment
 
-**Business Question:** How should commission be treated when an appointment is cancelled (service not performed)?
-
 **Options:**
 
-- [ ] A. **Reverse commission completely**
-- [ ] B. **Reduce commission proportionally**
-- [ ] C. **No change after finalization**
-- [ ] D. **Manual adjustment**
-- [ ] Other / Specify: _______________________________________________
+- [ ] A. Reverse completely
+- [ ] B. Reduce proportionally
+- [ ] C. No change after finalization
+- [ ] D. Manual adjustment
+- [ ] Other: _______________________________________________
 
-**Business Owner Decision:** _______________________________________________
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
 
 ---
 
 ### SC-011 — Refund: Cancelled Invoice
 
-**Business Question:** How should commission be treated when an invoice is voided?
-
 **Options:**
 
-- [ ] A. **Reverse commission completely**
-- [ ] B. **Reduce commission proportionally**
-- [ ] C. **No change after finalization**
-- [ ] D. **Manual adjustment**
-- [ ] Other / Specify: _______________________________________________
+- [ ] A. Reverse completely
+- [ ] B. Reduce proportionally
+- [ ] C. No change after finalization
+- [ ] D. Manual adjustment
+- [ ] Other: _______________________________________________
 
-**Business Owner Decision:** _______________________________________________
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
 
 ---
 
 ### SC-012 — Refund: Partial Refund
 
-**Business Question:** How should commission be treated when a partial refund is issued?
-
 **Options:**
 
-- [ ] A. **Reverse commission completely**
-- [ ] B. **Reduce commission proportionally**
-- [ ] C. **No change after finalization**
-- [ ] D. **Manual adjustment**
-- [ ] Other / Specify: _______________________________________________
+- [ ] A. Reverse completely
+- [ ] B. Reduce proportionally
+- [ ] C. No change after finalization
+- [ ] D. Manual adjustment
+- [ ] Other: _______________________________________________
 
-**Business Owner Decision:** _______________________________________________
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
 
 ---
 
 ### SC-013 — Refund: Full Refund
 
-**Business Question:** How should commission be treated when a full refund is issued?
-
 **Options:**
 
-- [ ] A. **Reverse commission completely**
-- [ ] B. **Reduce commission proportionally**
-- [ ] C. **No change after finalization**
-- [ ] D. **Manual adjustment**
-- [ ] Other / Specify: _______________________________________________
+- [ ] A. Reverse completely
+- [ ] B. Reduce proportionally
+- [ ] C. No change after finalization
+- [ ] D. Manual adjustment
+- [ ] Other: _______________________________________________
 
-**Business Owner Decision:** _______________________________________________
+**Business Owner Selection:** _______________________________________________
+
+**Status:** NOT SPECIFIED
 
 ---
 
 ### SC-014 — Multiple Staff Attribution
 
-**Business Question:** What happens when more than one staff member contributes to one service/transaction?
-
 **Options:**
 
-- [ ] A. **One primary staff member** — Only the primary staff member earns commission.
-- [ ] B. **Equal split** — Commission divided equally among all contributing staff.
-- [ ] C. **Configurable percentage split** — Each staff member gets a configured percentage. Total must not exceed 100%.
-- [ ] D. **Individual line-item attribution** — Each line item on the invoice is attributed to a specific staff member.
-- [ ] E. **Manual allocation** — Staff allocation is done manually per transaction.
-- [ ] Other / Specify: _______________________________________________
+- [ ] A. One primary staff member
+- [ ] B. Equal split
+- [ ] C. Configurable percentage split
+- [ ] D. Individual line-item attribution
+- [ ] E. Manual allocation
+- [ ] Other: _______________________________________________
 
-**Business Owner Decision:** _______________________________________________
+**Business Owner Selection:** _______________________________________________
 
-**Notes:** _______________________________________________
+**Status:** NOT SPECIFIED
+
+---
+
+## STAGE 6 — APPROVAL & PAYOUT
 
 ---
 
 ### SC-015 — Approval / Finalization
 
-**Business Question:** Does commission require approval before becoming final?
-
 **Options:**
 
-- [ ] A. **Automatically final** — Commission is final when calculated. No approval step.
-- [ ] B. **Manager approval required**
-- [ ] C. **Accountant approval required**
-- [ ] D. **Tenant-admin approval required**
-- [ ] Other / Specify: _______________________________________________
+- [ ] A. Automatically final
+- [ ] B. Manager approval
+- [ ] C. Accountant approval
+- [ ] D. Tenant-admin approval
+- [ ] Other: _______________________________________________
 
-**If approval is required, can finalized commission be edited?**
+**Business Owner Selection:** _______________________________________________
 
-- [ ] Yes
-- [ ] No
-
-**Business Owner Decision:** _______________________________________________
-
-**Notes:** _______________________________________________
+**Status:** NOT SPECIFIED
 
 ---
 
-### SC-016 — Historical Commission Rate
-
-**Business Question:** Must commission calculations remain historically reproducible when rates change?
+### SC-016 — Historical Rate
 
 **Options:**
 
-- [ ] A. **Snapshot** — The applicable commission rate is captured at calculation time. Historical calculations remain reproducible even if rates change later.
-- [ ] B. **Recalculate** — Historical periods are recalculated using current rates. Simpler but historical results change when rates change.
-- [ ] Other / Specify: _______________________________________________
+- [ ] A. Snapshot — rate captured at calculation time
+- [ ] B. Recalculate — historical periods use current rates
+- [ ] Other: _______________________________________________
 
-**Business Owner Decision:** _______________________________________________
+**Business Owner Selection:** _______________________________________________
 
-**Notes:** _______________________________________________
+**Status:** NOT SPECIFIED
 
 ---
 
 ### SC-017 — Calculation Period
 
-**Business Question:** What is the normal commission calculation period? (Separate from the earning event.)
-
 **Options:**
 
-- [ ] A. **Per transaction** — Commission calculated immediately on each transaction.
-- [ ] B. **Daily**
-- [ ] C. **Weekly**
-- [ ] D. **Monthly**
-- [ ] E. **Payroll period** (specify): _______________________________________________
-- [ ] Other / Specify: _______________________________________________
+- [ ] A. Per transaction
+- [ ] B. Daily
+- [ ] C. Weekly
+- [ ] D. Monthly
+- [ ] E. Same as target/incentive period
+- [ ] Other: _______________________________________________
 
-**Business Owner Decision:** _______________________________________________
+**Business Owner Selection:** _______________________________________________
 
-**Notes:** _______________________________________________
+**Status:** NOT SPECIFIED
 
 ---
 
 ### SC-018 — Manual Adjustments
 
-**Business Question:** Can authorized users manually adjust commission amounts?
-
 **Options:**
 
-- [ ] A. **No manual adjustments** — Commission is purely formula-driven.
-- [ ] B. **Manual positive/negative adjustments with reason** — Adjustments allowed with a required reason. History retained.
-- [ ] C. **Manual adjustments requiring approval** — Adjustments require approval before taking effect.
-- [ ] Other / Specify: _______________________________________________
+- [ ] A. No manual adjustments
+- [ ] B. Manual positive/negative with reason
+- [ ] C. Manual with approval
+- [ ] Other: _______________________________________________
 
-**If manual adjustments are allowed, must adjustment history be retained?**
+**Business Owner Selection:** _______________________________________________
 
-- [ ] Yes
-- [ ] No
-
-**Business Owner Decision:** _______________________________________________
-
-**Notes:** _______________________________________________
+**Status:** NOT SPECIFIED
 
 ---
 
 ### SC-019 — Branch / Staff Scope
 
-**Business Question:** To which branch does commission belong?
-
 **Options:**
 
-- [ ] A. **Staff's assigned branch** — Commission belongs to the branch where the staff member is assigned.
-- [ ] B. **Appointment branch** — Commission follows the appointment's branch.
-- [ ] C. **Invoice branch** — Commission follows the invoice's branch.
-- [ ] Other / Specify: _______________________________________________
+- [ ] A. Staff's assigned branch
+- [ ] B. Appointment branch
+- [ ] C. Invoice branch
+- [ ] D. Per assignment
+- [ ] Other: _______________________________________________
 
-**Business Owner Decision:** _______________________________________________
+**Business Owner Selection:** _______________________________________________
 
-**Notes:** _______________________________________________
+**Status:** NOT SPECIFIED
 
 ---
 
 ### SC-020 — Payment / Payout Boundary
 
-**Business Question:** What is the scope of this commission implementation?
-
 **Options:**
 
-- [ ] A. **Calculation only** — Platform calculates commission amounts. Actual payment to staff is handled externally (payroll).
-- [ ] B. **Calculation + approval** — Platform calculates and supports approval workflow. Payment is external.
-- [ ] C. **Full lifecycle** — Platform handles calculation, approval, and payment/payout tracking.
-- [ ] Other / Specify: _______________________________________________
+- [ ] A. Calculation only — payment external
+- [ ] B. Calculation + approval — payment external
+- [ ] C. Full lifecycle
+- [ ] Other: _______________________________________________
 
-**Business Owner Decision:** _______________________________________________
+**Business Owner Selection:** _______________________________________________
 
-**Notes:** _______________________________________________
+**Status:** NOT SPECIFIED
 
 ---
 
-## Commission Release Scope
+## Decision Priority Classification
 
-**Business Question:** What is the intended release scope for staff commission?
+### P0 — Required Before Technical Design (11 decisions)
+
+| ID | Decision | Stage |
+|----|----------|-------|
+| SE-002 | Salary structure | Employment |
+| SE-004 | Salary effective date | Employment |
+| SE-005 | Salary revision/history | Employment |
+| SA-001 | Assignment model | Assignment |
+| SA-002 | Multi-branch independence | Assignment |
+| SA-009 | Assignment-specific compensation | Assignment |
+| TG-001 | Target period | Target |
+| TG-002 | Target metric | Target |
+| TG-004 | Target ownership | Target |
+| IN-001 | Incentive eligibility | Incentive |
+| IN-003 | Incentive formula | Incentive |
+
+### P1 — Required Before Production Implementation (29 decisions)
+
+SE-001, SE-003, SE-006, SE-007, SE-008, SE-009, SA-003, SA-004, SA-005, SA-006, SA-007, SA-008, SA-010, TG-003, TG-005, TG-006, TG-007, TG-008, TG-009, TG-010, IN-002, IN-004, IN-005, IN-006, IN-007, IN-008, IN-009, IN-010, IN-011
+
+### P2 — Future / Deferrable (29 decisions)
+
+IN-012, IN-013, IN-014, IN-015, IN-016, IN-017, IN-018, IN-019, IN-020, SC-001, SC-002, SC-003, SC-004, SC-005, SC-006, SC-007, SC-009a, SC-009b, SC-009c, SC-009d, SC-010, SC-011, SC-012, SC-013, SC-014, SC-015, SC-016, SC-017, SC-018, SC-019, SC-020
+
+---
+
+## Release Scope
 
 **Options:**
 
-- [ ] A. **Full commission scope** — SC-001 through SC-020 all approved. Implement complete commission system.
-- [ ] B. **Limited Phase 1 scope** — Only P0 decisions (SC-001 through SC-005) approved for initial release. Remaining decisions (SC-006 through SC-020) deferred to a later phase. **Deferred decisions must be explicitly listed below.**
-- [ ] C. **Do not implement yet** — Commission remains blocked.
+- [ ] A. Full Staff Compensation — all 69 decisions approved
+- [ ] B. Phase 1 — Employment + Assignment + Salary
+- [ ] C. Phase 1 — Employment + Assignment + Salary + Target
+- [ ] D. Phase 1 — Employment + Assignment + Salary + Target + Incentive
+- [ ] E. Other (specify): _______________________________________________
+- [ ] F. Do not implement yet
 
-**If B is selected, list deferred decisions:**
+**Business Owner Selection:** _______________________________________________
+
+**If B, C, or D is selected, list deferred decisions:**
 
 _______________________________________________
-
-**Business Owner Decision:** _______________________________________________
-
-**Notes:** _______________________________________________
 
 ---
 
 ## Decision Dependencies
 
-The following dependencies exist between decisions:
+```
+Employment (SE)
+  → defines salary model
+  → SE-002 + SA-009 determine per-branch salary
+  → SE-004 + SE-005 determine salary history
 
-- **SC-001 / SC-002 / SC-004 / SC-005** — These four decisions together define the core commission calculation architecture. They must be consistent (e.g., if SC-001 = "collected payment" and SC-005 = "appointment completion", there may be a timing mismatch).
+Assignment (SA)
+  → SA-001 determines join table design
+  → SA-002 + SA-009 determine per-branch compensation
+  → SA-010 + TG-005 determine per-branch target
 
-- **SC-006 / SC-007 / SC-008** — These affect the commissionable base calculation. SC-006 (unpaid invoices) is only relevant if SC-001 selects invoice or payment basis.
+Target (TG)
+  → TG-001 determines target period
+  → TG-002 determines what is measured
+  → TG-004 + SA-002 determine target ownership across branches
 
-- **SC-009a–d** — These determine which revenue categories generate commission. If SC-009a (services) = "does not apply", the system has no commission source.
+Incentive Plan (IN)
+  → IN-001 determines eligibility
+  → IN-003 determines formula
+  → IN-004 + IN-005 determine slab behavior
+  → IN-007–010 determine per-category rates
 
-- **SC-010–SC-013** — These define refund/reversal behavior. If SC-015 (approval) = "auto-final", refund handling becomes more critical because finalized commissions may need reversal.
+Commission Event (SC)
+  → SC-004 + SC-014 determine staff attribution
+  → SC-005 + IN-016 determine earning event
+  → SC-008 APPROVED (excluding GST)
 
-- **SC-014** — Multiple staff attribution depends on SC-004 (staff attribution). If SC-004 = "appointment staff", SC-014 determines what happens when multiple staff serve one customer.
-
-- **SC-016** — Historical rate snapshot affects whether past commission calculations can be reproduced. If SC-002 changes rates later, SC-016 determines whether historical records change.
-
-- **SC-019** — Branch scope affects reporting and authorization. It is separate from franchise agreement ownership.
-
-- **SC-020** — Defines the implementation boundary. SC-020 = "calculation only" means no payout/payment tracking in this phase.
+Approval & Payout (SC)
+  → SC-015 determines finalization
+  → SC-020 determines implementation boundary
+```
 
 ---
 
 ## Known Technical Implications
 
-The following technical facts are verified in the current repository and may affect commission implementation:
+These are technical facts, NOT business decisions:
 
-1. **Appointment has nullable `staffId`** — An appointment CAN exist without a staff member. If SC-004 = "appointment staff", appointments without staff assignment will not generate commission.
-
-2. **Invoice does NOT have `staffId`** — An invoice cannot directly identify which staff member performed the service. If SC-004 = "explicit staff assignment at billing", a new field must be added to the Invoice model.
-
-3. **InvoiceLineItem does NOT have `staffId`** — Line items cannot be attributed to individual staff. If SC-004 = "invoice-line staff attribution", a new field must be added to the InvoiceLineItem model.
-
-4. **Payment does NOT have a status field** — The current Payment model has `amountCents`, `method`, `paidAt` but no status (paid/failed/refunded). If SC-006 = "only collected payments", the system may need payment status tracking.
-
-5. **Refund/cancellation mechanisms are not currently implemented** — No cancelled-invoice or refunded-payment representation exists. If SC-010–SC-013 require refund handling, a refund mechanism must be designed.
-
-6. **Multiple staff per appointment is not currently implemented** — The Appointment model has a single `staffId`. If SC-014 = "equal split" or "configurable split", a multi-staff mechanism must be designed.
-
-7. **Commission model does not currently exist** — No commission table, service, API, or UI exists. All commission infrastructure must be created.
-
-8. **Historical commission rate snapshot mechanism does not currently exist** — If SC-016 = "snapshot", a rate-capture mechanism must be designed.
-
-9. **The existing settlement pattern (FranchiseSettlement → FranchiseSettlementLine → FranchisePayment) provides a reusable architecture** for commission calculation → line items → approval lifecycle.
-
----
-
-## Implementation Sequence (After Approval)
-
-```
-Business Approval (this document)
-    → Technical Design (schema, service, API, UI)
-        → Design Review
-            → Implementation
-                → Tests
-                    → UAT
-                        → Production
-```
+1. Staff currently has a single nullable `branchId`
+2. Multi-branch assignment does not exist
+3. Staff territory relation does not exist
+4. Salary model does not exist
+5. Employment model does not exist
+6. Target model does not exist
+7. Incentive model does not exist
+8. Commission model does not exist
+9. Historical compensation model does not exist
+10. Invoice has no `staffId`
+11. InvoiceLineItem has no `staffId`
+12. Payment has no status field
+13. Refund/cancellation infrastructure does not exist
 
 ---
 
@@ -552,4 +1552,4 @@ Business Approval (this document)
 
 ---
 
-*End of decision sheet. Version 2.0 — Awaiting business approval.*
+*End of decision sheet. Version 4.0 — Ready for business owner staged review.*
