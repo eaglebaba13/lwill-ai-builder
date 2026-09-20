@@ -40,7 +40,7 @@ export interface CityAreaInput {
 
 export interface CityFranchiseInput extends EffectivePeriod {
   readonly tenantId: string;
-  readonly stateFranchiseId: string;
+  readonly stateFranchiseId: string | null;
   readonly partnerId: string;
   readonly cityId: string;
   readonly areaCode: string;
@@ -179,6 +179,17 @@ async function writeCityCoverage(db: Db, id: string, input: CityFranchiseInput, 
       effectiveFrom: input.effectiveFrom, effectiveTo: input.effectiveTo,
     })) });
   }
+}
+
+async function resolveCityGeography(db: Db, input: CityFranchiseInput | Omit<CityFranchiseInput, "tenantId">, parent: NonNullable<StateRecord> | null) {
+  const city = await db.geoCity.findUnique({ where: { id: input.cityId } });
+  if (!city) {
+    throw new FranchiseHierarchyError("INVALID_GEOGRAPHY", "Canonical City was not found.");
+  }
+  if (parent && city.stateId !== parent.stateId) {
+    throw new FranchiseHierarchyError("INVALID_GEOGRAPHY", "Canonical City does not belong to the parent State.");
+  }
+  return city;
 }
 
 async function assertStateCoverageAvailable(db: Db, record: NonNullable<StateRecord>) {
@@ -333,19 +344,18 @@ export function createFranchiseHierarchyService(prisma: RootDb) {
       assertPeriod(input);
       return tx(async (db) => {
         await requirePartner(db, input.tenantId, input.partnerId);
-        const parent = await requireStateFranchise(db, input.tenantId, input.stateFranchiseId);
-        const city = await db.geoCity.findUnique({ where: { id: input.cityId } });
-        if (!city || city.stateId !== parent.stateId) {
-          throw new FranchiseHierarchyError("INVALID_GEOGRAPHY", "Canonical City does not belong to the parent State.");
-        }
-        if (!containsPeriod(parent, input)) throw new FranchiseHierarchyError("INVALID_PARENT", "City period must be contained by its State parent.");
+        const parent = input.stateFranchiseId
+          ? await requireStateFranchise(db, input.tenantId, input.stateFranchiseId)
+          : null;
+        const canonicalCity = await resolveCityGeography(db, input, parent);
+        if (parent && !containsPeriod(parent, input)) throw new FranchiseHierarchyError("INVALID_PARENT", "City period must be contained by its State parent.");
         const row = await db.cityFranchise.create({ data: {
           tenantId: input.tenantId, stateFranchiseId: input.stateFranchiseId,
           partnerId: input.partnerId, cityId: input.cityId, areaCode: input.areaCode,
           displayName: input.displayName, effectiveFrom: input.effectiveFrom,
           effectiveTo: input.effectiveTo, ...approval(input),
         } });
-        await writeCityCoverage(db, row.id, input, parent.stateId);
+        await writeCityCoverage(db, row.id, input, canonicalCity.stateId);
         return row;
       });
     },
@@ -367,10 +377,11 @@ export function createFranchiseHierarchyService(prisma: RootDb) {
         const old = await requireCityFranchise(db, args.tenantId, args.cityFranchiseId);
         if (old.status !== "DRAFT") throw new FranchiseHierarchyError("INVALID_LIFECYCLE", "Only a draft City Franchise can be updated.");
         await requirePartner(db, args.tenantId, args.input.partnerId);
-        const parent = await requireStateFranchise(db, args.tenantId, args.input.stateFranchiseId);
-        const city = await db.geoCity.findUnique({ where: { id: args.input.cityId } });
-        if (!city || city.stateId !== parent.stateId) throw new FranchiseHierarchyError("INVALID_GEOGRAPHY", "Canonical City does not belong to the parent State.");
-        if (!containsPeriod(parent, args.input)) throw new FranchiseHierarchyError("INVALID_PARENT", "City period must be contained by its State parent.");
+        const parent = args.input.stateFranchiseId
+          ? await requireStateFranchise(db, args.tenantId, args.input.stateFranchiseId)
+          : null;
+        const canonicalCity = await resolveCityGeography(db, args.input, parent);
+        if (parent && !containsPeriod(parent, args.input)) throw new FranchiseHierarchyError("INVALID_PARENT", "City period must be contained by its State parent.");
         await db.cityFranchisePincode.deleteMany({ where: { tenantId: args.tenantId, cityFranchiseId: old.id } });
         await db.cityFranchiseArea.deleteMany({ where: { tenantId: args.tenantId, cityFranchiseId: old.id } });
         const input = { ...args.input, tenantId: args.tenantId };
@@ -379,7 +390,7 @@ export function createFranchiseHierarchyService(prisma: RootDb) {
           cityId: input.cityId, areaCode: input.areaCode, displayName: input.displayName,
           effectiveFrom: input.effectiveFrom, effectiveTo: input.effectiveTo, ...approval(input),
         } });
-        await writeCityCoverage(db, old.id, input, parent.stateId);
+        await writeCityCoverage(db, old.id, input, canonicalCity.stateId);
         return row;
       });
     },
@@ -388,12 +399,14 @@ export function createFranchiseHierarchyService(prisma: RootDb) {
       return serializableTx(async (db) => {
         const row = await requireCityFranchise(db, args.tenantId, args.cityFranchiseId);
         if (row.status !== "DRAFT") throw new FranchiseHierarchyError("INVALID_LIFECYCLE", "Only a draft City Franchise can be activated.");
-        const parent = await requireStateFranchise(db, args.tenantId, row.stateFranchiseId);
-        if (parent.status !== "ACTIVE" || !containsPeriod(parent, row)) {
-          throw new FranchiseHierarchyError("INVALID_PARENT", "City Franchise requires an active effective State parent.");
-        }
-        if (parent.partnerId === row.partnerId && !hasApproval(row)) {
-          throw new FranchiseHierarchyError("CONFLICT_APPROVAL_REQUIRED", "Related State and City Partner roles require conflict approval evidence.");
+        if (row.stateFranchiseId) {
+          const parent = await requireStateFranchise(db, args.tenantId, row.stateFranchiseId);
+          if (parent.status !== "ACTIVE" || !containsPeriod(parent, row)) {
+            throw new FranchiseHierarchyError("INVALID_PARENT", "City Franchise requires an active effective State parent.");
+          }
+          if (parent.partnerId === row.partnerId && !hasApproval(row)) {
+            throw new FranchiseHierarchyError("CONFLICT_APPROVAL_REQUIRED", "Related State and City Partner roles require conflict approval evidence.");
+          }
         }
         await assertCityCoverageAvailable(db, row);
         return db.cityFranchise.update({ where: { id: row.id }, data: { status: "ACTIVE" } });
@@ -506,7 +519,9 @@ export function createFranchiseHierarchyService(prisma: RootDb) {
       const assignment = assignments[0];
       if (!assignment) return null;
       const cityFranchise = await requireCityFranchise(prisma, args.tenantId, assignment.cityFranchiseId);
-      const stateFranchise = await requireStateFranchise(prisma, args.tenantId, cityFranchise.stateFranchiseId);
+      const stateFranchise = cityFranchise.stateFranchiseId
+        ? await requireStateFranchise(prisma, args.tenantId, cityFranchise.stateFranchiseId)
+        : null;
       return { outlet, assignment, cityFranchise, stateFranchise };
     },
   };

@@ -39,7 +39,7 @@ type StateFranchise = {
 type CityFranchise = {
   id: string;
   tenantId: string;
-  stateFranchiseId: string;
+  stateFranchiseId: string | null;
   partnerId: string;
   cityId: string;
   areaCode: string;
@@ -105,6 +105,7 @@ function patchJson<T>(url: string, body: unknown): Promise<T> {
 }
 
 function shortId(id: string) { return id.slice(0, 8); }
+function shortOptionalId(id: string | null) { return id ? shortId(id) : "-"; }
 function partnerLabel(partnerId: string | null, partners: FranchisePartner[]) {
   if (partnerId === null) return "Company Owned";
   return partners.find((p) => p.id === partnerId)?.name ?? shortId(partnerId);
@@ -482,7 +483,7 @@ function CityFranchiseSection({ cities, states, partners, geoCities, showCreate,
   onEnd: (id: string) => void;
   flash: (msg: string, type: "success" | "error") => void;
 }) {
-  const [form, setForm] = useState({ stateFranchiseId: "", partnerId: "", cityId: "", areaCode: "", displayName: "", effectiveFrom: "", effectiveTo: "" });
+  const [form, setForm] = useState({ parentMode: "DIRECT", stateFranchiseId: "", partnerId: "", cityId: "", areaCode: "", displayName: "", effectiveFrom: "", effectiveTo: "" });
   const [submitting, setSubmitting] = useState(false);
 
   const create = async () => {
@@ -490,10 +491,14 @@ function CityFranchiseSection({ cities, states, partners, geoCities, showCreate,
       flash("Canonical City is required.", "error");
       return;
     }
+    if (form.parentMode === "STATE" && !form.stateFranchiseId) {
+      flash("State Franchise is required for state-backed City Franchise.", "error");
+      return;
+    }
     setSubmitting(true);
     try {
       await postJson("/api/franchise/hierarchy/cities", {
-        stateFranchiseId: form.stateFranchiseId,
+        stateFranchiseId: form.parentMode === "STATE" ? form.stateFranchiseId : null,
         partnerId: form.partnerId,
         cityId: form.cityId || undefined,
         areaCode: form.areaCode,
@@ -503,7 +508,7 @@ function CityFranchiseSection({ cities, states, partners, geoCities, showCreate,
       });
       flash("City Franchise created as DRAFT", "success");
       setShowCreate(false);
-      setForm({ stateFranchiseId: "", partnerId: "", cityId: "", areaCode: "", displayName: "", effectiveFrom: "", effectiveTo: "" });
+      setForm({ parentMode: "DIRECT", stateFranchiseId: "", partnerId: "", cityId: "", areaCode: "", displayName: "", effectiveFrom: "", effectiveTo: "" });
       onRefresh();
     } catch (e) { flash(e instanceof Error ? e.message : "Create failed", "error"); }
     finally { setSubmitting(false); }
@@ -511,13 +516,15 @@ function CityFranchiseSection({ cities, states, partners, geoCities, showCreate,
 
   const activeStates = states.filter((s) => s.status === "ACTIVE");
   const selectedState = activeStates.find((s) => s.id === form.stateFranchiseId);
-  const availableGeoCities = selectedState ? geoCities.filter((city) => city.stateId === selectedState.stateId) : [];
+  const availableGeoCities = form.parentMode === "STATE" && selectedState
+    ? geoCities.filter((city) => city.stateId === selectedState.stateId)
+    : geoCities;
 
   return (
     <HierarchyPanel
       title="City Franchises"
       eyebrow="City Level"
-      description="Manage City Franchise assignments. Each City Franchise belongs to exactly one State Franchise."
+      description="Manage City Franchise assignments. A City Franchise can be direct under X Nail / HDK or state-backed."
       action={<HierarchyButton onClick={() => setShowCreate(!showCreate)}>{showCreate ? "Cancel" : "+ New City Franchise"}</HierarchyButton>}
     >
       {showCreate ? (
@@ -525,13 +532,25 @@ function CityFranchiseSection({ cities, states, partners, geoCities, showCreate,
           <h4 className="text-sm font-semibold text-[#f5f1e6] mb-3">Create City Franchise (DRAFT)</h4>
           <HierarchyFormRow>
             <HierarchySelect
-              label="Parent State Franchise"
-              value={form.stateFranchiseId}
-              onChange={(v) => setForm({ ...form, stateFranchiseId: v, cityId: "" })}
-              options={activeStates.map((s) => ({ value: s.id, label: `${s.code} – ${s.displayName}` }))}
-              placeholder="Select state..."
+              label="Parent Mode"
+              value={form.parentMode}
+              onChange={(v) => setForm({ ...form, parentMode: v, stateFranchiseId: "", cityId: "" })}
+              options={[
+                { value: "DIRECT", label: "Direct X Nail / HDK" },
+                { value: "STATE", label: "State Franchise" },
+              ]}
               required
             />
+            {form.parentMode === "STATE" ? (
+              <HierarchySelect
+                label="Parent State Franchise"
+                value={form.stateFranchiseId}
+                onChange={(v) => setForm({ ...form, stateFranchiseId: v, cityId: "" })}
+                options={activeStates.map((s) => ({ value: s.id, label: `${s.code} – ${s.displayName}` }))}
+                placeholder="Select state..."
+                required
+              />
+            ) : null}
             <HierarchySelect
               label="Partner (City Holder)"
               value={form.partnerId}
@@ -548,7 +567,7 @@ function CityFranchiseSection({ cities, states, partners, geoCities, showCreate,
                 setForm({ ...form, cityId: v, areaCode: geoCity?.code ?? form.areaCode });
               }}
               options={availableGeoCities.map((city) => ({ value: city.id, label: `${city.code} - ${city.name}` }))}
-              placeholder={selectedState ? "Select canonical city..." : "Select state first"}
+              placeholder={form.parentMode === "STATE" && !selectedState ? "Select state first" : "Select canonical city..."}
               required
             />
           </HierarchyFormRow>
@@ -564,14 +583,14 @@ function CityFranchiseSection({ cities, states, partners, geoCities, showCreate,
       ) : null}
 
       {cities.length === 0 ? (
-        <HierarchyEmptyState title="No City Franchises" description="Activate a State Franchise first, then create City Franchise DRAFTs." />
+        <HierarchyEmptyState title="No City Franchises" description="Create a direct City Franchise or activate a State Franchise for state-backed setup." />
       ) : (
         <HierarchyTable>
           <HierarchyTableHead>
             <HierarchyTableRow>
               <HierarchyTableHeaderCell>Area</HierarchyTableHeaderCell>
               <HierarchyTableHeaderCell>Name</HierarchyTableHeaderCell>
-              <HierarchyTableHeaderCell>Parent State</HierarchyTableHeaderCell>
+              <HierarchyTableHeaderCell>Parent</HierarchyTableHeaderCell>
               <HierarchyTableHeaderCell>Partner</HierarchyTableHeaderCell>
               <HierarchyTableHeaderCell>Effective</HierarchyTableHeaderCell>
               <HierarchyTableHeaderCell>Status</HierarchyTableHeaderCell>
@@ -581,13 +600,13 @@ function CityFranchiseSection({ cities, states, partners, geoCities, showCreate,
           <HierarchyTableBody>
             {cities.map((c) => {
               const badge = formatStatusBadge(c.status);
-              const parent = states.find((s) => s.id === c.stateFranchiseId);
+              const parent = c.stateFranchiseId ? states.find((s) => s.id === c.stateFranchiseId) : null;
               const partner = partners.find((p) => p.id === c.partnerId);
               return (
                 <HierarchyTableRow key={c.id}>
                   <HierarchyTableCell>{c.areaCode}</HierarchyTableCell>
                   <HierarchyTableCell>{c.displayName}</HierarchyTableCell>
-                  <HierarchyTableCell className="text-xs">{parent ? `${parent.code} – ${parent.displayName}` : shortId(c.stateFranchiseId)}</HierarchyTableCell>
+                  <HierarchyTableCell className="text-xs">{parent ? `${parent.code} – ${parent.displayName}` : c.stateFranchiseId ? shortOptionalId(c.stateFranchiseId) : "Direct X Nail / HDK"}</HierarchyTableCell>
                   <HierarchyTableCell className="text-xs">{partner?.name ?? shortId(c.partnerId)}</HierarchyTableCell>
                   <HierarchyTableCell className="text-xs">{fmtDate(c.effectiveFrom)} – {fmtDate(c.effectiveTo)}</HierarchyTableCell>
                   <HierarchyTableCell><HierarchyBadge tone={badge.tone}>{badge.label}</HierarchyBadge></HierarchyTableCell>

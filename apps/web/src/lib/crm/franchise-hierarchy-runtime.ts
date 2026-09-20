@@ -44,7 +44,7 @@ function stateServiceInput(tenantId:string,input:Record<string,unknown>):StateFr
     conflictApprovalReference:input.conflictApprovalReference as string|null|undefined};
 }
 function cityServiceInput(tenantId:string,input:Record<string,unknown>):CityFranchiseInput{
-  return{tenantId,stateFranchiseId:input.stateFranchiseId as string,partnerId:input.partnerId as string,
+  return{tenantId,stateFranchiseId:input.stateFranchiseId as string|null,partnerId:input.partnerId as string,
     cityId:input.cityId as string,areaCode:input.areaCode as string,displayName:input.displayName as string,
     areas:input.areas as readonly CityAreaInput[],effectiveFrom:input.effectiveFrom as Date,
     effectiveTo:input.effectiveTo as Date|null,conflictApprovedAt:input.conflictApprovedAt as Date|null,

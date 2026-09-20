@@ -76,6 +76,10 @@ function id(value: unknown): value is string {
   return typeof value === "string" && uuid.test(value);
 }
 
+function nullableId(value: unknown): value is string | null {
+  return value === null || id(value);
+}
+
 function date(value: unknown, nullable = false): Date | null | undefined {
   if (value === null && nullable) return null;
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T/.test(value)) return undefined;
@@ -120,7 +124,7 @@ function cityInput(value: Record<string, unknown>, tenantId: string) {
   const keys = ["stateFranchiseId", "partnerId", "cityId", "areaCode", "displayName",
     "areas", "effectiveFrom", "effectiveTo", "conflictApprovedAt",
     "conflictApprovedBy", "conflictApprovalReference"];
-  if (!allowed(value, keys) || !id(value.stateFranchiseId) || !id(value.partnerId) ||
+  if (!allowed(value, keys) || !nullableId(value.stateFranchiseId) || !id(value.partnerId) ||
       !id(value.cityId) || !string(value.areaCode) || !string(value.displayName) ||
       !Array.isArray(value.areas) || !value.areas.every((item) => {
         if (!item || typeof item !== "object" || Array.isArray(item)) return false;
