@@ -78,6 +78,46 @@ function createFixture() {
   return { prisma, state };
 }
 
+describe("franchise service - outlet listing", () => {
+  it("falls back to a stable outlet projection when newer outlet columns are unavailable", async () => {
+    const { prisma } = createFixture();
+    const createdAt = new Date("2026-09-01T00:00:00.000Z");
+    const updatedAt = new Date("2026-09-02T00:00:00.000Z");
+    vi.mocked(prisma.franchiseOutletProfile.findMany)
+      .mockRejectedValueOnce({ code: "P2022", message: "The column `ownershipMode` does not exist." })
+      .mockResolvedValueOnce([{
+        id: "outlet-1",
+        tenantId: "tenant-1",
+        partnerId: "partner-1",
+        branchId: "branch-1",
+        territoryId: "territory-1",
+        outletType: "STANDALONE",
+        investmentCents: 31000000,
+        isActive: true,
+        createdAt,
+        updatedAt,
+        partner: { name: "Kushwaha Chandan Vijaybhai" },
+        branch: { name: "Surat Outlet" },
+        territory: { name: "Surat City" },
+      }]);
+
+    const service = createFranchiseService(prisma as never);
+    const outlets = await service.listOutlets({ tenantId: "tenant-1" });
+
+    expect(prisma.franchiseOutletProfile.findMany).toHaveBeenCalledTimes(2);
+    expect(prisma.franchiseOutletProfile.findMany).toHaveBeenLastCalledWith(expect.objectContaining({
+      where: { tenantId: "tenant-1" },
+      select: expect.objectContaining({ id: true, branchId: true, partner: { select: { name: true } } }),
+    }));
+    expect(outlets).toEqual([expect.objectContaining({
+      id: "outlet-1",
+      partnerName: "Kushwaha Chandan Vijaybhai",
+      branchName: "Surat Outlet",
+      territoryName: "Surat City",
+      ownershipMode: null,
+    })]);
+  });
+});
 describe("franchise service — commercial terms foundation", () => {
   it("creates a new X NAIL ₹10L agreement with formula-based MG terms", async () => {
     const { prisma, state } = createFixture();

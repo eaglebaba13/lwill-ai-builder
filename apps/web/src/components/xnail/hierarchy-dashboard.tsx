@@ -155,8 +155,8 @@ export function HierarchyDashboard({ authenticated }: HierarchyDashboardProps) {
 
   const loadOutlets = useCallback(() => {
     if (!authenticated) return;
-    fetchJson<{ profiles: FranchiseOutletProfile[] }>("/api/franchise/outlets")
-      .then((d) => setOutlets((d as { profiles?: FranchiseOutletProfile[] }).profiles ?? (d as unknown as FranchiseOutletProfile[]) ?? []))
+    fetchJson<{ outlets: FranchiseOutletProfile[] }>("/api/franchise/outlets")
+      .then((d) => setOutlets(d.outlets ?? []))
       .catch(() => {});
   }, [authenticated]);
 

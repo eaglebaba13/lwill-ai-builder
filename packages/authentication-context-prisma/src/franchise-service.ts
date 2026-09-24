@@ -174,12 +174,62 @@ interface FranchisePrismaClient {
   readonly franchiseOutletProfile: {
     create(args: { data: Record<string, unknown> }): Promise<FranchiseOutletProfileRecord>;
     findUnique(args: { where: { id: string }; include?: Record<string, unknown> }): Promise<FranchiseOutletProfileRecord | null>;
-    findMany(args: { where?: Record<string, unknown>; include?: Record<string, unknown> }): Promise<ReadonlyArray<FranchiseOutletProfileRecord & Record<string, unknown>>>;
+    findMany(args: { where?: Record<string, unknown>; include?: Record<string, unknown>; select?: Record<string, unknown> }): Promise<ReadonlyArray<FranchiseOutletProfileRecord & Record<string, unknown>>>;
     update(args: { where: { id: string }; data: Record<string, unknown> }): Promise<FranchiseOutletProfileRecord>;
     count(args: { where?: Record<string, unknown> }): Promise<number>;
   };
 }
 
+
+const outletRelations = {
+  partner: { select: { name: true } },
+  branch: { select: { name: true } },
+  territory: { select: { name: true } },
+} as const;
+
+const outletStableSelect = {
+  id: true,
+  tenantId: true,
+  partnerId: true,
+  branchId: true,
+  territoryId: true,
+  outletType: true,
+  investmentCents: true,
+  isActive: true,
+  createdAt: true,
+  updatedAt: true,
+  ...outletRelations,
+} as const;
+
+function isSchemaReadCompatibilityError(error: unknown): boolean {
+  const record = error as { readonly code?: unknown; readonly message?: unknown } | null;
+  const code = typeof record?.code === "string" ? record.code : "";
+  const message = typeof record?.message === "string" ? record.message.toLowerCase() : "";
+  return code === "P2021" ||
+    code === "P2022" ||
+    (message.includes("column") && message.includes("does not exist")) ||
+    (message.includes("table") && message.includes("does not exist"));
+}
+
+async function listOutletProfiles(
+  prisma: FranchisePrismaClient,
+  tenantId: string,
+): Promise<ReadonlyArray<FranchiseOutletProfileRecord & Record<string, unknown>>> {
+  try {
+    return await prisma.franchiseOutletProfile.findMany({
+      where: { tenantId },
+      include: outletRelations,
+    });
+  } catch (error) {
+    if (!isSchemaReadCompatibilityError(error)) {
+      throw error;
+    }
+    return prisma.franchiseOutletProfile.findMany({
+      where: { tenantId },
+      select: outletStableSelect,
+    });
+  }
+}
 export function createFranchiseService(prisma: FranchisePrismaClient): FranchiseService {
   return {
     async listTerritories({ tenantId }) {
@@ -405,14 +455,7 @@ export function createFranchiseService(prisma: FranchisePrismaClient): Franchise
     },
 
     async listOutlets({ tenantId }) {
-      const outlets = await prisma.franchiseOutletProfile.findMany({
-        where: { tenantId },
-        include: {
-          partner: { select: { name: true } },
-          branch: { select: { name: true } },
-          territory: { select: { name: true } },
-        },
-      });
+      const outlets = await listOutletProfiles(prisma, tenantId);
       return outlets.map((outlet) => ({
         id: outlet.id,
         tenantId: outlet.tenantId,
@@ -525,11 +568,7 @@ export function createFranchiseService(prisma: FranchisePrismaClient): Franchise
         }),
         prisma.franchiseOutletProfile.findMany({
           where: { tenantId },
-          include: {
-            partner: { select: { name: true } },
-            branch: { select: { name: true } },
-            territory: { select: { name: true } },
-          },
+          include: outletRelations,
         }),
       ]);
 

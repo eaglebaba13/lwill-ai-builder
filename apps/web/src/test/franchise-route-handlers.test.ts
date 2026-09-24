@@ -159,9 +159,11 @@ describe("franchise route handlers: authorized access", () => {
 
   it("returns 200 with outlets list", async () => {
     const services = createServices({ outcome: "authorized", tenantId: "tenant-1", userId: "user-1" });
+    vi.mocked(services.listOutlets).mockResolvedValueOnce([{ id: "o1", branchName: "Surat Outlet" }]);
     const result = await handleListOutlets(request(), services);
     expect(result.status).toBe(200);
     expect(services.listOutlets).toHaveBeenCalledWith("tenant-1");
+    await expect(result.json()).resolves.toEqual({ outlets: [{ id: "o1", branchName: "Surat Outlet" }] });
   });
 
   it("returns 200 with franchise dashboard", async () => {

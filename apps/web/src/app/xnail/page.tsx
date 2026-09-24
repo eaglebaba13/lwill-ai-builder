@@ -705,9 +705,18 @@ export default function Home() {
   const [isLoadingAgreements, setIsLoadingAgreements] = useState(false);
   const [agreementsError, setAgreementsError] = useState<string | null>(null);
 
-  const [outlets, setOutlets] = useState<Array<{ id: string; partnerId: string; branchId: string; territoryId: string | null; partnerName: string; branchName: string; territoryName: string | null; outletType: string | null; isActive: boolean }>>([]);
+  const [outlets, setOutlets] = useState<Array<{ id: string; partnerId: string | null; branchId: string; territoryId: string | null; partnerName: string | null; branchName: string; territoryName: string | null; outletType: string | null; isActive: boolean }>>([]);
   const [isLoadingOutlets, setIsLoadingOutlets] = useState(false);
   const [outletsError, setOutletsError] = useState<string | null>(null);
+  const [showAddOutlet, setShowAddOutlet] = useState(false);
+  const [outletFormBranchId, setOutletFormBranchId] = useState("");
+  const [outletFormOwnershipMode, setOutletFormOwnershipMode] = useState<"UNDER_FRANCHISE_PARTNER" | "COMPANY_OWNED">("UNDER_FRANCHISE_PARTNER");
+  const [outletFormPartnerId, setOutletFormPartnerId] = useState("");
+  const [outletFormTerritoryId, setOutletFormTerritoryId] = useState("");
+  const [outletFormType, setOutletFormType] = useState("");
+  const [outletFormInvestment, setOutletFormInvestment] = useState("");
+  const [outletFormError, setOutletFormError] = useState<string | null>(null);
+  const [outletFormLoading, setOutletFormLoading] = useState(false);
 
   type SettlementRecord = {
     id: string; tenantId: string; agreementId: string; partnerId: string;
@@ -742,6 +751,8 @@ export default function Home() {
   const staffMap = new Map(staff.map((member) => [member.id, member.displayName]));
   const serviceMap = new Map(services.map((service) => [service.id, service.name]));
   const warehouseMap = new Map(warehouses.map((warehouse) => [warehouse.id, warehouse.name]));
+  const registeredOutletBranchIds = new Set(outlets.map((outlet) => outlet.branchId));
+  const availableOutletBranches = branches.filter((branch) => branch.isActive && !registeredOutletBranchIds.has(branch.id));
 
   useEffect(() => {
     let mounted = true;
@@ -1940,7 +1951,7 @@ export default function Home() {
   }, [authenticated, activeTab]);
 
   useEffect(() => {
-    if (authenticated !== true || activeTab !== "Branches") {
+    if (authenticated !== true || (activeTab !== "Branches" && activeTab !== "Outlets")) {
       return;
     }
 
@@ -2773,7 +2784,7 @@ export default function Home() {
   }, [authenticated, activeTab]);
 
   useEffect(() => {
-    if (authenticated !== true || activeTab !== "Territories") {
+    if (authenticated !== true || (activeTab !== "Territories" && activeTab !== "Outlets")) {
       return;
     }
     let mounted = true;
@@ -2795,7 +2806,7 @@ export default function Home() {
   }, [authenticated, activeTab]);
 
   useEffect(() => {
-    if (authenticated !== true || activeTab !== "Partners") {
+    if (authenticated !== true || (activeTab !== "Partners" && activeTab !== "Outlets")) {
       return;
     }
     let mounted = true;
@@ -3474,6 +3485,125 @@ export default function Home() {
     });
   };
 
+  const resetOutletForm = () => {
+    setOutletFormBranchId("");
+    setOutletFormOwnershipMode("UNDER_FRANCHISE_PARTNER");
+    setOutletFormPartnerId("");
+    setOutletFormTerritoryId("");
+    setOutletFormType("");
+    setOutletFormInvestment("");
+    setOutletFormError(null);
+  };
+
+  const cancelOutletForm = () => {
+    resetOutletForm();
+    setShowAddOutlet(false);
+  };
+
+  const createOutlet = async () => {
+    const branchId = outletFormBranchId.trim();
+    const partnerId = outletFormPartnerId.trim();
+    const territoryId = outletFormTerritoryId.trim();
+    const outletType = outletFormType.trim();
+    const investmentValue = outletFormInvestment.trim();
+
+    if (!branchId) {
+      setOutletFormError("Select a branch for this outlet.");
+      return;
+    }
+    if (registeredOutletBranchIds.has(branchId)) {
+      setOutletFormError("This branch already has a registered franchise outlet.");
+      return;
+    }
+    if (outletFormOwnershipMode === "UNDER_FRANCHISE_PARTNER" && !partnerId) {
+      setOutletFormError("Select a franchise partner for this ownership mode.");
+      return;
+    }
+
+    let investmentCents: number | null = null;
+    if (investmentValue) {
+      const parsedInvestment = Number(investmentValue);
+      if (!Number.isFinite(parsedInvestment) || parsedInvestment < 0) {
+        setOutletFormError("Investment amount must be a non-negative number.");
+        return;
+      }
+      investmentCents = Math.round(parsedInvestment * 100);
+    }
+
+    setOutletFormLoading(true);
+    setOutletFormError(null);
+    const payload: Record<string, unknown> = {
+      branchId,
+      ownershipMode: outletFormOwnershipMode,
+    };
+    if (outletFormOwnershipMode === "UNDER_FRANCHISE_PARTNER") {
+      payload.partnerId = partnerId;
+    }
+    if (territoryId) {
+      payload.territoryId = territoryId;
+    }
+    if (outletType) {
+      payload.outletType = outletType;
+    }
+    if (investmentCents !== null) {
+      payload.investmentCents = investmentCents;
+    }
+
+    try {
+      const result = await fetch("/api/franchise/outlets", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (result.status === 401) {
+        setAuthenticated(false);
+        setOutletFormLoading(false);
+        return;
+      }
+      if (result.status === 403) {
+        setOutletFormError("You are not authorized to create franchise outlets.");
+        setOutletFormLoading(false);
+        return;
+      }
+      if (!result.ok) {
+        const body = await result.json().catch(() => ({}));
+        setOutletFormError(typeof body?.error === "string" ? body.error : "Outlet could not be saved.");
+        setOutletFormLoading(false);
+        return;
+      }
+
+      const body = await result.json() as { outlet: { id: string; partnerId: string | null; branchId: string; territoryId: string | null } };
+      const outletsResult = await fetch("/api/franchise/outlets", { credentials: "same-origin" });
+      if (outletsResult.status === 401) {
+        setAuthenticated(false);
+        setOutletFormLoading(false);
+        return;
+      }
+      if (outletsResult.status === 403) {
+        setOutletsError("You are not authorized to view franchise outlets.");
+      } else if (!outletsResult.ok) {
+        setOutletsError("Outlets could not be loaded.");
+      } else {
+        const outletsBody = await outletsResult.json() as { outlets?: Array<{ id: string; partnerId: string | null; branchId: string; territoryId: string | null; partnerName: string | null; branchName: string; territoryName: string | null; outletType: string | null; isActive: boolean }> };
+        setOutlets(Array.isArray(outletsBody.outlets) ? outletsBody.outlets : []);
+        setOutletsError(null);
+      }
+      if (body.outlet.partnerId) {
+        setPartners((current) => current.map((partner) => partner.id === body.outlet.partnerId ? { ...partner, outletCount: partner.outletCount + 1 } : partner));
+      }
+      if (body.outlet.territoryId) {
+        setTerritories((current) => current.map((territory) => territory.id === body.outlet.territoryId ? { ...territory, outletCount: territory.outletCount + 1 } : territory));
+      }
+      resetOutletForm();
+      setShowAddOutlet(false);
+    } catch {
+      setOutletFormError("Outlet could not be saved.");
+    } finally {
+      setOutletFormLoading(false);
+    }
+  };
   const handleLogin = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     invalidatePendingRefresh();
@@ -7901,10 +8031,80 @@ export default function Home() {
 
         {activeTab === "Outlets" ? (
           <section className="mt-6 space-y-6">
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-              <h2 className="font-serif text-2xl font-bold bg-gradient-to-r from-[#9c7a1e] via-[#d4af37] to-[#f1d78c] bg-clip-text text-transparent">Franchise Outlets</h2>
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(212,175,55,0.3)] bg-[#17150f] px-3 py-1 text-xs font-medium text-[#d4af37]">{outlets.length} registered</span>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="font-serif text-2xl font-bold bg-gradient-to-r from-[#9c7a1e] via-[#d4af37] to-[#f1d78c] bg-clip-text text-transparent">Franchise Outlets</h2>
+                <p className="mt-1 text-sm text-[#a39a86]">Register outlets from existing branches and assign franchise ownership.</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(212,175,55,0.3)] bg-[#17150f] px-3 py-1 text-xs font-medium text-[#d4af37]">{outlets.length} registered</span>
+                {permissionCodes.includes("franchise.write") ? (
+                  <button onClick={() => { resetOutletForm(); setShowAddOutlet(true); }} className="premium-btn-primary px-4 py-2 text-sm">+ Add Outlet</button>
+                ) : null}
+              </div>
             </div>
+
+            {showAddOutlet ? (
+              <div className="rounded-2xl border border-[rgba(212,175,55,0.2)] bg-[#121110] p-5">
+                <h3 className="text-lg font-semibold text-[#f5f1e6]">Add Franchise Outlet</h3>
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  {outletFormError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-3 text-sm text-[#d1554a] md:col-span-2">{outletFormError}</div> : null}
+                  <div>
+                    <label className="mb-1 block text-xs text-[#a39a86]">Branch *</label>
+                    <select value={outletFormBranchId} onChange={(event) => setOutletFormBranchId(event.target.value)} className="premium-input w-full">
+                      <option value="">Select branch</option>
+                      {availableOutletBranches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+                    </select>
+                    {branches.length > 0 && availableOutletBranches.length === 0 ? <div className="mt-1 text-xs text-[#a39a86]">All active branches already have registered outlets.</div> : null}
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-[#a39a86]">Ownership Mode *</label>
+                    <select
+                      value={outletFormOwnershipMode}
+                      onChange={(event) => {
+                        const mode = event.target.value as "UNDER_FRANCHISE_PARTNER" | "COMPANY_OWNED";
+                        setOutletFormOwnershipMode(mode);
+                        if (mode === "COMPANY_OWNED") {
+                          setOutletFormPartnerId("");
+                        }
+                      }}
+                      className="premium-input w-full"
+                    >
+                      <option value="UNDER_FRANCHISE_PARTNER">Under Franchise Partner</option>
+                      <option value="COMPANY_OWNED">Company Owned</option>
+                    </select>
+                  </div>
+                  {outletFormOwnershipMode === "UNDER_FRANCHISE_PARTNER" ? (
+                    <div>
+                      <label className="mb-1 block text-xs text-[#a39a86]">Franchise Partner *</label>
+                      <select value={outletFormPartnerId} onChange={(event) => setOutletFormPartnerId(event.target.value)} className="premium-input w-full">
+                        <option value="">Select partner</option>
+                        {partners.filter((partner) => partner.isActive).map((partner) => <option key={partner.id} value={partner.id}>{partner.name}</option>)}
+                      </select>
+                    </div>
+                  ) : null}
+                  <div>
+                    <label className="mb-1 block text-xs text-[#a39a86]">Territory</label>
+                    <select value={outletFormTerritoryId} onChange={(event) => setOutletFormTerritoryId(event.target.value)} className="premium-input w-full">
+                      <option value="">No territory</option>
+                      {territories.filter((territory) => territory.isActive).map((territory) => <option key={territory.id} value={territory.id}>{territory.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-[#a39a86]">Outlet Type</label>
+                    <input value={outletFormType} onChange={(event) => setOutletFormType(event.target.value)} placeholder="Default: STANDALONE" className="premium-input w-full" />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-[#a39a86]">Investment Amount</label>
+                    <input type="number" min="0" step="0.01" value={outletFormInvestment} onChange={(event) => setOutletFormInvestment(event.target.value)} placeholder="Optional" className="premium-input w-full" />
+                  </div>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button onClick={() => void createOutlet()} disabled={outletFormLoading || !outletFormBranchId || (outletFormOwnershipMode === "UNDER_FRANCHISE_PARTNER" && !outletFormPartnerId)} className="premium-btn-primary px-4 py-2 text-sm disabled:opacity-60">{outletFormLoading ? "Saving..." : "Create Outlet"}</button>
+                  <button onClick={cancelOutletForm} className="premium-btn-secondary px-4 py-2 text-sm">Cancel</button>
+                </div>
+              </div>
+            ) : null}
             {isLoadingOutlets ? <div className="text-sm text-[#a39a86]">Loading outlets...</div> : null}
             {!isLoadingOutlets && outletsError ? <div className="rounded-xl border border-[rgba(209,85,74,0.3)] bg-[rgba(209,85,74,0.12)] p-4 text-sm text-[#d1554a]">{outletsError}</div> : null}
             {!isLoadingOutlets && !outletsError && outlets.length === 0 ? <div className="text-sm text-[#a39a86]">No franchise outlets registered yet.</div> : null}
@@ -7916,7 +8116,7 @@ export default function Home() {
                       <div className="font-serif text-lg font-semibold text-[#f5f1e6]">{outlet.branchName}</div>
                       <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${outlet.isActive ? "border border-[rgba(63,174,106,0.3)] bg-[rgba(63,174,106,0.12)] text-[#3fae6a]" : "border border-[rgba(163,154,134,0.3)] bg-[rgba(163,154,134,0.12)] text-[#a39a86]"}`}>{outlet.isActive ? "Active" : "Inactive"}</span>
                     </div>
-                    <div className="mt-1 text-xs text-[#a39a86]">Partner: {outlet.partnerName}</div>
+                    <div className="mt-1 text-xs text-[#a39a86]">Partner: {outlet.partnerId ? (outlet.partnerName ?? "Unknown") : "Company owned"}</div>
                     {outlet.territoryName ? <div className="mt-1 text-xs text-[#a39a86]">Territory: {outlet.territoryName}</div> : null}
                     {outlet.outletType ? <div className="mt-1 text-xs text-[#a39a86]">Type: {outlet.outletType}</div> : null}
                   </div>
