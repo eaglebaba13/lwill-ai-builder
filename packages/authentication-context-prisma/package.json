@@ -35,6 +35,7 @@
     "bootstrap:xnail-roles": "tsx src/xnail-role-bootstrap-cli.ts",
     "bootstrap:demo-users": "tsx src/demo-user-bootstrap-cli.ts",
     "bootstrap:platform-admin": "tsx src/platform-admin-bootstrap-cli.ts",
+    "bootstrap:geography": "tsx src/geography-bootstrap-cli.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

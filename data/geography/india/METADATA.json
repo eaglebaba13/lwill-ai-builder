@@ -1,0 +1,27 @@
+﻿{
+  "country": "India",
+  "isoAlpha2": "IN",
+  "isoAlpha3": "IND",
+  "sources": {
+    "country": "ISO 3166-1",
+    "states": "Census 2011 Location Code Directory (PC11_TV_DIR)",
+    "cities": "Census 2011 Location Code Directory (PC11_TV_DIR)",
+    "pincodes": "All India Pincode Directory / Department of Posts / data.gov.in"
+  },
+  "versions": {
+    "country": "2024",
+    "states": "2011 (current administrative boundaries as of 2024)",
+    "cities": "2011",
+    "pincodes": "2024 monthly update"
+  },
+  "notes": [
+    "Canonical Geography is LWILL global master data (no tenantId)",
+    "Initial supported country: India",
+    "Data is a snapshot - not live-updated",
+    "State codes are Census 2011 location codes (2-letter)",
+    "City codes are Census 2011 location codes (2-4 letters)",
+    "Pincodes are 6-digit numeric strings",
+    "Full datasets available from official Government of India sources",
+    "Import is idempotent and rerunnable"
+  ]
+}

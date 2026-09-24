@@ -1,0 +1,13 @@
+﻿{
+  "source": "ISO 3166-1 alpha-2 / ISO 3166-1 alpha-3",
+  "version": "2024",
+  "reference": "https://www.iso.org/obp/ui/#iso:code:3166:IN",
+  "license": "ISO codes are free to use",
+  "records": [
+    {
+      "code": "IN",
+      "alpha3": "IND",
+      "name": "India"
+    }
+  ]
+}
