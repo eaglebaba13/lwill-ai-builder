@@ -182,7 +182,15 @@ export function HierarchyDashboard({ authenticated }: HierarchyDashboardProps) {
         setGeoCities(d.cities ?? []);
         setGeoPincodes(d.pincodes ?? []);
       })
-      .catch(() => {});
+      .catch((e: unknown) => {
+        // Distinguish a failed request (401/500/network) from genuinely empty data:
+        // keep geography state empty and surface the failure in the existing error banner.
+        setGeoStates([]);
+        setGeoCities([]);
+        setGeoPincodes([]);
+        setSuccess(null);
+        setError(`Canonical geography could not be loaded (${e instanceof Error && e.message ? e.message : "network error"}).`);
+      });
   }, [authenticated]);
 
   useEffect(() => {
