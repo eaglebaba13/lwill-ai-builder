@@ -28,7 +28,7 @@ export interface HierarchyRouteServices {
 }
 
 const headers = { "cache-control": "no-store" };
-const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function response(status: number, body?: unknown) {
   return body === undefined

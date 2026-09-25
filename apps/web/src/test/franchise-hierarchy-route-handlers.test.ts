@@ -26,6 +26,7 @@ const stateId = "11111111-1111-4111-8111-111111111111";
 const cityId = "22222222-2222-4222-8222-222222222222";
 const partnerId = "33333333-3333-4333-8333-333333333333";
 const outletId = "44444444-4444-4444-8444-444444444444";
+const legacyOutletId = "ffffffff-ffff-ffff-ffff-ffffffffffff";
 const stateFranchiseId = "55555555-5555-4555-8555-555555555555";
 const cityFranchiseId = "66666666-6666-4666-8666-666666666666";
 const timestamp = "2026-01-01T00:00:00.000Z";
@@ -226,6 +227,28 @@ describe("FH-4C Outlet assignment handlers", () => {
     const api = services(authorized);
     expect((await handleGetCurrentOutletAssignment(get(`/x?at=${encodeURIComponent(timestamp)}`), api, outletId)).status).toBe(200);
     expect((await handleListOutletAssignments(get(), api, outletId)).status).toBe(200);
+  });
+
+  it("accepts PostgreSQL UUID outlet IDs that are not RFC version UUIDs", async () => {
+    const api = services(authorized);
+    expect((await handleGetCurrentOutletAssignment(get(), api, legacyOutletId)).status).toBe(200);
+    expect(api.getCurrentAssignment).toHaveBeenCalledWith("tenant-1", legacyOutletId, undefined);
+  });
+
+  it("still rejects malformed outlet IDs before calling the service", async () => {
+    const api = services(authorized);
+    const result = await handleGetCurrentOutletAssignment(get(), api, "not-an-outlet-id");
+    expect(result.status).toBe(400);
+    expect(await result.json()).toEqual({ error: { code: "INVALID_REQUEST", message: "Invalid Outlet ID." } });
+    expect(api.getCurrentAssignment).not.toHaveBeenCalled();
+  });
+
+  it("lets correctly formatted unknown outlet IDs reach the domain layer", async () => {
+    const api = services(authorized);
+    vi.mocked(api.getCurrentAssignment).mockRejectedValueOnce(new FranchiseHierarchyError("NOT_FOUND", "Outlet was not found."));
+    const result = await handleGetCurrentOutletAssignment(get(), api, legacyOutletId);
+    expect(result.status).toBe(404);
+    expect(api.getCurrentAssignment).toHaveBeenCalledWith("tenant-1", legacyOutletId, undefined);
   });
 
   it("maps cross-tenant and overlap errors without leaking internals", async () => {
