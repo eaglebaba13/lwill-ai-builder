@@ -112,6 +112,17 @@ function partnerLabel(partnerId: string | null, partners: FranchisePartner[]) {
 }
 function fmtDate(d: string | null) { return d ? new Date(d).toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "numeric" }) : "Open"; }
 
+// <input type="date"> and the end-date prompts produce YYYY-MM-DD, but the franchise
+// hierarchy API requires an explicit ISO date-time. Date-only values are normalized to
+// UTC midnight so the server-side effective-period validation can parse them.
+export function toEffectiveTimestamp(value: string): string {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T00:00:00.000Z` : value;
+}
+
+function effectiveToTimestamp(value: string | null): string | null {
+  return value ? toEffectiveTimestamp(value) : null;
+}
+
 export function HierarchyDashboard({ authenticated }: HierarchyDashboardProps) {
   const [activeSection, setActiveSection] = useState<"states" | "cities" | "outlets" | "geography">("states");
   const [error, setError] = useState<string | null>(null);
@@ -221,7 +232,7 @@ export function HierarchyDashboard({ authenticated }: HierarchyDashboardProps) {
     const effectiveTo = prompt("End date (YYYY-MM-DD):");
     if (!effectiveTo) return;
     try {
-      await postJson(`/api/franchise/hierarchy/states/${id}/end`, { effectiveTo });
+      await postJson(`/api/franchise/hierarchy/states/${id}/end`, { effectiveTo: toEffectiveTimestamp(effectiveTo) });
       flash("State Franchise ended", "success");
       loadStates();
     } catch (e) { flash(e instanceof Error ? e.message : "End failed", "error"); }
@@ -239,7 +250,7 @@ export function HierarchyDashboard({ authenticated }: HierarchyDashboardProps) {
     const effectiveTo = prompt("End date (YYYY-MM-DD):");
     if (!effectiveTo) return;
     try {
-      await postJson(`/api/franchise/hierarchy/cities/${id}/end`, { effectiveTo });
+      await postJson(`/api/franchise/hierarchy/cities/${id}/end`, { effectiveTo: toEffectiveTimestamp(effectiveTo) });
       flash("City Franchise ended", "success");
       loadCities();
     } catch (e) { flash(e instanceof Error ? e.message : "End failed", "error"); }
@@ -368,8 +379,8 @@ function StateFranchiseSection({ states, partners, geoStates, showCreate, setSho
         code: form.code,
         displayName: form.displayName,
         coverageMode: form.coverageMode,
-        effectiveFrom: form.effectiveFrom,
-        effectiveTo: form.effectiveTo || null,
+        effectiveFrom: toEffectiveTimestamp(form.effectiveFrom),
+        effectiveTo: effectiveToTimestamp(form.effectiveTo),
       };
       if (form.coverageMode === "PINCODE_SET" && form.pincodeIds) {
         body.pincodeIds = form.pincodeIds.split(",").map((s) => s.trim()).filter(Boolean);
@@ -511,8 +522,8 @@ function CityFranchiseSection({ cities, states, partners, geoCities, showCreate,
         cityId: form.cityId || undefined,
         areaCode: form.areaCode,
         displayName: form.displayName,
-        effectiveFrom: form.effectiveFrom,
-        effectiveTo: form.effectiveTo || null,
+        effectiveFrom: toEffectiveTimestamp(form.effectiveFrom),
+        effectiveTo: effectiveToTimestamp(form.effectiveTo),
       });
       flash("City Franchise created as DRAFT", "success");
       setShowCreate(false);
@@ -656,8 +667,8 @@ function OutletAssignmentSection({ outlets, cities, branches, partners, assignme
     try {
       await postJson(`/api/franchise/hierarchy/outlets/${outletProfileId}/assignments`, {
         cityFranchiseId: form.cityFranchiseId,
-        effectiveFrom: form.effectiveFrom,
-        effectiveTo: form.effectiveTo || null,
+        effectiveFrom: toEffectiveTimestamp(form.effectiveFrom),
+        effectiveTo: effectiveToTimestamp(form.effectiveTo),
       });
       flash("Outlet assigned to City Franchise", "success");
       setAssignOutletId(null);
@@ -671,7 +682,7 @@ function OutletAssignmentSection({ outlets, cities, branches, partners, assignme
     const effectiveFrom = prompt("Effective from (YYYY-MM-DD):");
     if (!cityFranchiseId || !effectiveFrom) return;
     try {
-      await postJson(`/api/franchise/hierarchy/outlets/${outletProfileId}/assignments/reassign`, { cityFranchiseId, effectiveFrom });
+      await postJson(`/api/franchise/hierarchy/outlets/${outletProfileId}/assignments/reassign`, { cityFranchiseId, effectiveFrom: toEffectiveTimestamp(effectiveFrom) });
       flash("Outlet reassigned", "success");
       onRefresh();
     } catch (e) { flash(e instanceof Error ? e.message : "Reassign failed", "error"); }
